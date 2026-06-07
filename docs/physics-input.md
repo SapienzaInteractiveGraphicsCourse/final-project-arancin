@@ -217,17 +217,17 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Creare `ArcadeVehicleController`.
 - [x] Implementare `reset(spawn)`.
 - [x] Implementare `setPerformance(performance)`.
-- [ ] Implementare accelerazione.
-- [ ] Implementare freno.
-- [ ] Implementare retromarcia.
+- [x] Implementare accelerazione.
+- [x] Implementare freno.
+- [x] Implementare retromarcia.
 - [ ] Implementare sterzo.
 - [ ] Implementare ritorno sterzo a zero.
-- [ ] Implementare attrito.
+- [x] Implementare attrito.
 - [ ] Implementare handbrake.
-- [ ] Calcolare `speedRatio`.
-- [ ] Calcolare `distanceThisFrame`.
-- [ ] Gestire `surfaceGrip` placeholder.
-- [ ] Gestire `boostFactor` placeholder.
+- [x] Calcolare `speedRatio`.
+- [x] Calcolare `distanceThisFrame`.
+- [x] Gestire `surfaceGrip` placeholder.
+- [x] Gestire `boostFactor` placeholder.
 - [ ] Integrare controller nella preview.
 - [ ] Collegare stato fisico a `vehicle.setTransform()`.
 - [ ] Passare stato fisico a `vehicle.update()`.

@@ -60,9 +60,39 @@ export class ArcadeVehicleController {
     };
   }
 
-  update() {
-    this.distanceThisFrame = 0;
+  update(deltaTime = 0, inputState = {}, environmentState = {}) {
+    const surfaceGrip = environmentState.surfaceGrip ?? 1;
+    const speedLimitMultiplier = environmentState.speedLimitMultiplier ?? 1;
+    const boostFactor = environmentState.boostFactor ?? 1;
+    const maxForwardSpeed = this.performance.maxForwardSpeed * speedLimitMultiplier;
+    const maxReverseSpeed = this.performance.maxReverseSpeed;
+
+    this.surfaceGrip = surfaceGrip;
+    this.surfaceType = environmentState.surfaceType ?? "asphalt";
+    this.boostActive = boostFactor > 1;
+    this.collided = Boolean(environmentState.collided);
+
+    if (inputState.accelerate) {
+      this.speed += this.performance.acceleration * boostFactor * deltaTime;
+    }
+
+    if (inputState.brake) {
+      const brakeDirection = this.speed > 0 ? -1 : -0.55;
+      this.speed += this.performance.brakeAcceleration * brakeDirection * deltaTime;
+    }
+
+    const friction = inputState.accelerate || inputState.brake
+      ? this.performance.rollingFriction
+      : this.performance.idleFriction;
+    this.speed *= Math.exp(-friction * deltaTime);
+    this.speed = clamp(this.speed, -maxReverseSpeed, maxForwardSpeed);
+
+    const distance = this.speed * deltaTime;
+    this.position.x += Math.sin(this.heading) * distance;
+    this.position.z += Math.cos(this.heading) * distance;
+    this.distanceThisFrame = Math.abs(distance);
     this.speedRatio = getSpeedRatio(this.speed, this.performance.maxForwardSpeed);
+
     return this.getState();
   }
 
@@ -91,4 +121,8 @@ function getSpeedRatio(speed, maxForwardSpeed) {
   }
 
   return Math.min(1, Math.abs(speed) / maxForwardSpeed);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
