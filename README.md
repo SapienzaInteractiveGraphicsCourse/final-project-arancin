@@ -151,11 +151,11 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] A / freccia sinistra;
   - [x] D / freccia destra;
   - [x] Space handbrake.
-- [ ] Gestire tasti one-shot:
-  - [ ] C cambio camera;
-  - [ ] L luci;
-  - [ ] R restart.
-- [ ] Consumare one-shot una sola volta per frame.
+- [x] Gestire tasti one-shot:
+  - [x] C cambio camera;
+  - [x] L luci;
+  - [x] R restart.
+- [x] Consumare one-shot una sola volta per frame.
 - [ ] Bloccare scroll pagina per i tasti di gioco.
 - [ ] Aggiungere `dispose()` a `InputManager`.
 - [ ] Creare `ArcadeVehicleController`.

@@ -2,6 +2,7 @@ export class InputManager {
   constructor(target = window) {
     this.target = target;
     this.heldKeys = new Set();
+    this.pendingActions = new Set();
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
 
@@ -14,6 +15,12 @@ export class InputManager {
 
     if (isHeldKey(key)) {
       this.heldKeys.add(key);
+    }
+
+    const action = ACTION_KEY_MAP.get(key);
+
+    if (action) {
+      this.pendingActions.add(action);
     }
   }
 
@@ -40,17 +47,22 @@ export class InputManager {
   }
 
   consumeActions() {
-    return {
-      camera: false,
-      lights: false,
-      restart: false
+    const actions = {
+      camera: this.pendingActions.has("camera"),
+      lights: this.pendingActions.has("lights"),
+      restart: this.pendingActions.has("restart")
     };
+
+    this.pendingActions.clear();
+
+    return actions;
   }
 
   dispose() {
     this.target.removeEventListener("keydown", this.handleKeyDown);
     this.target.removeEventListener("keyup", this.handleKeyUp);
     this.heldKeys.clear();
+    this.pendingActions.clear();
     this.target = null;
   }
 }
@@ -69,4 +81,10 @@ const HELD_KEY_MAP = new Map([
   ["steerLeft", ["a", "ArrowLeft"]],
   ["steerRight", ["d", "ArrowRight"]],
   ["handbrake", [" "]]
+]);
+
+const ACTION_KEY_MAP = new Map([
+  ["c", "camera"],
+  ["l", "lights"],
+  ["r", "restart"]
 ]);
