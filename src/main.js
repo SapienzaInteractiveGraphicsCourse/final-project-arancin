@@ -1,60 +1,65 @@
-import './style.css'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import { setupCounter } from './counter.js'
+import * as THREE from "three";
+import "./styles/main.css";
+import { createMainCamera } from "./scene/createMainCamera.js";
+import { createRenderer } from "./scene/createRenderer.js";
+import { createScene } from "./scene/createScene.js";
+import { createSceneLights } from "./scene/createSceneLights.js";
 
-document.querySelector('#app').innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${javascriptLogo}" class="framework" alt="JavaScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.js</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+const app = document.querySelector("#app");
 
-<div class="ticks"></div>
+const renderer = createRenderer(app);
+const scene = createScene();
+const camera = createMainCamera();
+const clock = new THREE.Clock();
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-          <img class="button-icon" src="${javascriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+createSceneLights(scene);
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({
+    color: 0x2f6f4e,
+    roughness: 0.85,
+    metalness: 0.02
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
 
-setupCounter(document.querySelector('#counter'))
+const marker = new THREE.Mesh(
+  new THREE.BoxGeometry(2.4, 0.7, 3.2),
+  new THREE.MeshStandardMaterial({
+    color: 0xd63b2f,
+    roughness: 0.55,
+    metalness: 0.18
+  })
+);
+marker.position.y = 0.35;
+marker.castShadow = true;
+scene.add(marker);
+
+function resize() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+function update(deltaTime) {
+  marker.rotation.y += deltaTime * 0.35;
+}
+
+function animate() {
+  const deltaTime = Math.min(clock.getDelta(), 0.05);
+
+  update(deltaTime);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+animate();

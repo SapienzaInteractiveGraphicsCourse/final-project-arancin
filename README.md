@@ -18,7 +18,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 - [x] `feature/vehicle-assets`: import asset Porsche e Silvia.
 - [x] `feature/project-skeleton`: struttura cartelle iniziale.
-- [ ] `feature/project-skeleton`: scena Three.js base.
+- [x] `feature/project-skeleton`: scena Three.js base.
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
@@ -36,22 +36,22 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] `src/systems/`
   - [x] `src/materials/`
   - [x] `src/styles/`
-- [ ] Sostituire starter Vite in `src/main.js`.
-- [ ] Creare entry point applicativo pulito.
-- [ ] Creare renderer Three.js con antialias.
-- [ ] Abilitare shadow map.
-- [ ] Impostare output color space sRGB.
-- [ ] Creare scena base.
-- [ ] Creare camera prospettica.
-- [ ] Creare luci base:
-  - [ ] ambient light;
-  - [ ] directional light con shadow.
-- [ ] Creare ground temporaneo.
-- [ ] Gestire resize finestra.
-- [ ] Creare game loop base con `THREE.Clock`.
-- [ ] Limitare `deltaTime` a `0.05`.
-- [ ] Creare overlay UI minimale.
-- [ ] Spostare CSS runtime in `src/styles/`.
+- [x] Sostituire starter Vite in `src/main.js`.
+- [x] Creare entry point applicativo pulito.
+- [x] Creare renderer Three.js con antialias.
+- [x] Abilitare shadow map.
+- [x] Impostare output color space sRGB.
+- [x] Creare scena base.
+- [x] Creare camera prospettica.
+- [x] Creare luci base:
+  - [x] ambient light;
+  - [x] directional light con shadow.
+- [x] Creare ground temporaneo.
+- [x] Gestire resize finestra.
+- [x] Creare game loop base con `THREE.Clock`.
+- [x] Limitare `deltaTime` a `0.05`.
+- [x] Creare overlay UI minimale.
+- [x] Spostare CSS runtime in `src/styles/`.
 - [ ] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [ ] Aggiungere `docs/project-structure.md`.
 - [ ] Verificare `bun run build`.
@@ -339,4 +339,3 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] AI e collisioni.
 - [ ] Limitazioni note.
 - [ ] Screenshot finali.
-

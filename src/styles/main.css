@@ -1,0 +1,36 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #111827;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+canvas {
+  display: block;
+}
+
+#app::after {
+  content: "Project skeleton";
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  z-index: 1;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  color: #f8fafc;
+  background: rgba(17, 24, 39, 0.68);
+  font-size: 13px;
+  letter-spacing: 0;
+}
