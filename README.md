@@ -56,10 +56,11 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] `trackId`;
   - [x] `vehicleId`;
   - [x] `raceMode`.
+- [x] Caricare preview Three.js solo dopo `Start`.
 - [x] Spostare CSS runtime in `src/styles/`.
 - [ ] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
-- [ ] Aggiungere `docs/project-structure.md`.
-- [ ] Verificare `bun run build`.
+- [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
+- [x] Verificare `bun run build`.
 
 ## 2. Veicoli
 
