@@ -143,34 +143,49 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 3. Fisica E Input
 
-- [ ] Creare `InputManager`.
-- [ ] Gestire tasti tenuti premuti:
-  - [ ] W / freccia su;
-  - [ ] S / freccia giu;
-  - [ ] A / freccia sinistra;
-  - [ ] D / freccia destra;
-  - [ ] Space handbrake.
-- [ ] Gestire tasti one-shot:
-  - [ ] C cambio camera;
-  - [ ] L luci;
-  - [ ] R restart.
-- [ ] Bloccare scroll pagina per i tasti di gioco.
-- [ ] Creare controller fisico arcade.
-- [ ] Stato fisico:
-  - [ ] position;
-  - [ ] heading;
-  - [ ] speed;
-  - [ ] steering;
-  - [ ] boostTimer;
-  - [ ] surfaceGrip;
-  - [ ] surfaceType.
-- [ ] Accelerazione/freno/retromarcia.
-- [ ] Sterzo dipendente da velocita e grip.
-- [ ] Attrito differenziato.
-- [ ] Handbrake.
-- [ ] Off-road su sabbia/erba.
-- [ ] Boost controllato.
-- [ ] Calcolare `distanceThisFrame` per animazione ruote.
+- [x] Creare documentazione `docs/physics-input.md`.
+- [x] Creare `InputManager`.
+- [x] Gestire tasti tenuti premuti:
+  - [x] W / freccia su;
+  - [x] S / freccia giu;
+  - [x] A / freccia sinistra;
+  - [x] D / freccia destra;
+  - [x] Space handbrake.
+- [x] Gestire tasti one-shot:
+  - [x] C cambio camera;
+  - [x] L luci;
+  - [x] R restart.
+- [x] Consumare one-shot una sola volta per frame.
+- [x] Bloccare scroll pagina per i tasti di gioco.
+- [x] Aggiungere `dispose()` a `InputManager`.
+- [x] Creare `ArcadeVehicleController`.
+- [x] Accettare `vehicle.performance` dal veicolo selezionato.
+- [x] Accettare `track.spawn` dalla pista selezionata.
+- [x] Stato fisico:
+  - [x] position;
+  - [x] heading;
+  - [x] speed;
+  - [x] steering;
+  - [x] boostTimer;
+  - [x] surfaceGrip;
+  - [x] surfaceType.
+- [x] Implementare `reset(spawn)`.
+- [x] Implementare `setPerformance(performance)`.
+- [x] Accelerazione/freno/retromarcia.
+- [x] Sterzo dipendente da velocita e grip.
+- [x] Ritorno graduale dello sterzo a zero.
+- [x] Attrito differenziato.
+- [x] Handbrake.
+- [x] Supporto placeholder per off-road/sabbia/erba tramite `environmentState`.
+- [x] Supporto placeholder per boost tramite `environmentState`.
+- [x] Calcolare `distanceThisFrame` per animazione ruote.
+- [x] Calcolare `speedRatio`.
+- [x] Collegare controller alla preview.
+- [x] Applicare `vehicle.setTransform(state.position, state.heading)`.
+- [x] Passare stato fisico a `vehicle.update(deltaTime, state)`.
+- [x] Implementare reset con `R` nella preview.
+- [x] Aggiornare `docs/contracts.md` con contratti input/controller.
+- [x] Verificare `bun run build`.
 
 ## 4. Piste
 
