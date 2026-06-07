@@ -274,6 +274,24 @@ Regole:
 - `time-trial` non deve richiedere AI;
 - record/best lap possono usare localStorage quando i checkpoint reali saranno disponibili.
 
+## Race Records
+
+File: `src/systems/raceRecords.js`
+
+Contratto:
+
+```js
+getRaceRecordKey({ trackId, vehicleId, mode }) -> string
+readBestLapTime(storage, key) -> number | null
+writeBestLapTime(storage, key, lapTime)
+```
+
+Chiave prevista:
+
+```text
+trackId:vehicleId:mode
+```
+
 ## Vehicle Factory
 
 File: `src/vehicles/vehicleFactory.js`

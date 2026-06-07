@@ -245,7 +245,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
 - [ ] Spingere fuori dalla barriera lungo la normale.
-- [ ] Ridurre/invertire velocita su impatto frontale.
+- [ ] Ridurre/invertire velocita su impatto frontale.s
 - [ ] Annullare boost su impatto importante.
 - [ ] Collisione player-bot.
 - [ ] Separare posizioni player/bot.
@@ -298,11 +298,11 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Tempi E Giri
 
-- [ ] Cronometro totale.
-- [ ] Cronometro giro.
+- [x] Cronometro totale.
+- [x] Cronometro giro.
 - [ ] Checkpoint in ordine.
 - [ ] Giri.
-- [ ] Best lap.
+- [x] Best lap predisposto per time trial.
 - [ ] Finish screen minimale.
 - [ ] Restart gara.
 

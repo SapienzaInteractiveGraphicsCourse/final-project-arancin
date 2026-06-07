@@ -17,11 +17,15 @@ export class RaceManager {
   constructor({
     mode = RACE_MODES.RACE,
     totalLaps = getDefaultTotalLaps(mode),
-    countdownSeconds = DEFAULT_COUNTDOWN_SECONDS
+    countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
+    bestLapTime = null,
+    onBestLap
   } = {}) {
     this.mode = normalizeMode(mode);
     this.totalLaps = normalizePositiveInteger(totalLaps, getDefaultTotalLaps(this.mode));
     this.countdownSeconds = Math.max(0, countdownSeconds);
+    this.initialBestLapTime = normalizeLapTime(bestLapTime);
+    this.onBestLap = onBestLap;
 
     this.reset();
   }
@@ -46,7 +50,7 @@ export class RaceManager {
     this.checkpointCount = 0;
     this.totalTime = 0;
     this.lapTime = 0;
-    this.bestLapTime = null;
+    this.bestLapTime = this.initialBestLapTime;
     this.countdown = this.countdownSeconds;
     this.finished = false;
   }
@@ -127,9 +131,15 @@ export class RaceManager {
   }
 
   completeLap() {
-    this.bestLapTime = this.bestLapTime === null
+    const previousBestLapTime = this.bestLapTime;
+    this.bestLapTime = previousBestLapTime === null
       ? this.lapTime
-      : Math.min(this.bestLapTime, this.lapTime);
+      : Math.min(previousBestLapTime, this.lapTime);
+
+    if (this.bestLapTime !== previousBestLapTime) {
+      this.onBestLap?.(this.bestLapTime);
+    }
+
     this.lapTime = 0;
     this.currentCheckpoint = 0;
     this.checkpointArmed = false;
@@ -156,6 +166,12 @@ function normalizePositiveInteger(value, fallback) {
   const normalized = Math.floor(Number(value));
 
   return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
+
+function normalizeLapTime(value) {
+  const normalized = Number(value);
+
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
 }
 
 function isInsideCheckpoint(position, checkpoint) {

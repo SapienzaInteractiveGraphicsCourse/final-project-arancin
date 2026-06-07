@@ -84,6 +84,7 @@ async function runVerification() {
   await page.locator("canvas").waitFor({ state: "visible" });
   const countdownText = await page.locator(".race-overlay").textContent();
   const overlay = await page.locator(".status-overlay").textContent();
+  const raceHud = await page.locator(".race-hud").textContent();
   const canvasBox = await page.locator("canvas").boundingBox();
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
@@ -100,6 +101,10 @@ async function runVerification() {
 
   if (!overlay.includes("Vehicle: Silvia") || !overlay.includes("Mode: Time Trial")) {
     throw new Error(`Overlay does not include selected setup: ${overlay}`);
+  }
+
+  if (!raceHud?.includes("Time Trial") || !raceHud.includes("1/1")) {
+    throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
   if (!/^[123]$/.test(countdownText ?? "")) {

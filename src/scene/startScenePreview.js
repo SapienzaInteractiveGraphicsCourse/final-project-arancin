@@ -8,6 +8,7 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
+import { getRaceRecordKey, readBestLapTime, writeBestLapTime } from "../systems/raceRecords.js";
 
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
@@ -19,8 +20,16 @@ export function startScenePreview(container, setup, options = {}) {
   const vehicle = createVehicleById(setup.vehicleId);
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
-  const raceManager = new RaceManager({ mode: setup.raceMode });
+  const recordKey = getRaceRecordKey(setup);
+  const raceManager = new RaceManager({
+    mode: setup.raceMode,
+    bestLapTime: readBestLapTime(window.localStorage, recordKey),
+    onBestLap: (bestLapTime) => {
+      writeBestLapTime(window.localStorage, recordKey, bestLapTime);
+    }
+  });
   const raceOverlay = createRaceOverlay();
+  const raceHud = createRaceHud();
   const pauseMenu = createPauseMenu({
     onResume: resumeGame,
     onExitToSetup: options.onExitToSetup
@@ -31,6 +40,7 @@ export function startScenePreview(container, setup, options = {}) {
   timer.connect(document);
   scene.add(track.group, vehicle.group);
   container.appendChild(raceOverlay);
+  container.appendChild(raceHud);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
   raceManager.startCountdown();
@@ -85,6 +95,7 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
     updateRaceOverlay(raceOverlay, raceState);
+    updateRaceHud(raceHud, raceState);
   }
 
   function updateCameraFollow(state) {
@@ -121,12 +132,45 @@ export function startScenePreview(container, setup, options = {}) {
       renderer.dispose();
       renderer.domElement.remove();
       raceOverlay.remove();
+      raceHud.remove();
       pauseMenu.element.remove();
       track.dispose();
       vehicle.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
     }
   };
+}
+
+function createRaceHud() {
+  const hud = document.createElement("aside");
+  hud.className = "race-hud";
+  hud.setAttribute("aria-label", "Race status");
+  return hud;
+}
+
+function updateRaceHud(hud, raceState) {
+  hud.innerHTML = `
+    <div>
+      <span>Mode</span>
+      <strong>${formatMode(raceState.mode)}</strong>
+    </div>
+    <div>
+      <span>Lap</span>
+      <strong>${raceState.currentLap}/${raceState.totalLaps}</strong>
+    </div>
+    <div>
+      <span>Total</span>
+      <strong>${formatRaceTime(raceState.totalTime)}</strong>
+    </div>
+    <div>
+      <span>Lap Time</span>
+      <strong>${formatRaceTime(raceState.lapTime)}</strong>
+    </div>
+    <div>
+      <span>Best</span>
+      <strong>${formatRaceTime(raceState.bestLapTime)}</strong>
+    </div>
+  `;
 }
 
 function createPauseMenu({ onResume, onExitToSetup }) {
@@ -194,4 +238,20 @@ function setRaceOverlayText(overlay, raceState, text) {
   overlay.textContent = text;
   overlay.hidden = text.length === 0;
   overlay.dataset.phase = raceState.phase;
+}
+
+function formatMode(mode) {
+  return mode === "time-trial" ? "Time Trial" : "Race";
+}
+
+function formatRaceTime(value) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  const centiseconds = Math.floor((value % 1) * 100);
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
 }

@@ -150,10 +150,10 @@ Obiettivo:
 
 Task:
 
-- [ ] configurare `totalLaps = 1`;
-- [ ] esporre `lapTime`;
-- [ ] esporre `bestLapTime`;
-- [ ] predisporre chiave localStorage: `trackId:vehicleId:mode`.
+- [x] configurare `totalLaps = 1`;
+- [x] esporre `lapTime`;
+- [x] esporre `bestLapTime`;
+- [x] predisporre chiave localStorage: `trackId:vehicleId:mode`.
 
 ## Milestone 4: Race Mode Base
 
@@ -219,10 +219,10 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Bloccare movimento durante countdown.
 - [x] Mostrare countdown in UI/overlay.
 - [x] Aggiungere menu pausa con ritorno alla GUI iniziale.
-- [ ] Aggiungere cronometro totale.
-- [ ] Aggiungere cronometro giro.
+- [x] Aggiungere cronometro totale.
+- [x] Aggiungere cronometro giro.
 - [ ] Preparare supporto checkpoint.
-- [ ] Preparare supporto best lap time trial.
+- [x] Preparare supporto best lap time trial.
 - [ ] Preparare supporto race vs AI.
 - [ ] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
