@@ -212,7 +212,7 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Creare `InputManager`.
 - [x] Gestire tasti tenuti.
 - [x] Gestire azioni one-shot.
-- [ ] Bloccare scroll per tasti di gioco.
+- [x] Bloccare scroll per tasti di gioco.
 - [ ] Aggiungere `dispose()` a `InputManager`.
 - [ ] Creare `ArcadeVehicleController`.
 - [ ] Implementare `reset(spawn)`.

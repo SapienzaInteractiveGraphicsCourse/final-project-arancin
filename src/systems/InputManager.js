@@ -13,6 +13,10 @@ export class InputManager {
   handleKeyDown(event) {
     const key = normalizeKey(event);
 
+    if (isManagedKey(key)) {
+      event.preventDefault();
+    }
+
     if (isHeldKey(key)) {
       this.heldKeys.add(key);
     }
@@ -26,6 +30,10 @@ export class InputManager {
 
   handleKeyUp(event) {
     const key = normalizeKey(event);
+
+    if (isManagedKey(key)) {
+      event.preventDefault();
+    }
 
     if (isHeldKey(key)) {
       this.heldKeys.delete(key);
@@ -73,6 +81,10 @@ function normalizeKey(event) {
 
 function isHeldKey(key) {
   return [...HELD_KEY_MAP.values()].some((keys) => keys.includes(key));
+}
+
+function isManagedKey(key) {
+  return isHeldKey(key) || ACTION_KEY_MAP.has(key);
 }
 
 const HELD_KEY_MAP = new Map([
