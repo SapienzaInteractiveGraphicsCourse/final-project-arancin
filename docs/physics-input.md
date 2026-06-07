@@ -220,8 +220,8 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Implementare accelerazione.
 - [x] Implementare freno.
 - [x] Implementare retromarcia.
-- [ ] Implementare sterzo.
-- [ ] Implementare ritorno sterzo a zero.
+- [x] Implementare sterzo.
+- [x] Implementare ritorno sterzo a zero.
 - [x] Implementare attrito.
 - [ ] Implementare handbrake.
 - [x] Calcolare `speedRatio`.

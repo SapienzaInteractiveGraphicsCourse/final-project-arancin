@@ -81,17 +81,27 @@ export class ArcadeVehicleController {
       this.speed += this.performance.brakeAcceleration * brakeDirection * deltaTime;
     }
 
+    const steeringTarget = Number(Boolean(inputState.steerLeft)) - Number(Boolean(inputState.steerRight));
+    const steeringRate = steeringTarget === 0
+      ? this.performance.steeringReturn
+      : this.performance.steeringResponsiveness;
+    this.steering = approach(this.steering, steeringTarget, steeringRate * deltaTime);
+
     const friction = inputState.accelerate || inputState.brake
       ? this.performance.rollingFriction
       : this.performance.idleFriction;
     this.speed *= Math.exp(-friction * deltaTime);
     this.speed = clamp(this.speed, -maxReverseSpeed, maxForwardSpeed);
+    this.speedRatio = getSpeedRatio(this.speed, this.performance.maxForwardSpeed);
+
+    const reverseFactor = this.speed < 0 ? -1 : 1;
+    const turnStrength = this.steering * this.performance.turnRate * surfaceGrip * this.speedRatio;
+    this.heading += turnStrength * reverseFactor * deltaTime;
 
     const distance = this.speed * deltaTime;
     this.position.x += Math.sin(this.heading) * distance;
     this.position.z += Math.cos(this.heading) * distance;
     this.distanceThisFrame = Math.abs(distance);
-    this.speedRatio = getSpeedRatio(this.speed, this.performance.maxForwardSpeed);
 
     return this.getState();
   }
@@ -125,4 +135,16 @@ function getSpeedRatio(speed, maxForwardSpeed) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function approach(current, target, maxDelta) {
+  if (current < target) {
+    return Math.min(target, current + maxDelta);
+  }
+
+  if (current > target) {
+    return Math.max(target, current - maxDelta);
+  }
+
+  return current;
 }

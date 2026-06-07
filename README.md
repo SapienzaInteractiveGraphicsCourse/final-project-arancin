@@ -172,8 +172,8 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Implementare `reset(spawn)`.
 - [x] Implementare `setPerformance(performance)`.
 - [x] Accelerazione/freno/retromarcia.
-- [ ] Sterzo dipendente da velocita e grip.
-- [ ] Ritorno graduale dello sterzo a zero.
+- [x] Sterzo dipendente da velocita e grip.
+- [x] Ritorno graduale dello sterzo a zero.
 - [x] Attrito differenziato.
 - [ ] Handbrake.
 - [x] Supporto placeholder per off-road/sabbia/erba tramite `environmentState`.
