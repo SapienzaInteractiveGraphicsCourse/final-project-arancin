@@ -19,12 +19,9 @@ const BARRIER_SAMPLE_STEP = 2;
 const CENTER_DASH_LENGTH = 1.45;
 const CENTER_DASH_WIDTH = 0.18;
 const CENTER_DASH_INTERVAL = 4.2;
-const START_LETTERS = {
-  S: ["111", "100", "100", "111", "001", "001", "111"],
-  T: ["111", "010", "010", "010", "010", "010", "010"],
-  A: ["010", "101", "101", "111", "101", "101", "101"],
-  R: ["110", "101", "101", "110", "101", "101", "101"]
-};
+const CURB_SAMPLE_STEP = 5;
+const CHEVRON_SAMPLE_STEP = 6;
+const CURVE_THRESHOLD = 0.09;
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -190,6 +187,96 @@ function addCenterLineDashes(group, edgeSamples, definition, material) {
   group.add(dashes);
 }
 
+function getCurveSide(edgeSamples, index) {
+  const previous = edgeSamples[Math.max(0, index - 2)];
+  const next = edgeSamples[Math.min(edgeSamples.length - 1, index + 2)];
+  const turn = previous.tangent.x * next.tangent.z - previous.tangent.z * next.tangent.x;
+
+  if (Math.abs(turn) < CURVE_THRESHOLD) {
+    return 0;
+  }
+
+  return turn > 0 ? 1 : -1;
+}
+
+function addRacingCurbs(group, edgeSamples, definition, materials) {
+  if (definition.id !== "vegas") {
+    return;
+  }
+
+  const curbGeometry = new THREE.BoxGeometry(1.1, 0.08, 0.42);
+
+  for (let index = 3; index < edgeSamples.length - 3; index += CURB_SAMPLE_STEP) {
+    const curveSide = getCurveSide(edgeSamples, index);
+
+    if (curveSide === 0) {
+      continue;
+    }
+
+    const sample = edgeSamples[index];
+    const insideSide = -curveSide;
+    const roadHalfWidth = definition.roadWidth * 0.5;
+    const curb = new THREE.Mesh(
+      curbGeometry,
+      index % (CURB_SAMPLE_STEP * 2) === 0 ? materials.curbA : materials.curbB
+    );
+
+    curb.name = `${definition.name}:RacingCurb`;
+    curb.position.copy(sample.center).addScaledVector(sample.normal, insideSide * roadHalfWidth);
+    curb.position.y = ROAD_Y + 0.06;
+    curb.rotation.y = getHeading(sample.tangent);
+    curb.castShadow = true;
+    curb.receiveShadow = true;
+    group.add(curb);
+  }
+}
+
+function createChevronGroup(material) {
+  const chevron = new THREE.Group();
+  const upper = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.48, 0.05), material);
+  const lower = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.48, 0.05), material);
+
+  upper.position.set(0.12, 0.13, 0);
+  upper.rotation.z = -Math.PI / 4;
+  lower.position.set(0.12, -0.13, 0);
+  lower.rotation.z = Math.PI / 4;
+  upper.receiveShadow = true;
+  lower.receiveShadow = true;
+  chevron.add(upper, lower);
+
+  return chevron;
+}
+
+function addCurveChevrons(group, edgeSamples, definition, material) {
+  if (definition.id !== "vegas") {
+    return;
+  }
+
+  for (let index = 4; index < edgeSamples.length - 4; index += CHEVRON_SAMPLE_STEP) {
+    const curveSide = getCurveSide(edgeSamples, index);
+
+    if (curveSide === 0) {
+      continue;
+    }
+
+    const sample = edgeSamples[index];
+    const outsideSide = curveSide;
+    const roadHalfWidth = definition.roadWidth * 0.5;
+    const barrierOffset = definition.barrierOffset ?? 0.85;
+    const barrierThickness = definition.barrierThickness ?? 0.44;
+    const barrierHeight = definition.barrierHeight ?? 0.68;
+    const chevron = createChevronGroup(material);
+
+    chevron.name = `${definition.name}:CurveChevron`;
+    chevron.position
+      .copy(sample.center)
+      .addScaledVector(sample.normal, outsideSide * (roadHalfWidth + barrierOffset + barrierThickness * 0.5 + 0.06));
+    chevron.position.y = barrierHeight * 0.72;
+    chevron.rotation.y = getHeading(sample.tangent) + (outsideSide > 0 ? -Math.PI / 2 : Math.PI / 2) + Math.PI;
+    group.add(chevron);
+  }
+}
+
 function createBarrierSegment(material, start, end, height, thickness) {
   const dx = end.x - start.x;
   const dz = end.z - start.z;
@@ -277,35 +364,6 @@ function addStartLine(group, checkpoint, materials) {
   group.add(startLine);
 }
 
-function addStartSignLetters(sign, material) {
-  const geometry = new THREE.BoxGeometry(0.12, 0.12, 0.04);
-  const letters = ["S", "T", "A", "R", "T"];
-  const cell = 0.16;
-  const letterGap = 0.18;
-  const totalWidth = letters.length * 3 * cell + (letters.length - 1) * letterGap;
-  let cursor = -totalWidth * 0.5;
-
-  letters.forEach((letter) => {
-    START_LETTERS[letter].forEach((row, rowIndex) => {
-      row.split("").forEach((value, columnIndex) => {
-        if (value !== "1") {
-          return;
-        }
-
-        const dot = new THREE.Mesh(geometry, material);
-        dot.position.set(
-          cursor + columnIndex * cell + cell,
-          0.4 - rowIndex * cell,
-          0.095
-        );
-        sign.add(dot);
-      });
-    });
-
-    cursor += 3 * cell + letterGap;
-  });
-}
-
 function addStartGantry(group, checkpoint, materials) {
   const gantry = new THREE.Group();
   gantry.name = "StartGantry";
@@ -326,13 +384,13 @@ function addStartGantry(group, checkpoint, materials) {
   rightPost.position.set(span * 0.5, postHeight * 0.5, 0);
   top.position.set(0, postHeight, 0);
   sign.position.set(0, postHeight - 0.02, 0.32);
+  sign.rotation.y = Math.PI;
 
   [leftPost, rightPost, top, sign].forEach((mesh) => {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
   });
 
-  addStartSignLetters(sign, materials.startDark);
   gantry.add(leftPost, rightPost, top, sign);
   group.add(gantry);
 }
@@ -444,7 +502,9 @@ export function createSplineTrack(definition) {
 
   group.add(ground, road, leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
+  addRacingCurbs(group, roadData.edgeSamples, definition, materials);
   const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
+  addCurveChevrons(group, roadData.edgeSamples, definition, materials.chevron);
   const checkpoints = createCheckpoints(curve, definition);
   addStartLine(group, checkpoints[0], materials);
   addStartGantry(group, checkpoints[0], materials);

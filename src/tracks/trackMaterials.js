@@ -45,6 +45,24 @@ export function createTrackMaterials(definition) {
       emissiveIntensity: definition.id === "vegas" ? 2.8 : 0.12,
       roughness: definition.id === "vegas" ? 0.32 : 0.58
     }),
+    curbA: createFlatStandardMaterial({
+      color: definition.id === "vegas" ? 0x08090d : 0xf4f2e8,
+      roughness: 0.58,
+      metalness: definition.id === "vegas" ? 0.08 : 0.02
+    }),
+    curbB: createFlatStandardMaterial({
+      color: definition.id === "vegas" ? 0xffd23a : 0xd92d2d,
+      emissive: definition.id === "vegas" ? 0xffd23a : undefined,
+      emissiveIntensity: definition.id === "vegas" ? 1.4 : 0,
+      roughness: 0.38,
+      metalness: definition.id === "vegas" ? 0.04 : 0.02
+    }),
+    chevron: createFlatStandardMaterial({
+      color: definition.id === "vegas" ? 0xffd23a : 0xf4f2e8,
+      emissive: definition.id === "vegas" ? 0xffd23a : undefined,
+      emissiveIntensity: definition.id === "vegas" ? 2.6 : 0,
+      roughness: 0.24
+    }),
     centerLine: createFlatStandardMaterial({
       color: palette.centerLine ?? 0xf3f0dc,
       emissive: definition.id === "vegas" ? palette.centerLine : undefined,
