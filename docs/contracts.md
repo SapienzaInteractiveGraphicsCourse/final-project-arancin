@@ -25,6 +25,57 @@ Uso previsto:
 - `main.js` cambia fase durante setup/loading/preview;
 - i sistemi futuri possono leggere `setup` per creare pista, veicolo e modalita corretta.
 
+## Input Manager
+
+File: `src/systems/InputManager.js`
+
+Firma:
+
+```js
+const input = new InputManager(window);
+```
+
+Contratto:
+
+```js
+input.getHeldState() -> {
+  accelerate,
+  brake,
+  steerLeft,
+  steerRight,
+  handbrake
+}
+
+input.consumeActions() -> {
+  camera,
+  lights,
+  restart
+}
+
+input.dispose()
+```
+
+Tasti tenuti:
+
+- `W` / `ArrowUp`: accelerazione;
+- `S` / `ArrowDown`: freno/retromarcia;
+- `A` / `ArrowLeft`: sterzo sinistra;
+- `D` / `ArrowRight`: sterzo destra;
+- `Space`: handbrake.
+
+Azioni one-shot:
+
+- `C`: cambio camera;
+- `L`: luci;
+- `R`: restart.
+
+Regole:
+
+- `getHeldState()` non consuma input;
+- `consumeActions()` consuma e svuota solo le azioni one-shot;
+- i tasti gestiti devono bloccare lo scroll pagina;
+- `dispose()` deve rimuovere i listener e puo essere chiamato piu volte.
+
 ## Track Factory
 
 File: `src/tracks/trackFactory.js`
@@ -129,4 +180,3 @@ Non creare direttamente piste o veicoli dentro la preview, salvo placeholder tem
 - `feature/tracks`: evolve `src/tracks/trackFactory.js` e aggiunge dati/generatori piste.
 - `feature/race-systems`: usa `trackInfo`, `vehicle.performance` e `AppState`.
 - `feature/hud-minimap`: usa `AppState`, `trackInfo.centerline`, `trackInfo.minimapBounds`.
-

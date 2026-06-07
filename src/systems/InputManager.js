@@ -67,6 +67,10 @@ export class InputManager {
   }
 
   dispose() {
+    if (!this.target) {
+      return;
+    }
+
     this.target.removeEventListener("keydown", this.handleKeyDown);
     this.target.removeEventListener("keyup", this.handleKeyUp);
     this.heldKeys.clear();
