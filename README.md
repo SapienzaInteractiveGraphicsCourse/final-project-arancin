@@ -161,7 +161,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Creare `ArcadeVehicleController`.
 - [x] Accettare `vehicle.performance` dal veicolo selezionato.
 - [x] Accettare `track.spawn` dalla pista selezionata.
-- [ ] Stato fisico:
+- [x] Stato fisico:
   - [x] position;
   - [x] heading;
   - [x] speed;
@@ -184,7 +184,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Applicare `vehicle.setTransform(state.position, state.heading)`.
 - [x] Passare stato fisico a `vehicle.update(deltaTime, state)`.
 - [x] Implementare reset con `R` nella preview.
-- [ ] Aggiornare `docs/contracts.md` con contratti input/controller.
+- [x] Aggiornare `docs/contracts.md` con contratti input/controller.
 - [x] Verificare `bun run build`.
 
 ## 4. Piste

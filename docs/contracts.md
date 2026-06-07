@@ -76,6 +76,84 @@ Regole:
 - i tasti gestiti devono bloccare lo scroll pagina;
 - `dispose()` deve rimuovere i listener e puo essere chiamato piu volte.
 
+## Arcade Vehicle Controller
+
+File: `src/systems/ArcadeVehicleController.js`
+
+Firma:
+
+```js
+const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
+```
+
+Contratto:
+
+```js
+controller.reset(spawn)
+controller.setPerformance(performance)
+controller.update(deltaTime, inputState, environmentState) -> VehicleState
+controller.getState() -> VehicleState
+controller.dispose()
+```
+
+`performance` previsto:
+
+```js
+{
+  maxForwardSpeed,
+  maxReverseSpeed,
+  acceleration,
+  brakeAcceleration,
+  rollingFriction,
+  idleFriction,
+  handbrakeFriction,
+  turnRate,
+  steeringReturn,
+  steeringResponsiveness
+}
+```
+
+Campi mancanti devono avere default interni al controller.
+
+`VehicleState`:
+
+```js
+{
+  position,            // THREE.Vector3 clone
+  heading,             // radians
+  speed,
+  steering,
+  distanceThisFrame,
+  speedRatio,
+  surfaceType,
+  surfaceGrip,
+  boostTimer,
+  boostActive,
+  collided
+}
+```
+
+`EnvironmentState`:
+
+```js
+{
+  surfaceType: "asphalt" | "grass" | "sand",
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided
+}
+```
+
+Regole:
+
+- il controller gestisce solo fisica arcade del player;
+- non deve conoscere direttamente mesh, DOM, HUD o AI;
+- `update()` deve restituire uno stato adatto a `vehicle.setTransform()` e `vehicle.update()`;
+- `distanceThisFrame` serve all'animazione ruote;
+- `surfaceGrip`, `boostFactor` e collisioni reali verranno forniti da sistemi pista/collisione futuri;
+- `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
+
 ## Track Factory
 
 File: `src/tracks/trackFactory.js`

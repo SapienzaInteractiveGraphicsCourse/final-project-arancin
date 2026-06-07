@@ -232,6 +232,6 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Collegare stato fisico a `vehicle.setTransform()`.
 - [x] Passare stato fisico a `vehicle.update()`.
 - [x] Implementare reset con `R`.
-- [ ] Aggiornare `docs/contracts.md`.
-- [ ] Aggiornare `README.md`.
+- [x] Aggiornare `docs/contracts.md`.
+- [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
