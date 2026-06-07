@@ -40,9 +40,10 @@ Before making changes:
 4. Read `README.md` for the active task list.
 5. Read `docs/branching-guide.md` for branch workflow.
 6. Read relevant docs in `docs/`, especially `docs/project-skeleton.md` for setup/scene work.
-7. Read `kartprivata/GUIDA.md` for project requirements and implementation constraints.
-8. Inspect `kartprivata/kart-simulator-NONUFFICIALE/` only as a technical reference.
-9. Create or switch to the requested feature branch.
+7. Read `docs/contracts.md` before touching shared APIs, factories, vehicles, tracks, scene setup, HUD, or race systems.
+8. Read `kartprivata/GUIDA.md` for project requirements and implementation constraints.
+9. Inspect `kartprivata/kart-simulator-NONUFFICIALE/` only as a technical reference.
+10. Create or switch to the requested feature branch.
 
 ## Branch Workflow
 
