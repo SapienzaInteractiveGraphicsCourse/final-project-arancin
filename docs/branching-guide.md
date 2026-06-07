@@ -61,7 +61,7 @@ git add path/to/files
 git commit -m "add basic scene skeleton"
 ```
 
-Before asking for review or merging:
+Before opening a pull request:
 
 ```bash
 bun run build
@@ -74,11 +74,13 @@ Push the branch:
 git push -u origin feature/name-of-feature
 ```
 
-Then open a pull request into `develop`, or merge locally if the team agrees.
+Then open a pull request into `develop`.
+
+Do not merge feature branches directly into `develop` from the local command line. Use a pull request so the team can review the diff, check the build result, and keep the project history understandable.
 
 ## Merge Rules
 
-- Feature branches merge into `develop`.
+- Feature branches merge into `develop` through pull requests.
 - `develop` merges into `main` only at stable milestones.
 - Do not merge unfinished experiments into `main`.
 - Keep each branch focused on one feature area.
@@ -92,4 +94,3 @@ Then open a pull request into `develop`, or merge locally if the team agrees.
 | `develop` | Team integration branch |
 | `feature/vehicle-assets` | Imported Porsche and Silvia assets plus asset documentation |
 | `feature/project-skeleton` | Placeholder branch for the initial Three.js project structure |
-
