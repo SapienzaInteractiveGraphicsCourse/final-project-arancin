@@ -48,9 +48,14 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] directional light con shadow.
 - [x] Creare ground temporaneo.
 - [x] Gestire resize finestra.
-- [x] Creare game loop base con `THREE.Clock`.
+- [x] Creare game loop base con `THREE.Timer`.
 - [x] Limitare `deltaTime` a `0.05`.
 - [x] Creare overlay UI minimale.
+- [x] Creare GUI setup placeholder.
+- [x] Esporre stato selezionato:
+  - [x] `trackId`;
+  - [x] `vehicleId`;
+  - [x] `raceMode`.
 - [x] Spostare CSS runtime in `src/styles/`.
 - [ ] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [ ] Aggiungere `docs/project-structure.md`.

@@ -20,17 +20,157 @@ canvas {
   display: block;
 }
 
-#app::after {
-  content: "Project skeleton";
+.status-overlay {
   position: fixed;
   left: 16px;
   top: 16px;
   z-index: 1;
+  max-width: calc(100vw - 32px);
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 6px;
   color: #f8fafc;
   background: rgba(17, 24, 39, 0.68);
   font-size: 13px;
+  line-height: 1.35;
   letter-spacing: 0;
+}
+
+.setup-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 12, 20, 0.76);
+}
+
+.setup-menu[hidden] {
+  display: none;
+}
+
+.setup-panel {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #f8fafc;
+  background: rgba(17, 24, 39, 0.94);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+}
+
+.setup-eyebrow {
+  margin: 0 0 8px;
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.setup-panel h1 {
+  margin: 0 0 22px;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.setup-group {
+  min-width: 0;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+}
+
+.setup-group legend {
+  margin-bottom: 10px;
+  color: #cbd5e1;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.setup-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.setup-option {
+  min-height: 94px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  color: #e5e7eb;
+  background: rgba(30, 41, 59, 0.72);
+  text-align: left;
+  cursor: pointer;
+}
+
+.setup-option strong,
+.setup-option span {
+  display: block;
+}
+
+.setup-option strong {
+  margin-bottom: 7px;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.setup-option span {
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.setup-option[aria-pressed="true"] {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.52);
+}
+
+.setup-option:focus-visible,
+.start-button:focus-visible {
+  outline: 2px solid #facc15;
+  outline-offset: 2px;
+}
+
+.start-button {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 7px;
+  color: #082f49;
+  background: #7dd3fc;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.start-button:hover {
+  background: #bae6fd;
+}
+
+@media (max-width: 760px) {
+  .setup-menu {
+    padding: 14px;
+  }
+
+  .setup-panel {
+    max-height: calc(100vh - 28px);
+    padding: 18px;
+  }
+
+  .setup-panel h1 {
+    font-size: 27px;
+  }
+
+  .setup-options {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-option {
+    min-height: 82px;
+  }
 }
