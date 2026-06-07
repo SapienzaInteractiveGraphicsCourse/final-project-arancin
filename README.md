@@ -62,9 +62,9 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] fase `preview`;
   - [x] fase `race`.
 - [x] Caricare preview Three.js solo dopo `Start`.
-- [ ] Creare `src/tracks/trackFactory.js` placeholder.
-- [ ] Creare `src/vehicles/vehicleFactory.js` placeholder.
-- [ ] Far usare alla preview le factory placeholder invece di mesh dirette.
+- [x] Creare `src/tracks/trackFactory.js` placeholder.
+- [x] Creare `src/vehicles/vehicleFactory.js` placeholder.
+- [x] Far usare alla preview le factory placeholder invece di mesh dirette.
 - [ ] Aggiungere `docs/contracts.md` con API condivise.
 - [ ] Aggiungere script `verify:scene`.
 - [x] Spostare CSS runtime in `src/styles/`.

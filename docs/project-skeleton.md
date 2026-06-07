@@ -36,6 +36,8 @@ Questo evita di caricare subito la scena 3D prima che l'utente abbia scelto impo
 - `src/scene/createScene.js`: scena base.
 - `src/scene/createMainCamera.js`: camera base.
 - `src/scene/createSceneLights.js`: luci base.
+- `src/tracks/trackFactory.js`: factory placeholder per selezione piste.
+- `src/vehicles/vehicleFactory.js`: factory placeholder per selezione veicoli.
 - `src/styles/main.css`: stile del menu, overlay e preview.
 
 ## Punti Di Integrazione Per I Colleghi
@@ -50,7 +52,7 @@ Valori previsti:
 - `porsche`
 - `silvia`
 
-Il branch veicoli dovra sostituire il marker temporaneo della preview con una factory o loader dedicato.
+Il branch veicoli deve evolvere `src/vehicles/vehicleFactory.js` senza cambiare il contratto di base usato dalla preview.
 
 ### Piste E Ambiente
 
@@ -62,7 +64,7 @@ Valori previsti:
 - `beach`
 - `monaco`
 
-Il branch piste dovra sostituire il ground temporaneo con generazione tracciato, tema, luci e props.
+Il branch piste deve evolvere `src/tracks/trackFactory.js` senza cambiare il contratto di base usato dalla preview.
 
 ### Modalita Gara
 
