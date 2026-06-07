@@ -75,12 +75,12 @@ src/systems/RaceManager.js
 
 Responsabilita:
 
-- gestire stato gara;
-- conoscere modalita selezionata;
-- gestire countdown;
-- gestire tempo totale;
-- gestire tempo giro;
-- esporre snapshot leggibile per HUD e sistemi futuri.
+- [x] gestire stato gara;
+- [x] conoscere modalita selezionata;
+- [x] gestire countdown;
+- [x] gestire tempo totale;
+- [x] gestire tempo giro;
+- [x] esporre snapshot leggibile per HUD e sistemi futuri.
 
 Fasi:
 
@@ -206,15 +206,15 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 
 ## Task Breakdown
 
-- [ ] Creare `RaceManager`.
-- [ ] Definire fasi `idle`, `countdown`, `running`, `finished`.
-- [ ] Configurare modalita `race`.
-- [ ] Configurare modalita `time-trial`.
-- [ ] Implementare `startCountdown()`.
-- [ ] Implementare `startRace()`.
-- [ ] Implementare `reset()`.
-- [ ] Implementare `update(deltaTime, playerState, trackInfo)`.
-- [ ] Esportare `getState()`.
+- [x] Creare `RaceManager`.
+- [x] Definire fasi `idle`, `countdown`, `running`, `finished`.
+- [x] Configurare modalita `race`.
+- [x] Configurare modalita `time-trial`.
+- [x] Implementare `startCountdown()`.
+- [x] Implementare `startRace()`.
+- [x] Implementare `reset()`.
+- [x] Implementare `update(deltaTime, playerState, trackInfo)`.
+- [x] Esportare `getState()`.
 - [ ] Bloccare movimento durante countdown.
 - [ ] Mostrare countdown in UI/overlay.
 - [ ] Aggiungere cronometro totale.
@@ -223,6 +223,5 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [ ] Preparare supporto best lap time trial.
 - [ ] Preparare supporto race vs AI.
 - [ ] Aggiornare `docs/contracts.md`.
-- [ ] Aggiornare `README.md`.
-- [ ] Eseguire `bun run build`.
-
+- [x] Aggiornare `README.md`.
+- [x] Eseguire `bun run build`.

@@ -1,0 +1,171 @@
+const RACE_PHASES = {
+  IDLE: "idle",
+  COUNTDOWN: "countdown",
+  RUNNING: "running",
+  FINISHED: "finished"
+};
+
+const RACE_MODES = {
+  RACE: "race",
+  TIME_TRIAL: "time-trial"
+};
+
+const DEFAULT_COUNTDOWN_SECONDS = 3;
+const DEFAULT_CHECKPOINT_RADIUS = 3;
+
+export class RaceManager {
+  constructor({
+    mode = RACE_MODES.RACE,
+    totalLaps = getDefaultTotalLaps(mode),
+    countdownSeconds = DEFAULT_COUNTDOWN_SECONDS
+  } = {}) {
+    this.mode = normalizeMode(mode);
+    this.totalLaps = normalizePositiveInteger(totalLaps, getDefaultTotalLaps(this.mode));
+    this.countdownSeconds = Math.max(0, countdownSeconds);
+
+    this.reset();
+  }
+
+  startCountdown() {
+    this.phase = this.countdownSeconds > 0 ? RACE_PHASES.COUNTDOWN : RACE_PHASES.RUNNING;
+    this.countdown = this.countdownSeconds;
+    this.finished = false;
+  }
+
+  startRace() {
+    this.phase = RACE_PHASES.RUNNING;
+    this.countdown = 0;
+    this.finished = false;
+  }
+
+  reset() {
+    this.phase = RACE_PHASES.IDLE;
+    this.currentLap = 1;
+    this.currentCheckpoint = 0;
+    this.checkpointArmed = true;
+    this.checkpointCount = 0;
+    this.totalTime = 0;
+    this.lapTime = 0;
+    this.bestLapTime = null;
+    this.countdown = this.countdownSeconds;
+    this.finished = false;
+  }
+
+  update(deltaTime = 0, playerState = {}, trackInfo = {}) {
+    const safeDeltaTime = Math.max(0, deltaTime);
+    const checkpoints = Array.isArray(trackInfo.checkpoints) ? trackInfo.checkpoints : [];
+    this.checkpointCount = checkpoints.length;
+
+    if (this.phase === RACE_PHASES.COUNTDOWN) {
+      this.updateCountdown(safeDeltaTime);
+      return this.getState();
+    }
+
+    if (this.phase !== RACE_PHASES.RUNNING) {
+      return this.getState();
+    }
+
+    this.totalTime += safeDeltaTime;
+    this.lapTime += safeDeltaTime;
+
+    if (checkpoints.length > 0) {
+      this.updateCheckpointProgress(playerState, checkpoints);
+    }
+
+    return this.getState();
+  }
+
+  getState() {
+    return {
+      phase: this.phase,
+      mode: this.mode,
+      totalLaps: this.totalLaps,
+      currentLap: this.currentLap,
+      currentCheckpoint: this.currentCheckpoint,
+      checkpointCount: this.checkpointCount,
+      totalTime: this.totalTime,
+      lapTime: this.lapTime,
+      bestLapTime: this.bestLapTime,
+      countdown: this.countdown,
+      finished: this.finished
+    };
+  }
+
+  updateCountdown(deltaTime) {
+    this.countdown = Math.max(0, this.countdown - deltaTime);
+
+    if (this.countdown === 0) {
+      this.startRace();
+    }
+  }
+
+  updateCheckpointProgress(playerState, checkpoints) {
+    const nextCheckpoint = checkpoints[this.currentCheckpoint];
+
+    if (!nextCheckpoint) {
+      return;
+    }
+
+    if (!isInsideCheckpoint(playerState.position, nextCheckpoint)) {
+      this.checkpointArmed = true;
+      return;
+    }
+
+    if (!this.checkpointArmed) {
+      return;
+    }
+
+    this.checkpointArmed = false;
+    const nextCheckpointIndex = this.currentCheckpoint + 1;
+
+    if (nextCheckpointIndex < checkpoints.length) {
+      this.currentCheckpoint = nextCheckpointIndex;
+      return;
+    }
+
+    this.completeLap();
+  }
+
+  completeLap() {
+    this.bestLapTime = this.bestLapTime === null
+      ? this.lapTime
+      : Math.min(this.bestLapTime, this.lapTime);
+    this.lapTime = 0;
+    this.currentCheckpoint = 0;
+    this.checkpointArmed = false;
+
+    if (this.currentLap >= this.totalLaps) {
+      this.phase = RACE_PHASES.FINISHED;
+      this.finished = true;
+      return;
+    }
+
+    this.currentLap += 1;
+  }
+}
+
+function getDefaultTotalLaps(mode) {
+  return normalizeMode(mode) === RACE_MODES.TIME_TRIAL ? 1 : 3;
+}
+
+function normalizeMode(mode) {
+  return mode === RACE_MODES.TIME_TRIAL ? RACE_MODES.TIME_TRIAL : RACE_MODES.RACE;
+}
+
+function normalizePositiveInteger(value, fallback) {
+  const normalized = Math.floor(Number(value));
+
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
+
+function isInsideCheckpoint(position, checkpoint) {
+  if (!position || !checkpoint?.position) {
+    return false;
+  }
+
+  const radius = checkpoint.radius ?? DEFAULT_CHECKPOINT_RADIUS;
+  const deltaX = position.x - checkpoint.position.x;
+  const deltaZ = position.z - checkpoint.position.z;
+
+  return deltaX * deltaX + deltaZ * deltaZ <= radius * radius;
+}

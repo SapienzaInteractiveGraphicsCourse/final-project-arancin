@@ -270,21 +270,21 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Race Manager
 
-- [ ] Creare `RaceManager`.
-- [ ] Definire fasi:
-  - [ ] `idle`;
-  - [ ] `countdown`;
-  - [ ] `running`;
-  - [ ] `finished`.
-- [ ] Configurare `totalLaps` in base alla modalita:
-  - [ ] `race`: 3 giri;
-  - [ ] `time-trial`: 1 giro.
-- [ ] Implementare `startCountdown()`.
-- [ ] Implementare `startRace()`.
-- [ ] Implementare `reset()`.
-- [ ] Implementare `update(deltaTime, playerState, trackInfo)`.
-- [ ] Esportare `getState()`.
-- [ ] Non rompersi con `trackInfo.checkpoints = []`.
+- [x] Creare `RaceManager`.
+- [x] Definire fasi:
+  - [x] `idle`;
+  - [x] `countdown`;
+  - [x] `running`;
+  - [x] `finished`.
+- [x] Configurare `totalLaps` in base alla modalita:
+  - [x] `race`: 3 giri;
+  - [x] `time-trial`: 1 giro.
+- [x] Implementare `startCountdown()`.
+- [x] Implementare `startRace()`.
+- [x] Implementare `reset()`.
+- [x] Implementare `update(deltaTime, playerState, trackInfo)`.
+- [x] Esportare `getState()`.
+- [x] Non rompersi con `trackInfo.checkpoints = []`.
 
 ### Countdown E Start Flow
 
