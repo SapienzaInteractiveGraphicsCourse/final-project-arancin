@@ -16,11 +16,11 @@ Use:
 
 Follow the project direction in `docs/` and the external greenfield guide at:
 
-`/KARTNONUFFICIALE/GUIDA.md`
+`/kartprivata/GUIDA.md`
 
 The old non-official simulator is a reference only:
 
-`/KARTNONUFFICIALE/kart-simulator-NONUFFICIALE/`
+`/kartprivata/kart-simulator-NONUFFICIALE/`
 
 Do not copy it mechanically. Rebuild the official project with cleaner structure and narrower scope.
 
