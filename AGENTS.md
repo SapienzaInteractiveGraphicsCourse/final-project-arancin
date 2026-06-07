@@ -24,6 +24,8 @@ The old non-official simulator is a reference only:
 
 Do not copy it mechanically. Rebuild the official project with cleaner structure and narrower scope.
 
+Use the README.md for the task workflows.
+
 ## Branch Workflow
 
 Read `docs/branching-guide.md` before creating or merging branches.
