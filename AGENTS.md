@@ -39,6 +39,8 @@ Expected flow:
 
 Start new implementation branches from `develop` unless the user says otherwise.
 
+Check if there are update on others branch, especially in `develop` for branches `feature/*`. 
+
 Do not merge unfinished work into `main`.
 
 ## Current Scope
@@ -90,6 +92,7 @@ Keep heavy model files in `src/assets/models/`.
 - Keep vehicle performance data separate from the physical controller.
 - The game loop should orchestrate systems; it should not become a monolithic physics/rendering/UI file.
 - Prefer procedural or team-authored assets when they help satisfy the exam requirements.
+- Create docs for every commit in `docs/`
 
 ## Required Checks
 
