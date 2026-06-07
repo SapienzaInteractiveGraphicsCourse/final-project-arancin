@@ -48,6 +48,10 @@ export class AppState extends EventTarget {
     this.setPhase(APP_PHASES.PREVIEW);
   }
 
+  startSetup() {
+    this.setPhase(APP_PHASES.SETUP);
+  }
+
   emitChange() {
     this.dispatchEvent(
       new CustomEvent("change", {

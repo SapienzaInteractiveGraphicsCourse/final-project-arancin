@@ -82,11 +82,13 @@ async function runVerification() {
   await page.getByRole("button", { name: /^Start$/i }).click();
 
   await page.locator("canvas").waitFor({ state: "visible" });
+  const countdownText = await page.locator(".race-overlay").textContent();
   const overlay = await page.locator(".status-overlay").textContent();
   const canvasBox = await page.locator("canvas").boundingBox();
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
-  await browser.close();
+  await page.waitForTimeout(3800);
+  const countdownHidden = await page.locator(".race-overlay").isHidden();
 
   if (setupVisible) {
     throw new Error("Setup menu is still visible after Start");
@@ -100,6 +102,24 @@ async function runVerification() {
     throw new Error(`Overlay does not include selected setup: ${overlay}`);
   }
 
+  if (!/^[123]$/.test(countdownText ?? "")) {
+    throw new Error(`Countdown overlay did not show expected value: ${countdownText}`);
+  }
+
+  if (!countdownHidden) {
+    throw new Error("Countdown overlay is still visible after race start");
+  }
+
+  await page.keyboard.press("Escape");
+  await page.locator(".pause-menu").waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Main Menu/i }).click();
+  await page.locator(".setup-menu").waitFor({ state: "visible" });
+  const canvasCountAfterExit = await page.locator("canvas").count();
+
+  if (canvasCountAfterExit !== 0) {
+    throw new Error(`Canvas was not disposed after returning to setup: ${canvasCountAfterExit}`);
+  }
+
   if (!canvasBox || canvasBox.width < 300 || canvasBox.height < 200) {
     throw new Error(`Canvas did not render at expected size: ${JSON.stringify(canvasBox)}`);
   }
@@ -109,6 +129,8 @@ async function runVerification() {
       `Browser errors detected:\n${[...pageErrors, ...consoleErrors].join("\n")}`
     );
   }
+
+  await browser.close();
 
   console.log("Scene verification passed.");
 }

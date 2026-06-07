@@ -155,6 +155,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] C cambio camera;
   - [x] L luci;
   - [x] R restart.
+  - [x] Esc pausa/menu.
 - [x] Consumare one-shot una sola volta per frame.
 - [x] Bloccare scroll pagina per i tasti di gioco.
 - [x] Aggiungere `dispose()` a `InputManager`.
@@ -288,10 +289,12 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Countdown E Start Flow
 
-- [ ] Countdown iniziale.
-- [ ] Bloccare movimento durante countdown.
-- [ ] Mostrare countdown in UI/overlay.
-- [ ] Passare a gara running dopo `GO`.
+- [x] Countdown iniziale.
+- [x] Bloccare movimento durante countdown.
+- [x] Mostrare countdown in UI/overlay.
+- [x] Passare a gara running dopo `GO`.
+- [x] Menu pausa con `Esc`.
+- [x] Ritorno alla GUI iniziale dal menu pausa.
 
 ### Tempi E Giri
 
@@ -325,8 +328,8 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 - [x] Aggiornare `docs/contracts.md` con contratto `RaceManager`.
 - [x] Aggiornare `docs/contracts.md` con contratto checkpoint.
-- [ ] Aggiornare `verify:scene` se il countdown ha DOM stabile.
-- [ ] Verificare `bun run build`.
+- [x] Aggiornare `verify:scene` se il countdown ha DOM stabile.
+- [x] Verificare `bun run build`.
 
 ## 7. Camera
 

@@ -1,11 +1,11 @@
-const RACE_PHASES = {
+export const RACE_PHASES = {
   IDLE: "idle",
   COUNTDOWN: "countdown",
   RUNNING: "running",
   FINISHED: "finished"
 };
 
-const RACE_MODES = {
+export const RACE_MODES = {
   RACE: "race",
   TIME_TRIAL: "time-trial"
 };

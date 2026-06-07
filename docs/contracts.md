@@ -49,7 +49,8 @@ input.getHeldState() -> {
 input.consumeActions() -> {
   camera,
   lights,
-  restart
+  restart,
+  pause
 }
 
 input.dispose()
@@ -68,6 +69,7 @@ Azioni one-shot:
 - `C`: cambio camera;
 - `L`: luci;
 - `R`: restart.
+- `Escape`: pausa/menu runtime.
 
 Regole:
 

@@ -34,12 +34,22 @@ const setupMenu = createSetupMenu({
     appState.startLoading(setup);
 
     const { startScenePreview } = await import("./scene/startScenePreview.js");
-    sceneApp = startScenePreview(app, setup);
+    sceneApp = startScenePreview(app, setup, {
+      onExitToSetup: returnToSetup
+    });
     placeholder.hidden = true;
     appState.startPreview();
   }
 });
 app.appendChild(setupMenu.element);
+
+function returnToSetup() {
+  sceneApp?.dispose();
+  sceneApp = null;
+  placeholder.hidden = false;
+  setupMenu.show();
+  appState.startSetup();
+}
 
 window.addEventListener("beforeunload", () => {
   sceneApp?.dispose();

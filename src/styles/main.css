@@ -48,6 +48,98 @@ canvas {
   border-color: rgba(125, 211, 252, 0.6);
 }
 
+.race-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 92px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.race-overlay[hidden] {
+  display: none;
+}
+
+.race-overlay[data-phase="running"] {
+  color: #facc15;
+}
+
+.pause-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 12, 20, 0.62);
+}
+
+.pause-menu[hidden] {
+  display: none;
+}
+
+.pause-panel {
+  width: min(360px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #f8fafc;
+  background: rgba(17, 24, 39, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+.pause-eyebrow {
+  margin: 0 0 7px;
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pause-panel h2 {
+  margin: 0 0 18px;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.pause-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.pause-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 7px;
+  color: #082f49;
+  background: #7dd3fc;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pause-button:hover {
+  background: #bae6fd;
+}
+
+.pause-button-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  color: #e5e7eb;
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.pause-button-secondary:hover {
+  background: rgba(51, 65, 85, 0.94);
+}
+
 .setup-menu {
   position: fixed;
   inset: 0;
@@ -143,7 +235,8 @@ canvas {
 }
 
 .setup-option:focus-visible,
-.start-button:focus-visible {
+.start-button:focus-visible,
+.pause-button:focus-visible {
   outline: 2px solid #facc15;
   outline-offset: 2px;
 }

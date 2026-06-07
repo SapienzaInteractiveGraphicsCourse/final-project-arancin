@@ -133,10 +133,11 @@ Obiettivo:
 
 Task:
 
-- [ ] creare stato countdown in `RaceManager`;
-- [ ] bloccare input fisico finche countdown non finisce;
-- [ ] mostrare countdown in overlay o componente dedicato;
-- [ ] aggiornare `AppState` o uno snapshot race leggibile.
+- [x] creare stato countdown in `RaceManager`;
+- [x] bloccare input fisico finche countdown non finisce;
+- [x] mostrare countdown in overlay o componente dedicato;
+- [x] aggiornare `AppState` o uno snapshot race leggibile.
+- [x] aggiungere pausa con `Esc` e ritorno alla GUI iniziale.
 
 ## Milestone 3: Time Trial Base
 
@@ -215,8 +216,9 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Implementare `reset()`.
 - [x] Implementare `update(deltaTime, playerState, trackInfo)`.
 - [x] Esportare `getState()`.
-- [ ] Bloccare movimento durante countdown.
-- [ ] Mostrare countdown in UI/overlay.
+- [x] Bloccare movimento durante countdown.
+- [x] Mostrare countdown in UI/overlay.
+- [x] Aggiungere menu pausa con ritorno alla GUI iniziale.
 - [ ] Aggiungere cronometro totale.
 - [ ] Aggiungere cronometro giro.
 - [ ] Preparare supporto checkpoint.
