@@ -61,6 +61,8 @@ Before working, fetch remote updates and check whether `develop` or your feature
 
 Do not merge unfinished work into `main`.
 
+Do not merge feature branches directly into `develop`. Push the branch and open a pull request targeting `develop`.
+
 ## Current Scope
 
 Implement exactly these three playable vehicles:
@@ -132,7 +134,7 @@ Report clearly if a check could not be run.
 - Do not delete or overwrite another teammate's work without explicit instruction.
 - Avoid broad refactors unless they are necessary for the current feature.
 - Prefer small, meaningful commits.
-- Do not merge, make a PR.
+- Do not merge directly; push the branch and make a PR to `develop`.
 
 ## Documentation Expectations
 
