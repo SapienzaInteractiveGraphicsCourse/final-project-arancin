@@ -209,8 +209,8 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 
 ## Task Breakdown
 
-- [ ] Creare `InputManager`.
-- [ ] Gestire tasti tenuti.
+- [x] Creare `InputManager`.
+- [x] Gestire tasti tenuti.
 - [ ] Gestire azioni one-shot.
 - [ ] Bloccare scroll per tasti di gioco.
 - [ ] Aggiungere `dispose()` a `InputManager`.
@@ -235,4 +235,3 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [ ] Aggiornare `docs/contracts.md`.
 - [ ] Aggiornare `README.md`.
 - [ ] Eseguire `bun run build`.
-

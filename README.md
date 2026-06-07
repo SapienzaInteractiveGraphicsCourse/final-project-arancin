@@ -144,13 +144,13 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 ## 3. Fisica E Input
 
 - [x] Creare documentazione `docs/physics-input.md`.
-- [ ] Creare `InputManager`.
-- [ ] Gestire tasti tenuti premuti:
-  - [ ] W / freccia su;
-  - [ ] S / freccia giu;
-  - [ ] A / freccia sinistra;
-  - [ ] D / freccia destra;
-  - [ ] Space handbrake.
+- [x] Creare `InputManager`.
+- [x] Gestire tasti tenuti premuti:
+  - [x] W / freccia su;
+  - [x] S / freccia giu;
+  - [x] A / freccia sinistra;
+  - [x] D / freccia destra;
+  - [x] Space handbrake.
 - [ ] Gestire tasti one-shot:
   - [ ] C cambio camera;
   - [ ] L luci;
