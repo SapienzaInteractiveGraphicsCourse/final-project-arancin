@@ -42,8 +42,14 @@ export function createTrackMaterials(definition) {
     roadEdge: createFlatStandardMaterial({
       color: palette.roadEdge,
       emissive: palette.roadEdge,
-      emissiveIntensity: definition.id === "vegas" ? 1.4 : 0.12,
-      roughness: 0.58
+      emissiveIntensity: definition.id === "vegas" ? 2.8 : 0.12,
+      roughness: definition.id === "vegas" ? 0.32 : 0.58
+    }),
+    centerLine: createFlatStandardMaterial({
+      color: palette.centerLine ?? 0xf3f0dc,
+      emissive: definition.id === "vegas" ? palette.centerLine : undefined,
+      emissiveIntensity: definition.id === "vegas" ? 0.85 : 0,
+      roughness: 0.55
     }),
     barrier: createFlatStandardMaterial({
       color: palette.barrier,
@@ -71,6 +77,18 @@ export function createTrackMaterials(definition) {
     startDark: createFlatStandardMaterial({
       color: 0x171b20,
       roughness: 0.72
+    }),
+    startGantry: createFlatStandardMaterial({
+      color: definition.id === "vegas" ? 0x181b24 : 0x2b3036,
+      roughness: 0.48,
+      metalness: definition.id === "vegas" ? 0.36 : 0.12
+    }),
+    startSign: createFlatStandardMaterial({
+      color: definition.id === "vegas" ? 0x48ff78 : 0xffd23a,
+      emissive: definition.id === "vegas" ? 0x48ff78 : 0xffd23a,
+      emissiveIntensity: definition.id === "vegas" ? 3.1 : 0.85,
+      roughness: 0.18,
+      metalness: 0.04
     })
   };
 }

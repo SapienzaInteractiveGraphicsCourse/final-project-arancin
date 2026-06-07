@@ -13,9 +13,18 @@ import { createTrackMaterials } from "./trackMaterials.js";
 const ROAD_Y = 0.045;
 const GROUND_Y = -0.025;
 const SPAWN_Y = 0.42;
-const EDGE_WIDTH = 0.22;
+const EDGE_WIDTH = 0.1;
 const ROAD_UV_SCALE = 8;
 const BARRIER_SAMPLE_STEP = 2;
+const CENTER_DASH_LENGTH = 1.45;
+const CENTER_DASH_WIDTH = 0.18;
+const CENTER_DASH_INTERVAL = 4.2;
+const START_LETTERS = {
+  S: ["111", "100", "100", "111", "001", "001", "111"],
+  T: ["111", "010", "010", "010", "010", "010", "010"],
+  A: ["010", "101", "101", "111", "101", "101", "101"],
+  R: ["110", "101", "101", "110", "101", "101", "101"]
+};
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -134,6 +143,53 @@ function createGround(definition, material) {
   return ground;
 }
 
+function sampleEdgeByDistance(edgeSamples, distance) {
+  for (let index = 1; index < edgeSamples.length; index += 1) {
+    const previous = edgeSamples[index - 1];
+    const current = edgeSamples[index];
+
+    if (current.distance >= distance) {
+      const span = current.distance - previous.distance;
+      const alpha = span === 0 ? 0 : (distance - previous.distance) / span;
+      const center = previous.center.clone().lerp(current.center, alpha);
+      const tangent = previous.tangent.clone().lerp(current.tangent, alpha).normalize();
+
+      return { center, tangent };
+    }
+  }
+
+  const last = edgeSamples[edgeSamples.length - 1];
+  return {
+    center: last.center.clone(),
+    tangent: last.tangent.clone()
+  };
+}
+
+function addCenterLineDashes(group, edgeSamples, definition, material) {
+  const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
+  const dashCount = Math.floor(totalDistance / CENTER_DASH_INTERVAL);
+  const geometry = new THREE.BoxGeometry(CENTER_DASH_WIDTH, 0.035, CENTER_DASH_LENGTH);
+  const dashes = new THREE.InstancedMesh(geometry, material, dashCount);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+
+  dashes.name = `${definition.name}:CenterLineDashes`;
+  dashes.receiveShadow = true;
+
+  for (let index = 0; index < dashCount; index += 1) {
+    const sample = sampleEdgeByDistance(edgeSamples, index * CENTER_DASH_INTERVAL + CENTER_DASH_INTERVAL * 0.5);
+    const position = sample.center;
+    position.y = ROAD_Y + 0.04;
+    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), getHeading(sample.tangent));
+    matrix.compose(position, quaternion, scale);
+    dashes.setMatrixAt(index, matrix);
+  }
+
+  dashes.instanceMatrix.needsUpdate = true;
+  group.add(dashes);
+}
+
 function createBarrierSegment(material, start, end, height, thickness) {
   const dx = end.x - start.x;
   const dz = end.z - start.z;
@@ -200,18 +256,18 @@ function addStartLine(group, checkpoint, materials) {
   const startLine = new THREE.Group();
   startLine.name = "StartFinishLine";
   startLine.position.copy(checkpoint.position);
-  startLine.position.y = ROAD_Y + 0.04;
+  startLine.position.y = ROAD_Y + 0.055;
   startLine.rotation.y = checkpoint.rotationY;
 
-  const columns = 10;
-  const rows = 3;
+  const columns = 12;
+  const rows = 4;
   const tileWidth = checkpoint.size.x / columns;
-  const tileDepth = 0.42;
+  const tileDepth = 0.36;
 
   for (let column = 0; column < columns; column += 1) {
     for (let row = 0; row < rows; row += 1) {
       const material = (column + row) % 2 === 0 ? materials.startWhite : materials.startDark;
-      const tile = new THREE.Mesh(new THREE.BoxGeometry(tileWidth, 0.035, tileDepth), material);
+      const tile = new THREE.Mesh(new THREE.BoxGeometry(tileWidth, 0.025, tileDepth), material);
       tile.position.set((column - (columns - 1) * 0.5) * tileWidth, 0, (row - 1) * tileDepth);
       tile.receiveShadow = true;
       startLine.add(tile);
@@ -221,8 +277,72 @@ function addStartLine(group, checkpoint, materials) {
   group.add(startLine);
 }
 
+function addStartSignLetters(sign, material) {
+  const geometry = new THREE.BoxGeometry(0.12, 0.12, 0.04);
+  const letters = ["S", "T", "A", "R", "T"];
+  const cell = 0.16;
+  const letterGap = 0.18;
+  const totalWidth = letters.length * 3 * cell + (letters.length - 1) * letterGap;
+  let cursor = -totalWidth * 0.5;
+
+  letters.forEach((letter) => {
+    START_LETTERS[letter].forEach((row, rowIndex) => {
+      row.split("").forEach((value, columnIndex) => {
+        if (value !== "1") {
+          return;
+        }
+
+        const dot = new THREE.Mesh(geometry, material);
+        dot.position.set(
+          cursor + columnIndex * cell + cell,
+          0.4 - rowIndex * cell,
+          0.095
+        );
+        sign.add(dot);
+      });
+    });
+
+    cursor += 3 * cell + letterGap;
+  });
+}
+
+function addStartGantry(group, checkpoint, materials) {
+  const gantry = new THREE.Group();
+  gantry.name = "StartGantry";
+  gantry.position.copy(checkpoint.position);
+  gantry.rotation.y = checkpoint.rotationY;
+
+  const span = checkpoint.size.x + 3.2;
+  const postHeight = 4.2;
+  const postGeometry = new THREE.CylinderGeometry(0.24, 0.32, postHeight, 8);
+  const topGeometry = new THREE.BoxGeometry(span, 0.58, 0.48);
+  const signGeometry = new THREE.BoxGeometry(4.7, 1.28, 0.16);
+  const leftPost = new THREE.Mesh(postGeometry, materials.startGantry);
+  const rightPost = new THREE.Mesh(postGeometry, materials.startGantry);
+  const top = new THREE.Mesh(topGeometry, materials.startGantry);
+  const sign = new THREE.Mesh(signGeometry, materials.startSign);
+
+  leftPost.position.set(-span * 0.5, postHeight * 0.5, 0);
+  rightPost.position.set(span * 0.5, postHeight * 0.5, 0);
+  top.position.set(0, postHeight, 0);
+  sign.position.set(0, postHeight - 0.02, 0.32);
+
+  [leftPost, rightPost, top, sign].forEach((mesh) => {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  });
+
+  addStartSignLetters(sign, materials.startDark);
+  gantry.add(leftPost, rightPost, top, sign);
+  group.add(gantry);
+}
+
 function addCheckpointGates(group, checkpoints, material) {
   checkpoints.forEach((checkpoint) => {
+    if (checkpoint.id === 0) {
+      return;
+    }
+
     const gate = new THREE.Group();
     gate.name = `${checkpoint.name}CheckpointGate`;
     gate.position.set(checkpoint.position.x, 0, checkpoint.position.z);
@@ -323,9 +443,11 @@ export function createSplineTrack(definition) {
   rightEdge.receiveShadow = true;
 
   group.add(ground, road, leftEdge, rightEdge);
+  addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
   const checkpoints = createCheckpoints(curve, definition);
   addStartLine(group, checkpoints[0], materials);
+  addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
   addTrackProps(group, curve, definition);

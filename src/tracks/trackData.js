@@ -24,15 +24,28 @@ export const TRACK_DEFINITIONS = {
     skyboxTheme: "vegas",
     particleProfile: "neon",
     scene: {
-      background: 0x070913,
-      fog: 0x070913,
-      fogNear: 75,
-      fogFar: 165
+      background: 0x1a0624,
+      fog: 0x2a0635,
+      fogType: "exp2",
+      fogDensity: 0.015,
+      ambientColor: 0x2a164c,
+      ambientIntensity: 0.38,
+      moonColor: 0xffb07a,
+      moonIntensity: 2.8,
+      moonPosition: [-42, 46, 30],
+      shadowBounds: 95,
+      shadowFar: 180,
+      skyGradient: {
+        horizon: 0xd66a25,
+        mid: 0x6a1b70,
+        zenith: 0x130820
+      }
     },
     palette: {
-      ground: 0x10131f,
-      road: 0x171b25,
+      ground: 0x0a0a0c,
+      road: 0x222228,
       roadEdge: 0x32f6ff,
+      centerLine: 0xffd36a,
       barrier: 0x252b38,
       checkpoint: 0x34f4ff,
       boost: 0xffd23a,

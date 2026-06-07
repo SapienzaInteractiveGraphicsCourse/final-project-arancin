@@ -3,7 +3,7 @@ import { createMainCamera } from "./createMainCamera.js";
 import { createRenderer } from "./createRenderer.js";
 import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
-import { applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
+import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 
@@ -18,6 +18,7 @@ export function startScenePreview(container, setup) {
   let animationFrameId = 0;
 
   applyTrackSceneTheme(scene, track.trackInfo);
+  applyTrackLightingTheme(lights, track.trackInfo);
   timer.connect(document);
   scene.add(track.group, vehicle.group);
   vehicle.setTransform(track.spawn.position, track.spawn.heading);
