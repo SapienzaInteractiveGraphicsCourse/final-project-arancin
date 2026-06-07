@@ -143,6 +143,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 3. Fisica E Input
 
+- [ ] Creare documentazione `docs/physics-input.md`.
 - [ ] Creare `InputManager`.
 - [ ] Gestire tasti tenuti premuti:
   - [ ] W / freccia su;
@@ -154,8 +155,12 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [ ] C cambio camera;
   - [ ] L luci;
   - [ ] R restart.
+- [ ] Consumare one-shot una sola volta per frame.
 - [ ] Bloccare scroll pagina per i tasti di gioco.
-- [ ] Creare controller fisico arcade.
+- [ ] Aggiungere `dispose()` a `InputManager`.
+- [ ] Creare `ArcadeVehicleController`.
+- [ ] Accettare `vehicle.performance` dal veicolo selezionato.
+- [ ] Accettare `track.spawn` dalla pista selezionata.
 - [ ] Stato fisico:
   - [ ] position;
   - [ ] heading;
@@ -164,13 +169,23 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [ ] boostTimer;
   - [ ] surfaceGrip;
   - [ ] surfaceType.
+- [ ] Implementare `reset(spawn)`.
+- [ ] Implementare `setPerformance(performance)`.
 - [ ] Accelerazione/freno/retromarcia.
 - [ ] Sterzo dipendente da velocita e grip.
+- [ ] Ritorno graduale dello sterzo a zero.
 - [ ] Attrito differenziato.
 - [ ] Handbrake.
-- [ ] Off-road su sabbia/erba.
-- [ ] Boost controllato.
+- [ ] Supporto placeholder per off-road/sabbia/erba tramite `environmentState`.
+- [ ] Supporto placeholder per boost tramite `environmentState`.
 - [ ] Calcolare `distanceThisFrame` per animazione ruote.
+- [ ] Calcolare `speedRatio`.
+- [ ] Collegare controller alla preview.
+- [ ] Applicare `vehicle.setTransform(state.position, state.heading)`.
+- [ ] Passare stato fisico a `vehicle.update(deltaTime, state)`.
+- [ ] Implementare reset con `R` nella preview.
+- [ ] Aggiornare `docs/contracts.md` con contratti input/controller.
+- [ ] Verificare `bun run build`.
 
 ## 4. Piste
 
