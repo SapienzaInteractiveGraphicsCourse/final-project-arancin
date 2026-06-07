@@ -44,7 +44,7 @@ canvas {
   letter-spacing: 0;
 }
 
-.status-overlay[data-loading="true"] {
+.status-overlay[data-phase="loading"] {
   border-color: rgba(125, 211, 252, 0.6);
 }
 

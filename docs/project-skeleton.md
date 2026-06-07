@@ -10,6 +10,7 @@ In questa fase il progetto contiene:
 
 - GUI iniziale per scegliere pista, veicolo e modalita;
 - stato selezionato esposto con `trackId`, `vehicleId`, `raceMode`;
+- stato applicativo condiviso con fase `setup`, `loading`, `preview`, `race`;
 - scena Three.js preview caricata solo dopo `Start`;
 - struttura cartelle per dividere responsabilita future;
 - asset importati Porsche/Silvia gia organizzati ma non ancora caricati in scena.
@@ -29,6 +30,7 @@ Questo evita di caricare subito la scena 3D prima che l'utente abbia scelto impo
 - `src/config/raceOptions.js`: opzioni disponibili per piste, veicoli e modalita gara.
 - `src/ui/setupMenu.js`: creazione DOM della GUI setup e gestione selezione.
 - `src/main.js`: entry point leggero e orchestrazione dello start.
+- `src/systems/AppState.js`: stato condiviso per fase corrente e setup selezionato.
 - `src/scene/startScenePreview.js`: preview Three.js temporanea, caricata lazy.
 - `src/scene/createRenderer.js`: configurazione renderer.
 - `src/scene/createScene.js`: scena base.

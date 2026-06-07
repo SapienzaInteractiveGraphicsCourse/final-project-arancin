@@ -1,8 +1,10 @@
 import "./styles/main.css";
 import { getRaceSetupLabels } from "./config/raceOptions.js";
+import { APP_PHASES, AppState } from "./systems/AppState.js";
 import { createSetupMenu } from "./ui/setupMenu.js";
 
 const app = document.querySelector("#app");
+const appState = new AppState();
 const placeholder = document.createElement("div");
 placeholder.className = "scene-placeholder";
 app.appendChild(placeholder);
@@ -14,22 +16,27 @@ app.appendChild(overlay);
 
 let sceneApp = null;
 
-function setOverlayText(setup) {
+function setOverlayText({ phase, setup }) {
   const labels = getRaceSetupLabels(setup);
-  overlay.textContent = `Track: ${labels.track} | Vehicle: ${labels.vehicle} | Mode: ${labels.mode}`;
+  const suffix = phase === APP_PHASES.LOADING ? " | Loading scene" : "";
+
+  overlay.dataset.phase = phase;
+  overlay.textContent = `Track: ${labels.track} | Vehicle: ${labels.vehicle} | Mode: ${labels.mode}${suffix}`;
 }
+
+appState.addEventListener("change", (event) => {
+  setOverlayText(event.detail);
+});
+setOverlayText(appState.getSnapshot());
 
 const setupMenu = createSetupMenu({
   onStart: async (setup) => {
-    setOverlayText(setup);
-    overlay.dataset.loading = "true";
-    overlay.textContent += " | Loading scene";
+    appState.startLoading(setup);
 
     const { startScenePreview } = await import("./scene/startScenePreview.js");
     sceneApp = startScenePreview(app, setup);
     placeholder.hidden = true;
-    setOverlayText(setup);
-    overlay.dataset.loading = "false";
+    appState.startPreview();
   }
 });
 app.appendChild(setupMenu.element);
