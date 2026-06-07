@@ -158,19 +158,19 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Consumare one-shot una sola volta per frame.
 - [x] Bloccare scroll pagina per i tasti di gioco.
 - [x] Aggiungere `dispose()` a `InputManager`.
-- [ ] Creare `ArcadeVehicleController`.
-- [ ] Accettare `vehicle.performance` dal veicolo selezionato.
-- [ ] Accettare `track.spawn` dalla pista selezionata.
+- [x] Creare `ArcadeVehicleController`.
+- [x] Accettare `vehicle.performance` dal veicolo selezionato.
+- [x] Accettare `track.spawn` dalla pista selezionata.
 - [ ] Stato fisico:
-  - [ ] position;
-  - [ ] heading;
-  - [ ] speed;
-  - [ ] steering;
-  - [ ] boostTimer;
-  - [ ] surfaceGrip;
-  - [ ] surfaceType.
-- [ ] Implementare `reset(spawn)`.
-- [ ] Implementare `setPerformance(performance)`.
+  - [x] position;
+  - [x] heading;
+  - [x] speed;
+  - [x] steering;
+  - [x] boostTimer;
+  - [x] surfaceGrip;
+  - [x] surfaceType.
+- [x] Implementare `reset(spawn)`.
+- [x] Implementare `setPerformance(performance)`.
 - [ ] Accelerazione/freno/retromarcia.
 - [ ] Sterzo dipendente da velocita e grip.
 - [ ] Ritorno graduale dello sterzo a zero.

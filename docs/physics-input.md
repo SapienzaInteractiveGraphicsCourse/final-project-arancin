@@ -214,9 +214,9 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Gestire azioni one-shot.
 - [x] Bloccare scroll per tasti di gioco.
 - [x] Aggiungere `dispose()` a `InputManager`.
-- [ ] Creare `ArcadeVehicleController`.
-- [ ] Implementare `reset(spawn)`.
-- [ ] Implementare `setPerformance(performance)`.
+- [x] Creare `ArcadeVehicleController`.
+- [x] Implementare `reset(spawn)`.
+- [x] Implementare `setPerformance(performance)`.
 - [ ] Implementare accelerazione.
 - [ ] Implementare freno.
 - [ ] Implementare retromarcia.
