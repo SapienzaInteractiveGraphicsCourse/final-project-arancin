@@ -87,15 +87,24 @@ export class ArcadeVehicleController {
       : this.performance.steeringResponsiveness;
     this.steering = approach(this.steering, steeringTarget, steeringRate * deltaTime);
 
-    const friction = inputState.accelerate || inputState.brake
+    const baseFriction = inputState.accelerate || inputState.brake
       ? this.performance.rollingFriction
       : this.performance.idleFriction;
+    const friction = inputState.handbrake
+      ? this.performance.handbrakeFriction
+      : baseFriction;
     this.speed *= Math.exp(-friction * deltaTime);
     this.speed = clamp(this.speed, -maxReverseSpeed, maxForwardSpeed);
     this.speedRatio = getSpeedRatio(this.speed, this.performance.maxForwardSpeed);
 
     const reverseFactor = this.speed < 0 ? -1 : 1;
-    const turnStrength = this.steering * this.performance.turnRate * surfaceGrip * this.speedRatio;
+    const handbrakeTurnMultiplier = inputState.handbrake ? 1.25 : 1;
+    const turnStrength =
+      this.steering *
+      this.performance.turnRate *
+      surfaceGrip *
+      this.speedRatio *
+      handbrakeTurnMultiplier;
     this.heading += turnStrength * reverseFactor * deltaTime;
 
     const distance = this.speed * deltaTime;

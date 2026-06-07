@@ -5,6 +5,8 @@ import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
+import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { InputManager } from "../systems/InputManager.js";
 
 export function startScenePreview(container, setup) {
   const renderer = createRenderer(container);
@@ -14,11 +16,13 @@ export function startScenePreview(container, setup) {
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
+  const inputManager = new InputManager(window);
+  const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   let animationFrameId = 0;
 
   timer.connect(document);
   scene.add(track.group, vehicle.group);
-  vehicle.setTransform(track.spawn.position, track.spawn.heading);
+  vehicle.setTransform(controller.position, controller.heading);
 
   function resize() {
     const width = window.innerWidth;
@@ -30,7 +34,34 @@ export function startScenePreview(container, setup) {
   }
 
   function update(deltaTime) {
-    vehicle.update(deltaTime);
+    const actions = inputManager.consumeActions();
+
+    if (actions.restart) {
+      controller.reset(track.spawn);
+    }
+
+    const state = controller.update(deltaTime, inputManager.getHeldState(), {
+      surfaceType: "asphalt",
+      surfaceGrip: 1,
+      speedLimitMultiplier: 1,
+      boostFactor: 1,
+      collided: false
+    });
+
+    vehicle.setTransform(state.position, state.heading);
+    vehicle.update(deltaTime, state);
+    updateCameraFollow(state);
+  }
+
+  function updateCameraFollow(state) {
+    const cameraTarget = new THREE.Vector3(
+      state.position.x + Math.sin(state.heading + Math.PI) * 8,
+      state.position.y + 5.5,
+      state.position.z + Math.cos(state.heading + Math.PI) * 8
+    );
+
+    camera.position.lerp(cameraTarget, 0.08);
+    camera.lookAt(state.position.x, state.position.y + 0.7, state.position.z);
   }
 
   function animate(timestamp) {
@@ -51,6 +82,8 @@ export function startScenePreview(container, setup) {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", resize);
       timer.dispose();
+      inputManager.dispose();
+      controller.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       track.dispose();

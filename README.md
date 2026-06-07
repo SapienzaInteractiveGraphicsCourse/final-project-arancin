@@ -175,17 +175,17 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Sterzo dipendente da velocita e grip.
 - [x] Ritorno graduale dello sterzo a zero.
 - [x] Attrito differenziato.
-- [ ] Handbrake.
+- [x] Handbrake.
 - [x] Supporto placeholder per off-road/sabbia/erba tramite `environmentState`.
 - [x] Supporto placeholder per boost tramite `environmentState`.
 - [x] Calcolare `distanceThisFrame` per animazione ruote.
 - [x] Calcolare `speedRatio`.
-- [ ] Collegare controller alla preview.
-- [ ] Applicare `vehicle.setTransform(state.position, state.heading)`.
-- [ ] Passare stato fisico a `vehicle.update(deltaTime, state)`.
-- [ ] Implementare reset con `R` nella preview.
+- [x] Collegare controller alla preview.
+- [x] Applicare `vehicle.setTransform(state.position, state.heading)`.
+- [x] Passare stato fisico a `vehicle.update(deltaTime, state)`.
+- [x] Implementare reset con `R` nella preview.
 - [ ] Aggiornare `docs/contracts.md` con contratti input/controller.
-- [ ] Verificare `bun run build`.
+- [x] Verificare `bun run build`.
 
 ## 4. Piste
 

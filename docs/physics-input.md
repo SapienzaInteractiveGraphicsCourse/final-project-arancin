@@ -223,15 +223,15 @@ Queste feature arriveranno con branch piste, race systems e veicoli.
 - [x] Implementare sterzo.
 - [x] Implementare ritorno sterzo a zero.
 - [x] Implementare attrito.
-- [ ] Implementare handbrake.
+- [x] Implementare handbrake.
 - [x] Calcolare `speedRatio`.
 - [x] Calcolare `distanceThisFrame`.
 - [x] Gestire `surfaceGrip` placeholder.
 - [x] Gestire `boostFactor` placeholder.
-- [ ] Integrare controller nella preview.
-- [ ] Collegare stato fisico a `vehicle.setTransform()`.
-- [ ] Passare stato fisico a `vehicle.update()`.
-- [ ] Implementare reset con `R`.
+- [x] Integrare controller nella preview.
+- [x] Collegare stato fisico a `vehicle.setTransform()`.
+- [x] Passare stato fisico a `vehicle.update()`.
+- [x] Implementare reset con `R`.
 - [ ] Aggiornare `docs/contracts.md`.
 - [ ] Aggiornare `README.md`.
-- [ ] Eseguire `bun run build`.
+- [x] Eseguire `bun run build`.
