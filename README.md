@@ -254,20 +254,57 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 6. Gara E AI
 
-- [ ] Race manager.
+### Modalita
+
+- [x] Documentare `docs/race-systems.md`.
+- [ ] Supportare modalita `race`:
+  - [ ] gara contro AI;
+  - [ ] giri multipli;
+  - [ ] checkpoint in ordine;
+  - [ ] classifica semplice player vs AI.
+- [ ] Supportare modalita `time-trial`:
+  - [ ] solo player;
+  - [ ] giro veloce;
+  - [ ] cronometro;
+  - [ ] best lap locale.
+
+### Race Manager
+
+- [ ] Creare `RaceManager`.
+- [ ] Definire fasi:
+  - [ ] `idle`;
+  - [ ] `countdown`;
+  - [ ] `running`;
+  - [ ] `finished`.
+- [ ] Configurare `totalLaps` in base alla modalita:
+  - [ ] `race`: 3 giri;
+  - [ ] `time-trial`: 1 giro.
+- [ ] Implementare `startCountdown()`.
+- [ ] Implementare `startRace()`.
+- [ ] Implementare `reset()`.
+- [ ] Implementare `update(deltaTime, playerState, trackInfo)`.
+- [ ] Esportare `getState()`.
+- [ ] Non rompersi con `trackInfo.checkpoints = []`.
+
+### Countdown E Start Flow
+
 - [ ] Countdown iniziale.
+- [ ] Bloccare movimento durante countdown.
+- [ ] Mostrare countdown in UI/overlay.
+- [ ] Passare a gara running dopo `GO`.
+
+### Tempi E Giri
+
+- [ ] Cronometro totale.
+- [ ] Cronometro giro.
 - [ ] Checkpoint in ordine.
 - [ ] Giri.
-- [ ] Cronometro.
 - [ ] Best lap.
-- [ ] Classifica semplice player vs AI.
 - [ ] Finish screen minimale.
 - [ ] Restart gara.
-- [ ] Avviso contromano:
-  - [ ] progresso piu vicino su centerline;
-  - [ ] heading pista da lookahead;
-  - [ ] prodotto scalare con forward veicolo;
-  - [ ] soglia temporale per evitare falsi positivi.
+
+### AI E Race Mode
+
 - [ ] AI opponent visibile.
 - [ ] AI usa stesso veicolo selezionato dal player.
 - [ ] Velocita AI dipendente dal veicolo.
@@ -275,6 +312,21 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] AI accelera in uscita.
 - [ ] AI segue traiettoria con offset laterale.
 - [ ] AI competitiva ma battibile.
+
+### Contromano
+
+- [ ] Avviso contromano:
+  - [ ] progresso piu vicino su centerline;
+  - [ ] heading pista da lookahead;
+  - [ ] prodotto scalare con forward veicolo;
+  - [ ] soglia temporale per evitare falsi positivi.
+
+### Contratti E Verifiche
+
+- [x] Aggiornare `docs/contracts.md` con contratto `RaceManager`.
+- [x] Aggiornare `docs/contracts.md` con contratto checkpoint.
+- [ ] Aggiornare `verify:scene` se il countdown ha DOM stabile.
+- [ ] Verificare `bun run build`.
 
 ## 7. Camera
 

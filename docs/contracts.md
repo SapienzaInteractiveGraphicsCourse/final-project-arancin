@@ -199,6 +199,79 @@ Regole:
 - mettere dati pista in moduli separati quando le piste reali saranno implementate;
 - evitare piste extra finche `vegas`, `beach`, `monaco` non sono complete.
 
+## Race Manager
+
+File previsto: `src/systems/RaceManager.js`
+
+Firma prevista:
+
+```js
+const raceManager = new RaceManager({
+  mode,
+  totalLaps,
+  countdownSeconds
+});
+```
+
+Contratto previsto:
+
+```js
+raceManager.startCountdown()
+raceManager.startRace()
+raceManager.update(deltaTime, playerState, trackInfo)
+raceManager.reset()
+raceManager.getState()
+```
+
+Fasi previste:
+
+```js
+"idle" | "countdown" | "running" | "finished"
+```
+
+Modalita supportate:
+
+- `race`: gara contro AI, giri multipli, classifica semplice;
+- `time-trial`: solo player, giro veloce, best lap locale.
+
+Stato previsto:
+
+```js
+{
+  phase,
+  mode,
+  totalLaps,
+  currentLap,
+  currentCheckpoint,
+  checkpointCount,
+  totalTime,
+  lapTime,
+  bestLapTime,
+  countdown,
+  finished
+}
+```
+
+Checkpoint previsto:
+
+```js
+{
+  id,
+  position,
+  radius,
+  order,
+  isStartFinish
+}
+```
+
+Regole:
+
+- `RaceManager` non deve dipendere direttamente da mesh o DOM;
+- deve funzionare anche con `trackInfo.checkpoints = []`;
+- `race` abilita logica futura per AI;
+- `time-trial` non deve richiedere AI;
+- record/best lap possono usare localStorage quando i checkpoint reali saranno disponibili.
+
 ## Vehicle Factory
 
 File: `src/vehicles/vehicleFactory.js`
