@@ -7,6 +7,7 @@ import {
   offsetProgress,
   samplePathAtProgress
 } from "./centerline.js";
+import { addTrackProps } from "./trackProps.js";
 import { createTrackMaterials } from "./trackMaterials.js";
 
 const ROAD_Y = 0.045;
@@ -327,6 +328,7 @@ export function createSplineTrack(definition) {
   addStartLine(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
+  addTrackProps(group, curve, definition);
 
   group.userData.trackInfo = {
     id: definition.id,
@@ -341,7 +343,8 @@ export function createSplineTrack(definition) {
     minimapBounds: getMinimapBounds(centerline, roadHalfWidth + 8),
     lightingMode: definition.lightingMode,
     skyboxTheme: definition.skyboxTheme,
-    particleProfile: definition.particleProfile
+    particleProfile: definition.particleProfile,
+    scene: definition.scene
   };
 
   return {

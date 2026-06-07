@@ -23,6 +23,12 @@ export const TRACK_DEFINITIONS = {
     lightingMode: "vegas",
     skyboxTheme: "vegas",
     particleProfile: "neon",
+    scene: {
+      background: 0x070913,
+      fog: 0x070913,
+      fogNear: 75,
+      fogFar: 165
+    },
     palette: {
       ground: 0x10131f,
       road: 0x171b25,
