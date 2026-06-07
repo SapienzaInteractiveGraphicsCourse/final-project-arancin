@@ -25,6 +25,135 @@ Uso previsto:
 - `main.js` cambia fase durante setup/loading/preview;
 - i sistemi futuri possono leggere `setup` per creare pista, veicolo e modalita corretta.
 
+## Input Manager
+
+File: `src/systems/InputManager.js`
+
+Firma:
+
+```js
+const input = new InputManager(window);
+```
+
+Contratto:
+
+```js
+input.getHeldState() -> {
+  accelerate,
+  brake,
+  steerLeft,
+  steerRight,
+  handbrake
+}
+
+input.consumeActions() -> {
+  camera,
+  lights,
+  restart
+}
+
+input.dispose()
+```
+
+Tasti tenuti:
+
+- `W` / `ArrowUp`: accelerazione;
+- `S` / `ArrowDown`: freno/retromarcia;
+- `A` / `ArrowLeft`: sterzo sinistra;
+- `D` / `ArrowRight`: sterzo destra;
+- `Space`: handbrake.
+
+Azioni one-shot:
+
+- `C`: cambio camera;
+- `L`: luci;
+- `R`: restart.
+
+Regole:
+
+- `getHeldState()` non consuma input;
+- `consumeActions()` consuma e svuota solo le azioni one-shot;
+- i tasti gestiti devono bloccare lo scroll pagina;
+- `dispose()` deve rimuovere i listener e puo essere chiamato piu volte.
+
+## Arcade Vehicle Controller
+
+File: `src/systems/ArcadeVehicleController.js`
+
+Firma:
+
+```js
+const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
+```
+
+Contratto:
+
+```js
+controller.reset(spawn)
+controller.setPerformance(performance)
+controller.update(deltaTime, inputState, environmentState) -> VehicleState
+controller.getState() -> VehicleState
+controller.dispose()
+```
+
+`performance` previsto:
+
+```js
+{
+  maxForwardSpeed,
+  maxReverseSpeed,
+  acceleration,
+  brakeAcceleration,
+  rollingFriction,
+  idleFriction,
+  handbrakeFriction,
+  turnRate,
+  steeringReturn,
+  steeringResponsiveness
+}
+```
+
+Campi mancanti devono avere default interni al controller.
+
+`VehicleState`:
+
+```js
+{
+  position,            // THREE.Vector3 clone
+  heading,             // radians
+  speed,
+  steering,
+  distanceThisFrame,
+  speedRatio,
+  surfaceType,
+  surfaceGrip,
+  boostTimer,
+  boostActive,
+  collided
+}
+```
+
+`EnvironmentState`:
+
+```js
+{
+  surfaceType: "asphalt" | "grass" | "sand",
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided
+}
+```
+
+Regole:
+
+- il controller gestisce solo fisica arcade del player;
+- non deve conoscere direttamente mesh, DOM, HUD o AI;
+- `update()` deve restituire uno stato adatto a `vehicle.setTransform()` e `vehicle.update()`;
+- `distanceThisFrame` serve all'animazione ruote;
+- `surfaceGrip`, `boostFactor` e collisioni reali verranno forniti da sistemi pista/collisione futuri;
+- `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
+
 ## Track Factory
 
 File: `src/tracks/trackFactory.js`
@@ -129,4 +258,3 @@ Non creare direttamente piste o veicoli dentro la preview, salvo placeholder tem
 - `feature/tracks`: evolve `src/tracks/trackFactory.js` e aggiunge dati/generatori piste.
 - `feature/race-systems`: usa `trackInfo`, `vehicle.performance` e `AppState`.
 - `feature/hud-minimap`: usa `AppState`, `trackInfo.centerline`, `trackInfo.minimapBounds`.
-
