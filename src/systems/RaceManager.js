@@ -111,6 +111,11 @@ export class RaceManager {
     };
   }
 
+  setPlayerPosition(position, participantCount = this.participantCount) {
+    this.position = normalizePositiveInteger(position, 1);
+    this.participantCount = normalizePositiveInteger(participantCount, 1);
+  }
+
   updateCountdown(deltaTime) {
     this.countdown = Math.max(0, this.countdown - deltaTime);
 

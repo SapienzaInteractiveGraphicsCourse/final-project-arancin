@@ -249,6 +249,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Evidenziare checkpoint successivo.
 - [x] Preparare supporto best lap time trial.
 - [x] Preparare supporto race vs AI.
+- [x] Aggiornare posizione player confrontando progresso player e AI.
 - [x] Aggiungere finish screen con classifica lap time e gap dal best lap.
 - [x] Salvare storico lap completati per pista/veicolo/modalita.
 - [x] Implementare warning contromano.

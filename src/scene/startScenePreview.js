@@ -4,6 +4,7 @@ import { createRenderer } from "./createRenderer.js";
 import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
 import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
+import { findClosestProgress } from "../tracks/centerline.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
@@ -134,9 +135,9 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     const currentVehicleState = controller.getState();
-    const raceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
-    const canDrive = raceState.phase === RACE_PHASES.RUNNING;
-    const state = raceState.finished
+    const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
+    const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
+    const state = updatedRaceState.finished
       ? controller.getState()
       : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, {
         surfaceType: "asphalt",
@@ -149,13 +150,18 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
 
+    let aiState = null;
+
     if (aiVehicle && aiController) {
-      const aiState = raceState.phase === RACE_PHASES.RUNNING && !raceState.finished
+      aiState = updatedRaceState.phase === RACE_PHASES.RUNNING && !updatedRaceState.finished
         ? aiController.update(deltaTime, track.trackInfo)
         : aiController.getState();
       applyAiVehicleTransform(aiVehicle, aiState);
       aiVehicle.update(deltaTime, aiState);
     }
+
+    updatePlayerRacePosition(raceManager, state, aiState, track.trackInfo);
+    const raceState = raceManager.getState();
 
     updateCameraFollow(state);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
@@ -224,6 +230,27 @@ export function startScenePreview(container, setup, options = {}) {
       }
     }
   };
+}
+
+function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) {
+  const centerline = Array.isArray(trackInfo.centerline) ? trackInfo.centerline : [];
+  const raceState = raceManager.getState();
+
+  if (!centerline.length || !aiState || raceState.mode !== "race") {
+    raceManager.setPlayerPosition(1, aiState ? 2 : 1);
+    return;
+  }
+
+  const playerProgress = findClosestProgress(centerline, playerState.position.x, playerState.position.z);
+  const playerScore = getRaceProgressScore(raceState.currentLap, playerProgress, raceState.totalLaps);
+  const aiScore = getRaceProgressScore(aiState.lap, aiState.progress, raceState.totalLaps);
+  const playerPosition = playerScore >= aiScore ? 1 : 2;
+
+  raceManager.setPlayerPosition(playerPosition, 2);
+}
+
+function getRaceProgressScore(lap, progress, totalLaps) {
+  return Math.min(totalLaps, Math.max(1, lap) - 1 + Math.max(0, Math.min(1, progress)));
 }
 
 function applyAiVehicleTransform(vehicle, aiState) {

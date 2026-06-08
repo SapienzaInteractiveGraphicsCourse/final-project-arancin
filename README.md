@@ -312,6 +312,7 @@ O
 
 - [x] Predisporre stato `aiEnabled`.
 - [x] Esporre posizione semplice player.
+- [x] Aggiornare posizione player rispetto all'AI.
 - [x] Preparare controller logico AI su centerline.
 - [x] AI opponent visibile.
 - [x] AI usa stesso veicolo selezionato dal player.

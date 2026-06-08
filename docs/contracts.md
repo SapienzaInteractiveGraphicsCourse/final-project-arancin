@@ -270,6 +270,12 @@ Stato previsto:
 ]
 ```
 
+La classifica non viene calcolata automaticamente da `RaceManager.update()`: la scena confronta il progresso del player con gli opponent e aggiorna `position` tramite:
+
+```js
+raceManager.setPlayerPosition(position, participantCount)
+```
+
 Checkpoint previsto:
 
 ```js
