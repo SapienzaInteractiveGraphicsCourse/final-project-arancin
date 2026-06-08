@@ -25,6 +25,12 @@ export async function createPorscheModelInstance() {
     if (child.isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
+
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((material) => material.clone());
+      } else if (child.material) {
+        child.material = child.material.clone();
+      }
     }
   });
 
