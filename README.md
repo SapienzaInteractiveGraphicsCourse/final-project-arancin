@@ -71,74 +71,74 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
 - [x] Verificare `bun run build`.
-
+O
 ## 2. Veicoli
 
 ### Interfaccia Comune
 
-- [ ] Definire interfaccia/base class veicolo.
-- [ ] Ogni veicolo deve esporre:
-  - [ ] `group`;
-  - [ ] `performance`;
-  - [ ] `setTransform(position, heading)`;
-  - [ ] `update(deltaTime, state)`;
-  - [ ] `setBodyColor(color)`;
-  - [ ] `setHeadlights(enabled)`;
-  - [ ] `toggleHeadlights()`;
-  - [ ] `dispose()`.
-- [ ] Creare `vehicleFactory`.
-- [ ] Separare dati performance da logica fisica.
-- [ ] Ordinare velocita massime: Porsche > Silvia > Kart.
+- [x] Definire interfaccia/base class veicolo.
+- [x] Ogni veicolo deve esporre:
+  - [x] `group`;
+  - [x] `performance`;
+  - [x] `setTransform(position, heading)`;
+  - [x] `update(deltaTime, state)`;
+  - [x] `setBodyColor(color)`;
+  - [x] `setHeadlights(enabled)`;
+  - [x] `toggleHeadlights()`;
+  - [x] `dispose()`.
+- [x] Creare `vehicleFactory`.
+- [x] Separare dati performance da logica fisica.
+- [x] Ordinare velocita massime: Porsche > Silvia > Kart.
 
 ### Kart Procedurale
 
-- [ ] Costruire kart da zero con primitive Three.js.
-- [ ] Creare gerarchia:
-  - [ ] root group;
-  - [ ] telaio;
-  - [ ] carrozzeria;
-  - [ ] sedile;
-  - [ ] volante;
-  - [ ] pilota opzionale;
-  - [ ] assi;
-  - [ ] quattro ruote;
-  - [ ] fari.
-- [ ] Ruote anteriori sterzanti con pivot separati.
-- [ ] Ruote animate in base a distanza percorsa.
-- [ ] Colore carrozzeria modificabile.
-- [ ] Headlights toggle.
-- [ ] Materiali con roughness/metalness coerenti.
-- [ ] Piccole animazioni gerarchiche JS:
-  - [ ] volante;
-  - [ ] ruote;
-  - [ ] possibile oscillazione telaio/sospensioni.
+- [x] Costruire kart da zero con primitive Three.js.
+- [x] Creare gerarchia:
+  - [x] root group;
+  - [x] telaio;
+  - [x] carrozzeria;
+  - [x] sedile;
+  - [x] volante;
+  - [x] pilota opzionale;
+  - [x] assi;
+  - [x] quattro ruote;
+  - [x] fari.
+- [x] Ruote anteriori sterzanti con pivot separati.
+- [x] Ruote animate in base a distanza percorsa.
+- [x] Colore carrozzeria modificabile.
+- [x] Headlights toggle.
+- [x] Materiali con roughness/metalness coerenti.
+- [x] Piccole animazioni gerarchiche JS:
+  - [x] volante;
+  - [x] ruote;
+  - [x] possibile oscillazione telaio/sospensioni.
 
 ### Porsche
 
 - [x] Importare asset GLB.
-- [ ] Creare loader dedicato.
-- [ ] Usare cache del modello caricato.
-- [ ] Clonare modello per player e AI.
-- [ ] Verificare scala.
-- [ ] Verificare orientamento.
-- [ ] Verificare origine/pivot.
-- [ ] Correggere luci anteriori.
-- [ ] Identificare o ricreare ruote animate.
-- [ ] Applicare colore carrozzeria se possibile.
-- [ ] Documentare fonte/licenza asset.
+- [x] Creare loader dedicato.
+- [x] Usare cache del modello caricato.
+- [x] Clonare modello per player e AI.
+- [x] Verificare scala.
+- [x] Verificare orientamento.
+- [x] Verificare origine/pivot.
+- [x] Correggere luci anteriori.
+- [x] Identificare o ricreare ruote animate.
+- [x] Applicare colore carrozzeria se possibile.
+- [x] Documentare fonte/licenza asset.
 
 ### Nissan Silvia
 
 - [x] Importare asset FBX.
-- [ ] Creare loader dedicato.
-- [ ] Usare cache del modello caricato.
-- [ ] Clonare modello per player e AI.
-- [ ] Verificare scala.
-- [ ] Verificare orientamento.
-- [ ] Verificare origine/pivot.
-- [ ] Correggere luci anteriori.
-- [ ] Identificare o ricreare ruote animate.
-- [ ] Applicare colore carrozzeria se possibile.
+- [x] Creare loader dedicato.
+- [x] Usare cache del modello caricato.
+- [x] Clonare modello per player e AI.
+- [x] Verificare scala.
+- [x] Verificare orientamento.
+- [x] Verificare origine/pivot.
+- [x] Correggere luci anteriori.
+- [x] Identificare o ricreare ruote animate.
+- [x] Applicare colore carrozzeria se possibile.
 - [ ] Documentare fonte/licenza asset.
 
 ## 3. Fisica E Input

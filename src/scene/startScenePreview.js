@@ -114,6 +114,10 @@ export function startScenePreview(container, setup, options = {}) {
       resetRace();
     }
 
+    if (actions.lights) {
+      vehicle.toggleHeadlights();
+    }
+
     const currentVehicleState = controller.getState();
     const raceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = raceState.phase === RACE_PHASES.RUNNING;
