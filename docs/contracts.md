@@ -270,6 +270,8 @@ Checkpoint previsto:
 }
 ```
 
+I checkpoint vengono letti in ordine crescente di `order`. Checkpoint senza `position.x`, `position.z` o `order` numerico vengono ignorati.
+
 Regole:
 
 - `RaceManager` non deve dipendere direttamente da mesh o DOM;
@@ -278,6 +280,24 @@ Regole:
 - in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
 - record/best lap possono usare localStorage quando i checkpoint reali saranno disponibili.
+
+## Checkpoint Utils
+
+File: `src/systems/checkpointUtils.js`
+
+Contratto:
+
+```js
+getOrderedCheckpoints(trackInfo) -> Checkpoint[]
+isInsideCheckpoint(position, checkpoint) -> boolean
+isValidCheckpoint(checkpoint) -> boolean
+```
+
+Regole:
+
+- `getOrderedCheckpoints()` non deve mutare `trackInfo.checkpoints`;
+- i checkpoint validi devono avere `position.x`, `position.z` e `order` numerici;
+- `radius` e opzionale, ma se presente deve essere positivo.
 
 ## Race Records
 

@@ -88,8 +88,7 @@ async function runVerification() {
   const canvasBox = await page.locator("canvas").boundingBox();
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
-  await page.waitForTimeout(3800);
-  const countdownHidden = await page.locator(".race-overlay").isHidden();
+  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 7000 });
 
   if (setupVisible) {
     throw new Error("Setup menu is still visible after Start");
@@ -109,10 +108,6 @@ async function runVerification() {
 
   if (!/^[123]$/.test(countdownText ?? "")) {
     throw new Error(`Countdown overlay did not show expected value: ${countdownText}`);
-  }
-
-  if (!countdownHidden) {
-    throw new Error("Countdown overlay is still visible after race start");
   }
 
   await page.keyboard.press("Escape");

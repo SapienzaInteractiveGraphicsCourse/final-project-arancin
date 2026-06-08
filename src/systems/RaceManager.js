@@ -1,3 +1,5 @@
+import { getOrderedCheckpoints, isInsideCheckpoint } from "./checkpointUtils.js";
+
 export const RACE_PHASES = {
   IDLE: "idle",
   COUNTDOWN: "countdown",
@@ -11,7 +13,6 @@ export const RACE_MODES = {
 };
 
 const DEFAULT_COUNTDOWN_SECONDS = 3;
-const DEFAULT_CHECKPOINT_RADIUS = 3;
 
 export class RaceManager {
   constructor({
@@ -63,7 +64,7 @@ export class RaceManager {
 
   update(deltaTime = 0, playerState = {}, trackInfo = {}) {
     const safeDeltaTime = Math.max(0, deltaTime);
-    const checkpoints = Array.isArray(trackInfo.checkpoints) ? trackInfo.checkpoints : [];
+    const checkpoints = getOrderedCheckpoints(trackInfo);
     this.checkpointCount = checkpoints.length;
 
     if (this.phase === RACE_PHASES.COUNTDOWN) {
@@ -188,16 +189,4 @@ function normalizeLapTime(value) {
   const normalized = Number(value);
 
   return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
-}
-
-function isInsideCheckpoint(position, checkpoint) {
-  if (!position || !checkpoint?.position) {
-    return false;
-  }
-
-  const radius = checkpoint.radius ?? DEFAULT_CHECKPOINT_RADIUS;
-  const deltaX = position.x - checkpoint.position.x;
-  const deltaZ = position.z - checkpoint.position.z;
-
-  return deltaX * deltaX + deltaZ * deltaZ <= radius * radius;
 }

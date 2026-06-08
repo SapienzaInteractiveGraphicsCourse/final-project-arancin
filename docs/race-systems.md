@@ -191,9 +191,9 @@ Forma proposta:
 
 Task:
 
-- [ ] aggiornare `docs/contracts.md`;
-- [ ] `RaceManager` non deve rompersi con `trackInfo.checkpoints = []`;
-- [ ] quando i checkpoint esistono, richiedere ordine corretto.
+- [x] aggiornare `docs/contracts.md`;
+- [x] `RaceManager` non deve rompersi con `trackInfo.checkpoints = []`;
+- [x] quando i checkpoint esistono, richiedere ordine corretto.
 
 ## Milestone 6: Verification
 
@@ -221,9 +221,9 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Aggiungere menu pausa con ritorno alla GUI iniziale.
 - [x] Aggiungere cronometro totale.
 - [x] Aggiungere cronometro giro.
-- [ ] Preparare supporto checkpoint.
+- [x] Preparare supporto checkpoint.
 - [x] Preparare supporto best lap time trial.
 - [x] Preparare supporto race vs AI.
-- [ ] Aggiornare `docs/contracts.md`.
+- [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
