@@ -246,6 +246,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Aggiungere cronometro totale.
 - [x] Aggiungere cronometro giro.
 - [x] Preparare supporto checkpoint.
+- [x] Evidenziare checkpoint successivo.
 - [x] Preparare supporto best lap time trial.
 - [x] Preparare supporto race vs AI.
 - [x] Aggiungere finish screen con classifica lap time e gap dal best lap.

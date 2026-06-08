@@ -139,7 +139,7 @@ export class RaceManager {
     const crossedStartFinish = Boolean(nextCheckpoint.isStartFinish);
 
     if (crossedStartFinish && this.lapHasPassedSectors) {
-      this.completeLap();
+      this.completeLap(checkpoints.length);
       return;
     }
 
@@ -150,7 +150,7 @@ export class RaceManager {
     this.currentCheckpoint = getNextCheckpointIndex(this.currentCheckpoint, checkpoints.length);
   }
 
-  completeLap() {
+  completeLap(checkpointCount = 0) {
     const completedLapTime = this.lapTime;
     const previousBestLapTime = this.bestLapTime;
     this.bestLapTime = previousBestLapTime === null
@@ -169,7 +169,7 @@ export class RaceManager {
     }
 
     this.lapTime = 0;
-    this.currentCheckpoint = 0;
+    this.currentCheckpoint = getNextCheckpointIndex(0, checkpointCount);
     this.checkpointArmed = false;
     this.lapHasPassedSectors = false;
 

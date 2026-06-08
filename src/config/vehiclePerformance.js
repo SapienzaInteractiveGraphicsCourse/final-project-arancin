@@ -1,6 +1,6 @@
 export const VEHICLE_PERFORMANCE = {
   porsche: {
-    maxForwardSpeed: 44,
+    maxForwardSpeed: 1,
     maxReverseSpeed: 9,
     acceleration: 36,
     brakeAcceleration: 38,
@@ -12,7 +12,7 @@ export const VEHICLE_PERFORMANCE = {
     steeringResponsiveness: 9.5
   },
   silvia: {
-    maxForwardSpeed: 39,
+    maxForwardSpeed: 1,
     maxReverseSpeed: 8,
     acceleration: 34,
     brakeAcceleration: 36,
@@ -24,7 +24,7 @@ export const VEHICLE_PERFORMANCE = {
     steeringResponsiveness: 10
   },
   kart: {
-    maxForwardSpeed: 32,
+    maxForwardSpeed: 1,
     maxReverseSpeed: 8,
     acceleration: 30,
     brakeAcceleration: 34,

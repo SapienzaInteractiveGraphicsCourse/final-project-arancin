@@ -12,7 +12,7 @@ import { createTrackMaterials } from "./trackMaterials.js";
 
 const ROAD_Y = 0.045;
 const GROUND_Y = -0.025;
-const SPAWN_Y = 0.42;
+const SPAWN_Y = ROAD_Y + 0.1;
 const EDGE_WIDTH = 0.1;
 const ROAD_UV_SCALE = 8;
 const BARRIER_SAMPLE_STEP = 2;
@@ -275,6 +275,17 @@ function addStartLine(group, checkpoint, materials) {
   }
 
   group.add(startLine);
+
+  const checkpointMarker = new THREE.Group();
+  checkpointMarker.name = "StartFinishCheckpointGate";
+  checkpointMarker.position.copy(checkpoint.position);
+  checkpointMarker.position.y = ROAD_Y + 0.09;
+  checkpointMarker.rotation.y = checkpoint.rotationY;
+
+  const marker = new THREE.Mesh(new THREE.BoxGeometry(checkpoint.size.x, 0.035, 0.34), materials.checkpoint);
+  checkpointMarker.add(marker);
+  checkpoint.gate = checkpointMarker;
+  group.add(checkpointMarker);
 }
 
 function addStartSignLetters(sign, material) {
