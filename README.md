@@ -352,13 +352,13 @@ O
 - [x] Menu selezione veicolo.
 - [x] Selezione colore veicolo.
 - [x] Pulsante start.
-- [ ] HUD speed.
-- [ ] HUD lap.
-- [ ] HUD time.
-- [ ] HUD checkpoint.
-- [ ] HUD surface.
-- [ ] HUD status/wrong way.
-- [ ] HUD posizione/gap.
+- [x] HUD speed.
+- [x] HUD lap.
+- [x] HUD time.
+- [x] HUD checkpoint.
+- [x] HUD surface.
+- [x] HUD status/wrong way.
+- [x] HUD posizione/gap.
 - [ ] Minimap canvas.
 - [ ] Disegnare centerline su minimap.
 - [ ] Marker player.

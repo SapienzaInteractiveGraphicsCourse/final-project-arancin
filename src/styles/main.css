@@ -77,15 +77,16 @@ canvas {
   top: 16px;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(5, 88px);
+  grid-template-columns: repeat(auto-fit, minmax(72px, 84px));
+  justify-content: end;
   gap: 8px;
-  max-width: calc(100vw - 32px);
+  width: min(920px, calc(100vw - 32px));
   color: #f8fafc;
   pointer-events: none;
 }
 
-.race-hud div {
-  width: 88px;
+.race-hud-field {
+  width: auto;
   min-width: 0;
   padding: 7px 9px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -640,7 +641,7 @@ canvas {
     width: calc(100vw - 24px);
   }
 
-  .race-hud div {
+  .race-hud-field {
     width: auto;
     min-width: 0;
   }

@@ -506,6 +506,42 @@ const vehicle = createVehicleById(setup.vehicleId);
 
 Non creare direttamente piste o veicoli dentro la preview, salvo placeholder temporanei dentro le factory.
 
+## Race HUD
+
+File: `src/ui/RaceHud.js`
+
+Firma:
+
+```js
+createRaceHud() -> {
+  element,
+  update({ raceState, vehicleState, wrongWayState }),
+  remove()
+}
+```
+
+Campi DOM stabili:
+
+```text
+mode
+speed
+lap
+totalTime
+lapTime
+checkpoint
+surface
+status
+position
+gap
+```
+
+Regole:
+
+- il componente crea il DOM una sola volta;
+- `update()` aggiorna solo i valori testuali dei campi;
+- deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
+- il warning contromano deve comparire nel campo `status` quando `wrongWayState.warning` e' attivo.
+
 ## Branch Responsibilities
 
 - `feature/procedural-kart`: evolve `src/vehicles/vehicleFactory.js` e aggiunge classi veicolo.

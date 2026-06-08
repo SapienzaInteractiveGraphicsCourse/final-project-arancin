@@ -12,6 +12,7 @@ import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
+import { createRaceHud } from "../ui/RaceHud.js";
 import {
   appendLapRecord,
   ensureBestLapInRecords,
@@ -85,7 +86,7 @@ export function startScenePreview(container, setup, options = {}) {
   timer.connect(document);
   scene.add(track.group, vehicle.group);
   container.appendChild(raceOverlay);
-  container.appendChild(raceHud);
+  container.appendChild(raceHud.element);
   container.appendChild(wrongWayOverlay);
   container.appendChild(colorPicker.element);
   container.appendChild(finishScreen.element);
@@ -154,10 +155,15 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
-    updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
+    const wrongWayState = wrongWayDetector.update(deltaTime, state, track.trackInfo);
+    updateWrongWayOverlay(wrongWayOverlay, wrongWayState);
     checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);
-    updateRaceHud(raceHud, raceState);
+    raceHud.update({
+      raceState,
+      vehicleState: state,
+      wrongWayState
+    });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
       raceState,
@@ -498,42 +504,6 @@ function formatLapRows(lapTimes, bestLapTime) {
       `;
     })
     .join("");
-}
-
-function createRaceHud() {
-  const hud = document.createElement("aside");
-  hud.className = "race-hud";
-  hud.setAttribute("aria-label", "Race status");
-  return hud;
-}
-
-function updateRaceHud(hud, raceState) {
-  const finalPanel = raceState.mode === "race"
-    ? { label: "Position", value: `${raceState.position}/${raceState.participantCount}` }
-    : { label: "Best", value: formatRaceTime(raceState.bestLapTime) };
-
-  hud.innerHTML = `
-    <div>
-      <span>Mode</span>
-      <strong>${formatMode(raceState.mode)}</strong>
-    </div>
-    <div>
-      <span>Lap</span>
-      <strong>${raceState.currentLap}/${raceState.totalLaps}</strong>
-    </div>
-    <div>
-      <span>Total</span>
-      <strong>${formatRaceTime(raceState.totalTime)}</strong>
-    </div>
-    <div>
-      <span>Lap Time</span>
-      <strong>${formatRaceTime(raceState.lapTime)}</strong>
-    </div>
-    <div>
-      <span>${finalPanel.label}</span>
-      <strong>${finalPanel.value}</strong>
-    </div>
-  `;
 }
 
 function createPauseMenu({ onResume, onExitToSetup }) {

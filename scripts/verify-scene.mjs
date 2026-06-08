@@ -110,6 +110,12 @@ async function runVerification() {
     throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
+  for (const field of ["Speed", "Checkpoint", "Surface", "Status", "Position", "Gap"]) {
+    if (!raceHud.includes(field)) {
+      throw new Error(`Race HUD is missing ${field} field: ${raceHud}`);
+    }
+  }
+
   if (!/^[123]$/.test(countdownText ?? "")) {
     throw new Error(`Countdown overlay did not show expected value: ${countdownText}`);
   }
