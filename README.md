@@ -356,12 +356,12 @@ O
 - [x] HUD lap.
 - [x] HUD time.
 - [x] HUD checkpoint.
-- [x] HUD surface.
+- [ ] HUD surface.
 - [x] HUD status/wrong way.
 - [x] HUD posizione/gap.
-- [ ] Minimap canvas.
-- [ ] Disegnare centerline su minimap.
-- [ ] Marker player.
+- [x] Minimap canvas.
+- [x] Disegnare centerline su minimap.
+- [x] Marker player.
 - [ ] Marker AI.
 - [ ] Marker checkpoint/start.
 - [ ] UI responsive.

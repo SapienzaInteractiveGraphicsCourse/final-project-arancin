@@ -1,16 +1,24 @@
 import { RACE_PHASES } from "../systems/RaceManager.js";
 
-const HUD_FIELDS = [
-  { id: "mode", label: "Mode" },
-  { id: "speed", label: "Speed" },
-  { id: "lap", label: "Lap" },
-  { id: "totalTime", label: "Total" },
-  { id: "lapTime", label: "Lap Time" },
-  { id: "checkpoint", label: "Checkpoint" },
-  { id: "surface", label: "Surface" },
-  { id: "status", label: "Status" },
-  { id: "position", label: "Position" },
-  { id: "gap", label: "Gap" }
+const HUD_GROUPS = [
+  {
+    className: "race-hud-top-left",
+    fields: [
+      { id: "speed", className: "race-hud-speed" },
+      { id: "totalTime", className: "race-hud-time" },
+      { id: "map", className: "race-hud-chip race-hud-map" },
+      { id: "status", className: "race-hud-chip race-hud-status" }
+    ]
+  },
+  {
+    className: "race-hud-position",
+    fields: [
+      { id: "position", className: "race-hud-place" },
+      { id: "lap", className: "race-hud-chip race-hud-lap" },
+      { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
+      { id: "gap", className: "race-hud-chip race-hud-gap" }
+    ]
+  }
 ];
 
 export function createRaceHud() {
@@ -20,32 +28,32 @@ export function createRaceHud() {
 
   const values = new Map();
 
-  HUD_FIELDS.forEach((field) => {
-    const row = document.createElement("div");
-    row.className = "race-hud-field";
-    row.dataset.hudField = field.id;
+  HUD_GROUPS.forEach((group) => {
+    const panel = document.createElement("div");
+    panel.className = `race-hud-cluster ${group.className}`;
 
-    const label = document.createElement("span");
-    label.textContent = field.label;
+    group.fields.forEach((field) => {
+      const value = document.createElement("span");
+      value.className = `race-hud-value ${field.className}`;
+      value.dataset.hudField = field.id;
+      value.setAttribute("aria-label", field.id);
+      value.textContent = "--";
 
-    const value = document.createElement("strong");
-    value.textContent = "--";
+      panel.appendChild(value);
+      values.set(field.id, value);
+    });
 
-    row.append(label, value);
-    element.appendChild(row);
-    values.set(field.id, value);
+    element.appendChild(panel);
   });
 
   return {
     element,
-    update({ raceState, vehicleState, wrongWayState } = {}) {
+    update({ raceState, vehicleState, wrongWayState, trackName } = {}) {
       values.get("speed").textContent = formatSpeed(vehicleState?.speed);
-      values.get("mode").textContent = formatMode(raceState?.mode);
       values.get("lap").textContent = formatLap(raceState);
       values.get("totalTime").textContent = formatRaceTime(raceState?.totalTime);
-      values.get("lapTime").textContent = formatRaceTime(raceState?.lapTime);
       values.get("checkpoint").textContent = formatCheckpoint(raceState);
-      values.get("surface").textContent = formatSurface(vehicleState?.surfaceType);
+      values.get("map").textContent = formatMap(trackName);
       values.get("status").textContent = formatStatus(raceState, wrongWayState);
       values.get("position").textContent = formatPosition(raceState);
       values.get("gap").textContent = formatGap(raceState);
@@ -64,32 +72,24 @@ function formatSpeed(speed) {
   return `${Math.round(Math.abs(speed) * 3.6)} km/h`;
 }
 
-function formatMode(mode) {
-  return mode === "time-trial" ? "Time Trial" : "Race";
-}
-
 function formatLap(raceState) {
   if (!raceState) {
     return "--";
   }
 
-  return `${raceState.currentLap}/${raceState.totalLaps}`;
+  return `Lap ${raceState.currentLap}/${raceState.totalLaps}`;
 }
 
 function formatCheckpoint(raceState) {
   if (!raceState || raceState.checkpointCount <= 0) {
-    return "--";
+    return "Checkpoint --";
   }
 
-  return `${raceState.currentCheckpoint + 1}/${raceState.checkpointCount}`;
+  return `Checkpoint ${raceState.currentCheckpoint + 1}/${raceState.checkpointCount}`;
 }
 
-function formatSurface(surfaceType) {
-  if (!surfaceType) {
-    return "--";
-  }
-
-  return surfaceType.charAt(0).toUpperCase() + surfaceType.slice(1);
+function formatMap(trackName) {
+  return `Map: ${trackName ?? "--"}`;
 }
 
 function formatStatus(raceState, wrongWayState) {
@@ -122,10 +122,10 @@ function formatPosition(raceState) {
   }
 
   if (raceState.mode === "race") {
-    return `${raceState.position}/${raceState.participantCount}`;
+    return `${formatOrdinal(raceState.position)} / ${raceState.participantCount}`;
   }
 
-  return "1/1";
+  return "1st / 1";
 }
 
 function formatGap(raceState) {
@@ -134,7 +134,7 @@ function formatGap(raceState) {
   }
 
   if (raceState.mode === "time-trial") {
-    return `Best ${formatRaceTime(raceState.bestLapTime)}`;
+    return `BEST ${formatRaceTime(raceState.bestLapTime)}`;
   }
 
   return "--";
@@ -150,4 +150,27 @@ function formatRaceTime(value) {
   const centiseconds = Math.floor((value % 1) * 100);
 
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
+function formatOrdinal(value) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+
+  const remainder = value % 100;
+
+  if (remainder >= 11 && remainder <= 13) {
+    return `${value}th`;
+  }
+
+  switch (value % 10) {
+    case 1:
+      return `${value}st`;
+    case 2:
+      return `${value}nd`;
+    case 3:
+      return `${value}rd`;
+    default:
+      return `${value}th`;
+  }
 }

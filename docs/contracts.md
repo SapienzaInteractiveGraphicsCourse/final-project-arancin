@@ -523,13 +523,11 @@ createRaceHud() -> {
 Campi DOM stabili:
 
 ```text
-mode
 speed
 lap
 totalTime
-lapTime
 checkpoint
-surface
+map
 status
 position
 gap
@@ -541,6 +539,28 @@ Regole:
 - `update()` aggiorna solo i valori testuali dei campi;
 - deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
 - il warning contromano deve comparire nel campo `status` quando `wrongWayState.warning` e' attivo.
+
+## Minimap System
+
+File: `src/systems/MinimapSystem.js`
+
+Firma:
+
+```js
+const minimap = new MinimapSystem(canvas);
+minimap.setTrack(trackInfo);
+minimap.resize();
+minimap.update({ playerState });
+```
+
+Contratto:
+
+- usa `trackInfo.centerline` per disegnare il percorso;
+- usa `trackInfo.minimapBounds` per calcolare la scala;
+- ruota la mappa in base a `playerState.heading`;
+- usa `playerState.position` come centro quando disponibile;
+- gestisce `devicePixelRatio` in `resize()`;
+- deve mostrare un fallback leggibile se centerline o bounds mancano.
 
 ## Branch Responsibilities
 

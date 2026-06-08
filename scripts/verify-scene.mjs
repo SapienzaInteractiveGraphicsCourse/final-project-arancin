@@ -81,15 +81,32 @@ async function runVerification() {
   await page.getByRole("button", { name: /Time Trial/i }).click();
   await page.getByRole("button", { name: /^Start$/i }).click();
 
-  await page.locator("canvas").waitFor({ state: "visible" });
+  const rendererCanvas = page.locator("canvas").first();
+  await rendererCanvas.waitFor({ state: "visible" });
   await page.locator(".pre-race-color-picker").waitFor({ state: "visible" });
+  await page.keyboard.press("KeyR");
+  await page.waitForTimeout(150);
+  if (await page.locator(".race-overlay").isVisible()) {
+    throw new Error("Restart key started countdown before color confirmation");
+  }
   await page.getByRole("button", { name: /Electric Blue/i }).click();
   await page.getByRole("button", { name: /Start Race/i }).click();
   await page.locator(".race-overlay").waitFor({ state: "visible" });
   const countdownText = await page.locator(".race-overlay").textContent();
-  const overlay = await page.locator(".status-overlay").textContent();
   const raceHud = await page.locator(".race-hud").textContent();
-  const canvasBox = await page.locator("canvas").boundingBox();
+  const canvasBox = await rendererCanvas.boundingBox();
+  const minimapBox = await page.locator(".race-minimap").boundingBox();
+  const minimapHasPixels = await page.locator(".race-minimap").evaluate((canvas) => {
+    const context = canvas.getContext("2d");
+    const sample = context.getImageData(
+      Math.floor(canvas.width * 0.5),
+      Math.floor(canvas.height * 0.5),
+      1,
+      1
+    ).data;
+
+    return sample[3] > 0;
+  });
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
   await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 12000 });
@@ -98,21 +115,14 @@ async function runVerification() {
     throw new Error("Setup menu is still visible after Start");
   }
 
-  if (!overlay?.includes("Track: Tropical Beach")) {
-    throw new Error(`Unexpected overlay text: ${overlay}`);
-  }
-
-  if (!overlay.includes("Vehicle: Silvia") || !overlay.includes("Mode: Time Trial")) {
-    throw new Error(`Overlay does not include selected setup: ${overlay}`);
-  }
-
-  if (!raceHud?.includes("Time Trial") || !raceHud.includes("1/1")) {
+  if (!raceHud?.includes("1st / 1") || !raceHud.includes("Lap 1/1")) {
     throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
-  for (const field of ["Speed", "Checkpoint", "Surface", "Status", "Position", "Gap"]) {
-    if (!raceHud.includes(field)) {
-      throw new Error(`Race HUD is missing ${field} field: ${raceHud}`);
+  for (const field of ["speed", "checkpoint", "map", "status", "position", "gap"]) {
+    const fieldCount = await page.locator(`[data-hud-field="${field}"]`).count();
+    if (fieldCount !== 1) {
+      throw new Error(`Race HUD is missing stable ${field} field`);
     }
   }
 
@@ -132,17 +142,21 @@ async function runVerification() {
 
   await page.getByRole("button", { name: /Race/i }).click();
   await page.getByRole("button", { name: /^Start$/i }).click();
-  await page.locator("canvas").waitFor({ state: "visible" });
+  await page.locator("canvas").first().waitFor({ state: "visible" });
   await page.getByRole("button", { name: /Start Race/i }).click();
   await page.locator(".race-overlay").waitFor({ state: "visible" });
   const raceModeHud = await page.locator(".race-hud").textContent();
 
-  if (!raceModeHud?.includes("Race") || !raceModeHud.includes("1/3") || !raceModeHud.includes("1/2")) {
+  if (!raceModeHud?.includes("1st / 2") || !raceModeHud.includes("Lap 1/3")) {
     throw new Error(`Race HUD does not include expected race state: ${raceModeHud}`);
   }
 
   if (!canvasBox || canvasBox.width < 300 || canvasBox.height < 200) {
     throw new Error(`Canvas did not render at expected size: ${JSON.stringify(canvasBox)}`);
+  }
+
+  if (!minimapBox || minimapBox.width < 100 || minimapBox.height < 100 || !minimapHasPixels) {
+    throw new Error(`Minimap did not render at expected size: ${JSON.stringify(minimapBox)}`);
   }
 
   if (pageErrors.length > 0 || consoleErrors.length > 0) {

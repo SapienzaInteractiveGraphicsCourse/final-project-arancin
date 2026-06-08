@@ -10,6 +10,7 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
+import { MinimapSystem } from "../systems/MinimapSystem.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
 import { createRaceHud } from "../ui/RaceHud.js";
@@ -56,6 +57,10 @@ export function startScenePreview(container, setup, options = {}) {
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
   const wrongWayOverlay = createWrongWayOverlay();
+  const minimapPanel = createMinimapPanel();
+  const minimapCanvas = minimapPanel.querySelector("canvas");
+  const minimap = new MinimapSystem(minimapCanvas);
+  minimap.setTrack(track.trackInfo);
   const colorPicker = createPreRaceColorPicker({
     selectedColor: selectedBodyColor,
     onSelect: (color) => {
@@ -64,6 +69,7 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.setBodyColor(color);
     },
     onConfirm: () => {
+      raceArmed = true;
       colorPicker.hide();
       raceManager.startCountdown();
     }
@@ -79,6 +85,7 @@ export function startScenePreview(container, setup, options = {}) {
   });
   let animationFrameId = 0;
   let paused = false;
+  let raceArmed = false;
   let renderedFinishSignature = "";
 
   applyTrackSceneTheme(scene, track.trackInfo);
@@ -88,6 +95,7 @@ export function startScenePreview(container, setup, options = {}) {
   container.appendChild(raceOverlay);
   container.appendChild(raceHud.element);
   container.appendChild(wrongWayOverlay);
+  container.appendChild(minimapPanel);
   container.appendChild(colorPicker.element);
   container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
@@ -100,6 +108,7 @@ export function startScenePreview(container, setup, options = {}) {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    minimap.resize();
   }
 
   function setPaused(nextPaused) {
@@ -128,6 +137,21 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     if (paused) {
+      return;
+    }
+
+    if (!raceArmed) {
+      const state = controller.getState();
+      vehicle.setTransform(state.position, state.heading);
+      vehicle.update(deltaTime, state);
+      updateCameraFollow(state);
+      raceHud.update({
+        raceState: raceManager.getState(),
+        vehicleState: state,
+        wrongWayState: wrongWayDetector.getState(),
+        trackName: track.trackInfo.name
+      });
+      minimap.update({ playerState: state });
       return;
     }
 
@@ -162,8 +186,10 @@ export function startScenePreview(container, setup, options = {}) {
     raceHud.update({
       raceState,
       vehicleState: state,
-      wrongWayState
+      wrongWayState,
+      trackName: track.trackInfo.name
     });
+    minimap.update({ playerState: state });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
       raceState,
@@ -213,6 +239,7 @@ export function startScenePreview(container, setup, options = {}) {
       raceOverlay.remove();
       raceHud.remove();
       wrongWayOverlay.remove();
+      minimapPanel.remove();
       colorPicker.element.remove();
       finishScreen.element.remove();
       pauseMenu.element.remove();
@@ -280,6 +307,19 @@ function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm }) {
       element.hidden = true;
     }
   };
+}
+
+function createMinimapPanel() {
+  const panel = document.createElement("aside");
+  panel.className = "race-minimap-panel";
+  panel.setAttribute("aria-label", "Map");
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "race-minimap";
+  canvas.setAttribute("aria-label", "Rotating track minimap");
+
+  panel.append(canvas);
+  return panel;
 }
 
 function createCheckpointHighlighter(trackInfo) {
@@ -548,6 +588,7 @@ function createPauseMenu({ onResume, onExitToSetup }) {
 function createRaceOverlay() {
   const overlay = document.createElement("div");
   overlay.className = "race-overlay";
+  overlay.hidden = true;
   overlay.setAttribute("aria-live", "polite");
   return overlay;
 }
