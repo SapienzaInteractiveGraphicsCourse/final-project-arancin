@@ -34,6 +34,8 @@ export function createTrackMaterials(definition) {
   return {
     ground: createFlatStandardMaterial({
       color: palette.ground,
+      emissive: definition.id === "vegas" ? 0x0a0020 : undefined,
+      emissiveIntensity: definition.id === "vegas" ? 0.15 : 0,
       roughness: 0.92
     }),
     road: createFlatStandardMaterial({
