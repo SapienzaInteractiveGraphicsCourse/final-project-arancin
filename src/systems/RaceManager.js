@@ -19,12 +19,16 @@ export class RaceManager {
     totalLaps = getDefaultTotalLaps(mode),
     countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
     bestLapTime = null,
+    aiEnabled = mode === RACE_MODES.RACE,
+    opponentCount = aiEnabled ? 1 : 0,
     onBestLap
   } = {}) {
     this.mode = normalizeMode(mode);
     this.totalLaps = normalizePositiveInteger(totalLaps, getDefaultTotalLaps(this.mode));
     this.countdownSeconds = Math.max(0, countdownSeconds);
     this.initialBestLapTime = normalizeLapTime(bestLapTime);
+    this.aiEnabled = Boolean(aiEnabled);
+    this.opponentCount = this.aiEnabled ? normalizeNonNegativeInteger(opponentCount, 1) : 0;
     this.onBestLap = onBestLap;
 
     this.reset();
@@ -51,6 +55,8 @@ export class RaceManager {
     this.totalTime = 0;
     this.lapTime = 0;
     this.bestLapTime = this.initialBestLapTime;
+    this.position = 1;
+    this.participantCount = 1 + this.opponentCount;
     this.countdown = this.countdownSeconds;
     this.finished = false;
   }
@@ -90,6 +96,10 @@ export class RaceManager {
       totalTime: this.totalTime,
       lapTime: this.lapTime,
       bestLapTime: this.bestLapTime,
+      position: this.position,
+      participantCount: this.participantCount,
+      aiEnabled: this.aiEnabled,
+      opponentCount: this.opponentCount,
       countdown: this.countdown,
       finished: this.finished
     };
@@ -166,6 +176,12 @@ function normalizePositiveInteger(value, fallback) {
   const normalized = Math.floor(Number(value));
 
   return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
+
+function normalizeNonNegativeInteger(value, fallback) {
+  const normalized = Math.floor(Number(value));
+
+  return Number.isFinite(normalized) && normalized >= 0 ? normalized : fallback;
 }
 
 function normalizeLapTime(value) {

@@ -125,6 +125,15 @@ async function runVerification() {
     throw new Error(`Canvas was not disposed after returning to setup: ${canvasCountAfterExit}`);
   }
 
+  await page.getByRole("button", { name: /Race/i }).click();
+  await page.getByRole("button", { name: /^Start$/i }).click();
+  await page.locator("canvas").waitFor({ state: "visible" });
+  const raceModeHud = await page.locator(".race-hud").textContent();
+
+  if (!raceModeHud?.includes("Race") || !raceModeHud.includes("1/3") || !raceModeHud.includes("1/2")) {
+    throw new Error(`Race HUD does not include expected race state: ${raceModeHud}`);
+  }
+
   if (!canvasBox || canvasBox.width < 300 || canvasBox.height < 200) {
     throw new Error(`Canvas did not render at expected size: ${JSON.stringify(canvasBox)}`);
   }

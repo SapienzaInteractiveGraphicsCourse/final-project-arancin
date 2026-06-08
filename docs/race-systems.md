@@ -165,10 +165,10 @@ Obiettivo:
 
 Task:
 
-- [ ] configurare `totalLaps = 3`;
-- [ ] esporre posizione semplice;
-- [ ] predisporre `aiEnabled`;
-- [ ] documentare che AI completa dipende da centerline e veicoli finali.
+- [x] configurare `totalLaps = 3`;
+- [x] esporre posizione semplice;
+- [x] predisporre `aiEnabled`;
+- [x] documentare che AI completa dipende da centerline e veicoli finali.
 
 ## Milestone 5: Checkpoint Contract
 
@@ -223,7 +223,7 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Aggiungere cronometro giro.
 - [ ] Preparare supporto checkpoint.
 - [x] Preparare supporto best lap time trial.
-- [ ] Preparare supporto race vs AI.
+- [x] Preparare supporto race vs AI.
 - [ ] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.

@@ -149,6 +149,10 @@ function createRaceHud() {
 }
 
 function updateRaceHud(hud, raceState) {
+  const finalPanel = raceState.mode === "race"
+    ? { label: "Position", value: `${raceState.position}/${raceState.participantCount}` }
+    : { label: "Best", value: formatRaceTime(raceState.bestLapTime) };
+
   hud.innerHTML = `
     <div>
       <span>Mode</span>
@@ -167,8 +171,8 @@ function updateRaceHud(hud, raceState) {
       <strong>${formatRaceTime(raceState.lapTime)}</strong>
     </div>
     <div>
-      <span>Best</span>
-      <strong>${formatRaceTime(raceState.bestLapTime)}</strong>
+      <span>${finalPanel.label}</span>
+      <strong>${finalPanel.value}</strong>
     </div>
   `;
 }

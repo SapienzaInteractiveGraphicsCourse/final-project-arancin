@@ -249,6 +249,10 @@ Stato previsto:
   totalTime,
   lapTime,
   bestLapTime,
+  position,
+  participantCount,
+  aiEnabled,
+  opponentCount,
   countdown,
   finished
 }
@@ -271,6 +275,7 @@ Regole:
 - `RaceManager` non deve dipendere direttamente da mesh o DOM;
 - deve funzionare anche con `trackInfo.checkpoints = []`;
 - `race` abilita logica futura per AI;
+- in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
 - record/best lap possono usare localStorage quando i checkpoint reali saranno disponibili.
 
