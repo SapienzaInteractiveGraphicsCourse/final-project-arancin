@@ -303,7 +303,8 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Checkpoint in ordine predisposti.
 - [ ] Giri.
 - [x] Best lap predisposto per time trial.
-- [ ] Finish screen minimale.
+- [x] Finish screen con classifica lap time.
+- [x] Storico lap completati in localStorage.
 - [ ] Restart gara.
 
 ### AI E Race Mode

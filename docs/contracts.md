@@ -248,6 +248,7 @@ Stato previsto:
   checkpointCount,
   totalTime,
   lapTime,
+  lapTimes,
   bestLapTime,
   position,
   participantCount,
@@ -258,24 +259,55 @@ Stato previsto:
 }
 ```
 
+`lapTimes` contiene i giri completati:
+
+```js
+[
+  {
+    lap,
+    time
+  }
+]
+```
+
 Checkpoint previsto:
 
 ```js
 {
   id,
   position,
-  radius,
-  order,
+  radius,        // opzionale se esiste size
+  order,         // opzionale se esiste id numerico
   isStartFinish
 }
 ```
 
-I checkpoint vengono letti in ordine crescente di `order`. Checkpoint senza `position.x`, `position.z` o `order` numerico vengono ignorati.
+Formato checkpoint generato dalle piste spline:
+
+```js
+{
+  id,
+  name,
+  position,
+  rotationY,
+  size,
+  tangent
+}
+```
+
+I checkpoint vengono normalizzati prima dell'uso:
+
+- `order` usa `checkpoint.order`, oppure `checkpoint.id`;
+- `radius` usa `checkpoint.radius`, oppure viene derivato da `checkpoint.size`;
+- `isStartFinish` usa `checkpoint.isStartFinish`, oppure `checkpoint.id === 0`.
+
+Checkpoint senza `position.x`, `position.z` o un ordine numerico vengono ignorati.
 
 Regole:
 
 - `RaceManager` non deve dipendere direttamente da mesh o DOM;
 - deve funzionare anche con `trackInfo.checkpoints = []`;
+- un giro completo si chiude sulla start/finish line dopo aver attraversato i checkpoint intermedi;
 - `race` abilita logica futura per AI;
 - in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
@@ -296,8 +328,8 @@ isValidCheckpoint(checkpoint) -> boolean
 Regole:
 
 - `getOrderedCheckpoints()` non deve mutare `trackInfo.checkpoints`;
-- i checkpoint validi devono avere `position.x`, `position.z` e `order` numerici;
-- `radius` e opzionale, ma se presente deve essere positivo.
+- i checkpoint validi devono avere `position.x`, `position.z` e `order`/`id` numerici;
+- `radius` e opzionale se e presente `size`.
 
 ## Race Records
 
@@ -307,8 +339,12 @@ Contratto:
 
 ```js
 getRaceRecordKey({ trackId, vehicleId, mode }) -> string
+getRaceLapRecordsKey(recordKey) -> string
 readBestLapTime(storage, key) -> number | null
 writeBestLapTime(storage, key, lapTime)
+readLapRecords(storage, key) -> LapRecord[]
+appendLapRecord(storage, key, lapRecord) -> LapRecord[]
+ensureBestLapInRecords(storage, key, bestLapTime) -> LapRecord[]
 ```
 
 Chiave prevista:
@@ -316,6 +352,25 @@ Chiave prevista:
 ```text
 trackId:vehicleId:mode
 ```
+
+Chiave storico lap:
+
+```text
+trackId:vehicleId:mode:laps
+```
+
+`LapRecord`:
+
+```js
+{
+  lap,
+  time,
+  completedAt,
+  migrated
+}
+```
+
+`ensureBestLapInRecords()` serve a migrare i best lap salvati prima dello storico lap persistente.
 
 ## Vehicle Factory
 

@@ -9,7 +9,15 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
-import { getRaceRecordKey, readBestLapTime, writeBestLapTime } from "../systems/raceRecords.js";
+import {
+  appendLapRecord,
+  ensureBestLapInRecords,
+  getRaceLapRecordsKey,
+  getRaceRecordKey,
+  readBestLapTime,
+  readLapRecords,
+  writeBestLapTime
+} from "../systems/raceRecords.js";
 
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
@@ -22,21 +30,32 @@ export function startScenePreview(container, setup, options = {}) {
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const recordKey = getRaceRecordKey(setup);
+  const lapRecordsKey = getRaceLapRecordsKey(recordKey);
+  const savedBestLapTime = readBestLapTime(window.localStorage, recordKey);
+  let savedLapRecords = ensureBestLapInRecords(window.localStorage, lapRecordsKey, savedBestLapTime);
   const raceManager = new RaceManager({
     mode: setup.raceMode,
-    bestLapTime: readBestLapTime(window.localStorage, recordKey),
+    bestLapTime: savedBestLapTime,
+    onLapComplete: (lapRecord) => {
+      savedLapRecords = appendLapRecord(window.localStorage, lapRecordsKey, lapRecord);
+    },
     onBestLap: (bestLapTime) => {
       writeBestLapTime(window.localStorage, recordKey, bestLapTime);
     }
   });
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
+  const finishScreen = createFinishScreen({
+    onRestart: resetRace,
+    onExitToSetup: options.onExitToSetup
+  });
   const pauseMenu = createPauseMenu({
     onResume: resumeGame,
     onExitToSetup: options.onExitToSetup
   });
   let animationFrameId = 0;
   let paused = false;
+  let renderedFinishSignature = "";
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
@@ -44,6 +63,7 @@ export function startScenePreview(container, setup, options = {}) {
   scene.add(track.group, vehicle.group);
   container.appendChild(raceOverlay);
   container.appendChild(raceHud);
+  container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
   raceManager.startCountdown();
@@ -66,6 +86,14 @@ export function startScenePreview(container, setup, options = {}) {
     setPaused(false);
   }
 
+  function resetRace() {
+    controller.reset(track.spawn);
+    raceManager.reset();
+    raceManager.startCountdown();
+    renderedFinishSignature = "";
+    finishScreen.setVisible(false);
+  }
+
   function update(deltaTime) {
     const actions = inputManager.consumeActions();
 
@@ -78,27 +106,33 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     if (actions.restart) {
-      controller.reset(track.spawn);
-      raceManager.reset();
-      raceManager.startCountdown();
+      resetRace();
     }
 
     const currentVehicleState = controller.getState();
     const raceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = raceState.phase === RACE_PHASES.RUNNING;
-    const state = controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, {
-      surfaceType: "asphalt",
-      surfaceGrip: 1,
-      speedLimitMultiplier: 1,
-      boostFactor: 1,
-      collided: false
-    });
+    const state = raceState.finished
+      ? controller.getState()
+      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, {
+        surfaceType: "asphalt",
+        surfaceGrip: 1,
+        speedLimitMultiplier: 1,
+        boostFactor: 1,
+        collided: false
+      });
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
     updateRaceOverlay(raceOverlay, raceState);
     updateRaceHud(raceHud, raceState);
+    renderedFinishSignature = updateFinishScreen(
+      finishScreen,
+      raceState,
+      savedLapRecords,
+      renderedFinishSignature
+    );
   }
 
   function updateCameraFollow(state) {
@@ -136,12 +170,164 @@ export function startScenePreview(container, setup, options = {}) {
       renderer.domElement.remove();
       raceOverlay.remove();
       raceHud.remove();
+      finishScreen.element.remove();
       pauseMenu.element.remove();
       track.dispose();
       vehicle.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
     }
   };
+}
+
+function createFinishScreen({ onRestart, onExitToSetup }) {
+  const element = document.createElement("section");
+  element.className = "finish-screen";
+  element.hidden = true;
+  element.setAttribute("aria-label", "Race results");
+
+  element.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+
+    if (!button) {
+      return;
+    }
+
+    if (button.dataset.action === "restart") {
+      onRestart?.();
+      return;
+    }
+
+    onExitToSetup?.();
+  });
+
+  return {
+    element,
+    setVisible(visible) {
+      element.hidden = !visible;
+    }
+  };
+}
+
+function updateFinishScreen(finishScreen, raceState, savedLapRecords, previousSignature) {
+  if (!raceState.finished) {
+    finishScreen.setVisible(false);
+    return "";
+  }
+
+  const signature = [
+    raceState.mode,
+    raceState.totalTime,
+    raceState.lapTimes.length,
+    raceState.bestLapTime,
+    savedLapRecords.length
+  ].join(":");
+
+  if (signature === previousSignature) {
+    return previousSignature;
+  }
+
+  finishScreen.element.innerHTML = `
+    <div class="finish-panel">
+      <p class="finish-eyebrow">${formatMode(raceState.mode)}</p>
+      <h2>${raceState.mode === "time-trial" ? "Time Trial Complete" : "Race Complete"}</h2>
+      <div class="finish-summary">
+        <div>
+          <span>Total</span>
+          <strong>${formatRaceTime(raceState.totalTime)}</strong>
+        </div>
+        <div>
+          <span>Best</span>
+          <strong>${formatRaceTime(raceState.bestLapTime)}</strong>
+        </div>
+        <div>
+          <span>Position</span>
+          <strong>${raceState.position}/${raceState.participantCount}</strong>
+        </div>
+      </div>
+      <table class="finish-table">
+        <caption>This Run</caption>
+        <thead>
+          <tr>
+            <th>Lap</th>
+            <th>Time</th>
+            <th>Gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${formatLapRows(raceState.lapTimes, raceState.bestLapTime)}
+        </tbody>
+      </table>
+      <table class="finish-table">
+        <caption>Saved Laps</caption>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Time</th>
+            <th>Gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${formatSavedLapRows(savedLapRecords, raceState.bestLapTime)}
+        </tbody>
+      </table>
+      <div class="finish-actions">
+        <button class="finish-button" type="button" data-action="restart">Restart</button>
+        <button class="finish-button finish-button-secondary" type="button" data-action="setup">Main Menu</button>
+      </div>
+    </div>
+  `;
+  finishScreen.setVisible(true);
+  return signature;
+}
+
+function formatSavedLapRows(savedLapRecords, bestLapTime) {
+  if (!savedLapRecords.length) {
+    return `
+      <tr>
+        <td colspan="3">No saved laps</td>
+      </tr>
+    `;
+  }
+
+  return savedLapRecords
+    .map((record, index) => {
+      const gap = Number.isFinite(bestLapTime) ? Math.max(0, record.time - bestLapTime) : 0;
+      const bestClass = isSameTime(record.time, bestLapTime) ? " class=\"finish-best-lap\"" : "";
+
+      return `
+        <tr${bestClass}>
+          <td>${index + 1}</td>
+          <td>${formatRaceTime(record.time)}</td>
+          <td>${formatGapTime(gap)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function formatLapRows(lapTimes, bestLapTime) {
+  if (!lapTimes.length) {
+    return `
+      <tr>
+        <td colspan="3">No laps completed</td>
+      </tr>
+    `;
+  }
+
+  return lapTimes
+    .map((lap) => {
+      const gap = Number.isFinite(bestLapTime) ? Math.max(0, lap.time - bestLapTime) : 0;
+      const bestClass = isSameTime(lap.time, bestLapTime) ? " class=\"finish-best-lap\"" : "";
+
+      return `
+        <tr${bestClass}>
+          <td>${lap.lap}</td>
+          <td>${formatRaceTime(lap.time)}</td>
+          <td>${formatGapTime(gap)}</td>
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function createRaceHud() {
@@ -261,4 +447,16 @@ function formatRaceTime(value) {
   const centiseconds = Math.floor((value % 1) * 100);
 
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
+function formatGapTime(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "+0.00";
+  }
+
+  return `+${value.toFixed(2)}`;
+}
+
+function isSameTime(first, second) {
+  return Number.isFinite(first) && Number.isFinite(second) && Math.abs(first - second) < 0.005;
 }

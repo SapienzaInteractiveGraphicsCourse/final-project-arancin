@@ -189,6 +189,22 @@ Forma proposta:
 }
 ```
 
+Formato piste spline attualmente supportato:
+
+```js
+{
+  id,
+  name,
+  position,
+  rotationY,
+  size,
+  tangent
+}
+```
+
+`checkpointUtils` normalizza `id -> order`, `size -> radius` e `id === 0 -> isStartFinish`.
+Il giro si completa solo tornando sulla start/finish line dopo aver attraversato i checkpoint intermedi.
+
 Task:
 
 - [x] aggiornare `docs/contracts.md`;
@@ -224,6 +240,8 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Preparare supporto checkpoint.
 - [x] Preparare supporto best lap time trial.
 - [x] Preparare supporto race vs AI.
+- [x] Aggiungere finish screen con classifica lap time e gap dal best lap.
+- [x] Salvare storico lap completati per pista/veicolo/modalita.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.

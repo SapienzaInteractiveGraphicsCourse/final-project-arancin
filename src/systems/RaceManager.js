@@ -22,6 +22,7 @@ export class RaceManager {
     bestLapTime = null,
     aiEnabled = mode === RACE_MODES.RACE,
     opponentCount = aiEnabled ? 1 : 0,
+    onLapComplete,
     onBestLap
   } = {}) {
     this.mode = normalizeMode(mode);
@@ -30,6 +31,7 @@ export class RaceManager {
     this.initialBestLapTime = normalizeLapTime(bestLapTime);
     this.aiEnabled = Boolean(aiEnabled);
     this.opponentCount = this.aiEnabled ? normalizeNonNegativeInteger(opponentCount, 1) : 0;
+    this.onLapComplete = onLapComplete;
     this.onBestLap = onBestLap;
 
     this.reset();
@@ -52,9 +54,11 @@ export class RaceManager {
     this.currentLap = 1;
     this.currentCheckpoint = 0;
     this.checkpointArmed = true;
+    this.lapHasPassedSectors = false;
     this.checkpointCount = 0;
     this.totalTime = 0;
     this.lapTime = 0;
+    this.lapTimes = [];
     this.bestLapTime = this.initialBestLapTime;
     this.position = 1;
     this.participantCount = 1 + this.opponentCount;
@@ -96,6 +100,7 @@ export class RaceManager {
       checkpointCount: this.checkpointCount,
       totalTime: this.totalTime,
       lapTime: this.lapTime,
+      lapTimes: this.lapTimes.map((lap) => ({ ...lap })),
       bestLapTime: this.bestLapTime,
       position: this.position,
       participantCount: this.participantCount,
@@ -131,21 +136,33 @@ export class RaceManager {
     }
 
     this.checkpointArmed = false;
-    const nextCheckpointIndex = this.currentCheckpoint + 1;
+    const crossedStartFinish = Boolean(nextCheckpoint.isStartFinish);
 
-    if (nextCheckpointIndex < checkpoints.length) {
-      this.currentCheckpoint = nextCheckpointIndex;
+    if (crossedStartFinish && this.lapHasPassedSectors) {
+      this.completeLap();
       return;
     }
 
-    this.completeLap();
+    if (!crossedStartFinish) {
+      this.lapHasPassedSectors = true;
+    }
+
+    this.currentCheckpoint = getNextCheckpointIndex(this.currentCheckpoint, checkpoints.length);
   }
 
   completeLap() {
+    const completedLapTime = this.lapTime;
     const previousBestLapTime = this.bestLapTime;
     this.bestLapTime = previousBestLapTime === null
-      ? this.lapTime
-      : Math.min(previousBestLapTime, this.lapTime);
+      ? completedLapTime
+      : Math.min(previousBestLapTime, completedLapTime);
+
+    const completedLap = {
+      lap: this.currentLap,
+      time: completedLapTime
+    };
+    this.lapTimes.push(completedLap);
+    this.onLapComplete?.({ ...completedLap });
 
     if (this.bestLapTime !== previousBestLapTime) {
       this.onBestLap?.(this.bestLapTime);
@@ -154,6 +171,7 @@ export class RaceManager {
     this.lapTime = 0;
     this.currentCheckpoint = 0;
     this.checkpointArmed = false;
+    this.lapHasPassedSectors = false;
 
     if (this.currentLap >= this.totalLaps) {
       this.phase = RACE_PHASES.FINISHED;
@@ -189,4 +207,12 @@ function normalizeLapTime(value) {
   const normalized = Number(value);
 
   return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+}
+
+function getNextCheckpointIndex(currentCheckpoint, checkpointCount) {
+  if (checkpointCount <= 0) {
+    return 0;
+  }
+
+  return (currentCheckpoint + 1) % checkpointCount;
 }
