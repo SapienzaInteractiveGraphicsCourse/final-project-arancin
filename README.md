@@ -77,37 +77,37 @@ O
 ### Interfaccia Comune
 
 - [x] Definire interfaccia/base class veicolo.
-- [ ] Ogni veicolo deve esporre:
-  - [ ] `group`;
-  - [ ] `performance`;
-  - [ ] `setTransform(position, heading)`;
-  - [ ] `update(deltaTime, state)`;
-  - [ ] `setBodyColor(color)`;
-  - [ ] `setHeadlights(enabled)`;
-  - [ ] `toggleHeadlights()`;
-  - [ ] `dispose()`.
-- [ ] Creare `vehicleFactory`.
+- [x] Ogni veicolo deve esporre:
+  - [x] `group`;
+  - [x] `performance`;
+  - [x] `setTransform(position, heading)`;
+  - [x] `update(deltaTime, state)`;
+  - [x] `setBodyColor(color)`;
+  - [x] `setHeadlights(enabled)`;
+  - [x] `toggleHeadlights()`;
+  - [x] `dispose()`.
+- [x] Creare `vehicleFactory`.
 - [x] Separare dati performance da logica fisica.
 - [x] Ordinare velocita massime: Porsche > Silvia > Kart.
 
 ### Kart Procedurale
 
-- [ ] Costruire kart da zero con primitive Three.js.
+- [x] Costruire kart da zero con primitive Three.js.
 - [ ] Creare gerarchia:
-  - [ ] root group;
-  - [ ] telaio;
-  - [ ] carrozzeria;
-  - [ ] sedile;
+  - [x] root group;
+  - [x] telaio;
+  - [x] carrozzeria;
+  - [x] sedile;
   - [ ] volante;
   - [ ] pilota opzionale;
-  - [ ] assi;
-  - [ ] quattro ruote;
+  - [x] assi;
+  - [x] quattro ruote;
   - [ ] fari.
 - [ ] Ruote anteriori sterzanti con pivot separati.
 - [ ] Ruote animate in base a distanza percorsa.
 - [ ] Colore carrozzeria modificabile.
 - [ ] Headlights toggle.
-- [ ] Materiali con roughness/metalness coerenti.
+- [x] Materiali con roughness/metalness coerenti.
 - [ ] Piccole animazioni gerarchiche JS:
   - [ ] volante;
   - [ ] ruote;
