@@ -133,12 +133,12 @@ O
 - [x] Creare loader dedicato.
 - [x] Usare cache del modello caricato.
 - [x] Clonare modello per player e AI.
-- [ ] Verificare scala.
-- [ ] Verificare orientamento.
-- [ ] Verificare origine/pivot.
-- [ ] Correggere luci anteriori.
-- [ ] Identificare o ricreare ruote animate.
-- [ ] Applicare colore carrozzeria se possibile.
+- [x] Verificare scala.
+- [x] Verificare orientamento.
+- [x] Verificare origine/pivot.
+- [x] Correggere luci anteriori.
+- [x] Identificare o ricreare ruote animate.
+- [x] Applicare colore carrozzeria se possibile.
 - [ ] Documentare fonte/licenza asset.
 
 ## 3. Fisica E Input
