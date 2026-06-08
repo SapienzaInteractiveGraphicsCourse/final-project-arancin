@@ -8,9 +8,13 @@ const VEHICLE_COLORS = {
 
 const PLACEHOLDER_PERFORMANCE = {
   kart: {
-    maxForwardSpeed: 32,
-    acceleration: 30,
-    turnRate: 1.95
+    maxForwardSpeed: 42,
+    acceleration: 48,
+    rollingFriction: 1.05,
+    idleFriction: 1.8,
+    turnRate: 2.15,
+    steeringReturn: 9,
+    steeringResponsiveness: 10
   },
   porsche: {
     maxForwardSpeed: 44,
@@ -64,17 +68,19 @@ export function createVehicleById(vehicleId) {
     group.add(wheel);
     return wheel;
   });
+  let wheelRotation = 0;
 
   return {
     group,
     performance: PLACEHOLDER_PERFORMANCE[vehicleId] ?? PLACEHOLDER_PERFORMANCE.kart,
     setTransform(position, heading = 0) {
-      group.position.copy(position);
+      group.position.set(position.x, 0.42, position.z);
       group.rotation.y = heading;
     },
-    update(deltaTime) {
+    update(deltaTime, state = {}) {
+      wheelRotation += (state.distanceThisFrame ?? 0) / 0.34;
       wheels.forEach((wheel) => {
-        wheel.rotation.x += deltaTime * 2.2;
+        wheel.rotation.x = wheelRotation;
       });
     },
     setBodyColor(nextColor) {
