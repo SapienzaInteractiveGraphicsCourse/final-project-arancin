@@ -1,27 +1,10 @@
 import * as THREE from "three";
+import { getVehiclePerformance } from "../config/vehiclePerformance.js";
 
 const VEHICLE_COLORS = {
   kart: 0xd6332f,
   porsche: 0xf8fafc,
   silvia: 0x2f74d6
-};
-
-const PLACEHOLDER_PERFORMANCE = {
-  kart: {
-    maxForwardSpeed: 32,
-    acceleration: 30,
-    turnRate: 1.95
-  },
-  porsche: {
-    maxForwardSpeed: 44,
-    acceleration: 36,
-    turnRate: 2.15
-  },
-  silvia: {
-    maxForwardSpeed: 39,
-    acceleration: 34,
-    turnRate: 2.45
-  }
 };
 
 export function createVehicleById(vehicleId) {
@@ -67,7 +50,7 @@ export function createVehicleById(vehicleId) {
 
   return {
     group,
-    performance: PLACEHOLDER_PERFORMANCE[vehicleId] ?? PLACEHOLDER_PERFORMANCE.kart,
+    performance: getVehiclePerformance(vehicleId),
     setTransform(position, heading = 0) {
       group.position.copy(position);
       group.rotation.y = heading;

@@ -76,7 +76,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Interfaccia Comune
 
-- [ ] Definire interfaccia/base class veicolo.
+- [x] Definire interfaccia/base class veicolo.
 - [ ] Ogni veicolo deve esporre:
   - [ ] `group`;
   - [ ] `performance`;
@@ -87,8 +87,8 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [ ] `toggleHeadlights()`;
   - [ ] `dispose()`.
 - [ ] Creare `vehicleFactory`.
-- [ ] Separare dati performance da logica fisica.
-- [ ] Ordinare velocita massime: Porsche > Silvia > Kart.
+- [x] Separare dati performance da logica fisica.
+- [x] Ordinare velocita massime: Porsche > Silvia > Kart.
 
 ### Kart Procedurale
 

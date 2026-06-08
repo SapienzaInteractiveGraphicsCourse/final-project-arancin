@@ -203,6 +203,8 @@ Regole:
 
 File: `src/vehicles/vehicleFactory.js`
 
+Classe base: `src/vehicles/BaseVehicle.js`
+
 Firma:
 
 ```js
@@ -230,9 +232,18 @@ Contratto `Vehicle`:
 Porsche > Silvia > Kart
 ```
 
+I dati performance condivisi sono definiti in `src/config/vehiclePerformance.js`, separati dal controller fisico e dalla factory visuale. I valori di base sono:
+
+```text
+Porsche maxForwardSpeed 44
+Silvia maxForwardSpeed 39
+Kart maxForwardSpeed 32
+```
+
 Regole:
 
 - non esporre Formula 1 come veicolo selezionabile;
+- i veicoli concreti devono estendere o rispettare `BaseVehicle`;
 - il kart deve essere procedurale;
 - Porsche e Silvia possono usare asset importati, ma con cache loader;
 - non importare animazioni esterne;
