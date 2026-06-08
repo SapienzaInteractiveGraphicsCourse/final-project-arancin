@@ -61,7 +61,8 @@ export class InputManager {
     const actions = {
       camera: this.pendingActions.has("camera"),
       lights: this.pendingActions.has("lights"),
-      restart: this.pendingActions.has("restart")
+      restart: this.pendingActions.has("restart"),
+      pause: this.pendingActions.has("pause")
     };
 
     this.pendingActions.clear();
@@ -112,5 +113,6 @@ const HELD_KEY_MAP = new Map([
 const ACTION_KEY_MAP = new Map([
   ["c", "camera"],
   ["l", "lights"],
-  ["r", "restart"]
+  ["r", "restart"],
+  ["Escape", "pause"]
 ]);

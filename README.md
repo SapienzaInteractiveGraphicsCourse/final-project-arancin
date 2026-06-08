@@ -22,7 +22,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
-- [ ] `feature/race-systems`: fisica, checkpoint, collisioni, AI.
+- [ ] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen; AI e contromano da completare.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
@@ -71,74 +71,74 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
 - [x] Verificare `bun run build`.
-
+O
 ## 2. Veicoli
 
 ### Interfaccia Comune
 
-- [ ] Definire interfaccia/base class veicolo.
-- [ ] Ogni veicolo deve esporre:
-  - [ ] `group`;
-  - [ ] `performance`;
-  - [ ] `setTransform(position, heading)`;
-  - [ ] `update(deltaTime, state)`;
-  - [ ] `setBodyColor(color)`;
-  - [ ] `setHeadlights(enabled)`;
-  - [ ] `toggleHeadlights()`;
-  - [ ] `dispose()`.
-- [ ] Creare `vehicleFactory`.
-- [ ] Separare dati performance da logica fisica.
-- [ ] Ordinare velocita massime: Porsche > Silvia > Kart.
+- [x] Definire interfaccia/base class veicolo.
+- [x] Ogni veicolo deve esporre:
+  - [x] `group`;
+  - [x] `performance`;
+  - [x] `setTransform(position, heading)`;
+  - [x] `update(deltaTime, state)`;
+  - [x] `setBodyColor(color)`;
+  - [x] `setHeadlights(enabled)`;
+  - [x] `toggleHeadlights()`;
+  - [x] `dispose()`.
+- [x] Creare `vehicleFactory`.
+- [x] Separare dati performance da logica fisica.
+- [x] Ordinare velocita massime: Porsche > Silvia > Kart.
 
 ### Kart Procedurale
 
-- [ ] Costruire kart da zero con primitive Three.js.
-- [ ] Creare gerarchia:
-  - [ ] root group;
-  - [ ] telaio;
-  - [ ] carrozzeria;
-  - [ ] sedile;
-  - [ ] volante;
-  - [ ] pilota opzionale;
-  - [ ] assi;
-  - [ ] quattro ruote;
-  - [ ] fari.
-- [ ] Ruote anteriori sterzanti con pivot separati.
-- [ ] Ruote animate in base a distanza percorsa.
-- [ ] Colore carrozzeria modificabile.
-- [ ] Headlights toggle.
-- [ ] Materiali con roughness/metalness coerenti.
-- [ ] Piccole animazioni gerarchiche JS:
-  - [ ] volante;
-  - [ ] ruote;
-  - [ ] possibile oscillazione telaio/sospensioni.
+- [x] Costruire kart da zero con primitive Three.js.
+- [x] Creare gerarchia:
+  - [x] root group;
+  - [x] telaio;
+  - [x] carrozzeria;
+  - [x] sedile;
+  - [x] volante;
+  - [x] pilota opzionale;
+  - [x] assi;
+  - [x] quattro ruote;
+  - [x] fari.
+- [x] Ruote anteriori sterzanti con pivot separati.
+- [x] Ruote animate in base a distanza percorsa.
+- [x] Colore carrozzeria modificabile.
+- [x] Headlights toggle.
+- [x] Materiali con roughness/metalness coerenti.
+- [x] Piccole animazioni gerarchiche JS:
+  - [x] volante;
+  - [x] ruote;
+  - [x] possibile oscillazione telaio/sospensioni.
 
 ### Porsche
 
 - [x] Importare asset GLB.
-- [ ] Creare loader dedicato.
-- [ ] Usare cache del modello caricato.
-- [ ] Clonare modello per player e AI.
-- [ ] Verificare scala.
-- [ ] Verificare orientamento.
-- [ ] Verificare origine/pivot.
-- [ ] Correggere luci anteriori.
-- [ ] Identificare o ricreare ruote animate.
-- [ ] Applicare colore carrozzeria se possibile.
-- [ ] Documentare fonte/licenza asset.
+- [x] Creare loader dedicato.
+- [x] Usare cache del modello caricato.
+- [x] Clonare modello per player e AI.
+- [x] Verificare scala.
+- [x] Verificare orientamento.
+- [x] Verificare origine/pivot.
+- [x] Correggere luci anteriori.
+- [x] Identificare o ricreare ruote animate.
+- [x] Applicare colore carrozzeria se possibile.
+- [x] Documentare fonte/licenza asset.
 
 ### Nissan Silvia
 
 - [x] Importare asset FBX.
-- [ ] Creare loader dedicato.
-- [ ] Usare cache del modello caricato.
-- [ ] Clonare modello per player e AI.
-- [ ] Verificare scala.
-- [ ] Verificare orientamento.
-- [ ] Verificare origine/pivot.
-- [ ] Correggere luci anteriori.
-- [ ] Identificare o ricreare ruote animate.
-- [ ] Applicare colore carrozzeria se possibile.
+- [x] Creare loader dedicato.
+- [x] Usare cache del modello caricato.
+- [x] Clonare modello per player e AI.
+- [x] Verificare scala.
+- [x] Verificare orientamento.
+- [x] Verificare origine/pivot.
+- [x] Correggere luci anteriori.
+- [x] Identificare o ricreare ruote animate.
+- [x] Applicare colore carrozzeria se possibile.
 - [ ] Documentare fonte/licenza asset.
 
 ## 3. Fisica E Input
@@ -155,6 +155,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
   - [x] C cambio camera;
   - [x] L luci;
   - [x] R restart.
+  - [x] Esc pausa/menu.
 - [x] Consumare one-shot una sola volta per frame.
 - [x] Bloccare scroll pagina per i tasti di gioco.
 - [x] Aggiungere `dispose()` a `InputManager`.
@@ -254,20 +255,63 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 6. Gara E AI
 
-- [ ] Race manager.
-- [ ] Countdown iniziale.
-- [ ] Checkpoint in ordine.
-- [ ] Giri.
-- [ ] Cronometro.
-- [ ] Best lap.
-- [ ] Classifica semplice player vs AI.
-- [ ] Finish screen minimale.
-- [ ] Restart gara.
-- [ ] Avviso contromano:
-  - [ ] progresso piu vicino su centerline;
-  - [ ] heading pista da lookahead;
-  - [ ] prodotto scalare con forward veicolo;
-  - [ ] soglia temporale per evitare falsi positivi.
+### Modalita
+
+- [x] Documentare `docs/race-systems.md`.
+- [ ] Supportare modalita `race`:
+  - [ ] gara contro AI;
+  - [x] giri multipli;
+  - [x] checkpoint in ordine;
+  - [x] classifica semplice player predisposta.
+- [x] Supportare modalita `time-trial`:
+  - [x] solo player;
+  - [x] giro veloce;
+  - [x] cronometro;
+  - [x] best lap locale.
+
+### Race Manager
+
+- [x] Creare `RaceManager`.
+- [x] Definire fasi:
+  - [x] `idle`;
+  - [x] `countdown`;
+  - [x] `running`;
+  - [x] `finished`.
+- [x] Configurare `totalLaps` in base alla modalita:
+  - [x] `race`: 3 giri;
+  - [x] `time-trial`: 1 giro.
+- [x] Implementare `startCountdown()`.
+- [x] Implementare `startRace()`.
+- [x] Implementare `reset()`.
+- [x] Implementare `update(deltaTime, playerState, trackInfo)`.
+- [x] Esportare `getState()`.
+- [x] Non rompersi con `trackInfo.checkpoints = []`.
+
+### Countdown E Start Flow
+
+- [x] Countdown iniziale.
+- [x] Bloccare movimento durante countdown.
+- [x] Mostrare countdown in UI/overlay.
+- [x] Passare a gara running dopo `GO`.
+- [x] Menu pausa con `Esc`.
+- [x] Ritorno alla GUI iniziale dal menu pausa.
+
+### Tempi E Giri
+
+- [x] Cronometro totale.
+- [x] Cronometro giro.
+- [x] Checkpoint in ordine predisposti.
+- [x] Giri.
+- [x] Best lap predisposto per time trial.
+- [x] Finish screen con classifica lap time.
+- [x] Storico lap completati in localStorage.
+- [x] Restart gara.
+
+### AI E Race Mode
+
+- [x] Predisporre stato `aiEnabled`.
+- [x] Esporre posizione semplice player.
+- [x] Preparare controller logico AI su centerline.
 - [ ] AI opponent visibile.
 - [ ] AI usa stesso veicolo selezionato dal player.
 - [ ] Velocita AI dipendente dal veicolo.
@@ -275,6 +319,21 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] AI accelera in uscita.
 - [ ] AI segue traiettoria con offset laterale.
 - [ ] AI competitiva ma battibile.
+
+### Contromano
+
+- [x] Avviso contromano:
+  - [x] progresso piu vicino su centerline;
+  - [x] heading pista da lookahead;
+  - [x] prodotto scalare con forward veicolo;
+  - [x] soglia temporale per evitare falsi positivi.
+
+### Contratti E Verifiche
+
+- [x] Aggiornare `docs/contracts.md` con contratto `RaceManager`.
+- [x] Aggiornare `docs/contracts.md` con contratto checkpoint.
+- [x] Aggiornare `verify:scene` se il countdown ha DOM stabile.
+- [x] Verificare `bun run build`.
 
 ## 7. Camera
 

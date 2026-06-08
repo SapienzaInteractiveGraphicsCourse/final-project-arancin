@@ -49,7 +49,8 @@ input.getHeldState() -> {
 input.consumeActions() -> {
   camera,
   lights,
-  restart
+  restart,
+  pause
 }
 
 input.dispose()
@@ -68,6 +69,7 @@ Azioni one-shot:
 - `C`: cambio camera;
 - `L`: luci;
 - `R`: restart.
+- `Escape`: pausa/menu runtime.
 
 Regole:
 
@@ -199,9 +201,251 @@ Regole:
 - mettere dati pista in moduli separati quando le piste reali saranno implementate;
 - evitare piste extra finche `vegas`, `beach`, `monaco` non sono complete.
 
+## Race Manager
+
+File previsto: `src/systems/RaceManager.js`
+
+Firma prevista:
+
+```js
+const raceManager = new RaceManager({
+  mode,
+  totalLaps,
+  countdownSeconds
+});
+```
+
+Contratto previsto:
+
+```js
+raceManager.startCountdown()
+raceManager.startRace()
+raceManager.update(deltaTime, playerState, trackInfo)
+raceManager.reset()
+raceManager.getState()
+```
+
+Fasi previste:
+
+```js
+"idle" | "countdown" | "running" | "finished"
+```
+
+Modalita supportate:
+
+- `race`: gara contro AI, giri multipli, classifica semplice;
+- `time-trial`: solo player, giro veloce, best lap locale.
+
+Stato previsto:
+
+```js
+{
+  phase,
+  mode,
+  totalLaps,
+  currentLap,
+  currentCheckpoint,
+  checkpointCount,
+  totalTime,
+  lapTime,
+  lapTimes,
+  bestLapTime,
+  position,
+  participantCount,
+  aiEnabled,
+  opponentCount,
+  countdown,
+  finished
+}
+```
+
+`lapTimes` contiene i giri completati:
+
+```js
+[
+  {
+    lap,
+    time
+  }
+]
+```
+
+Checkpoint previsto:
+
+```js
+{
+  id,
+  position,
+  radius,        // opzionale se esiste size
+  order,         // opzionale se esiste id numerico
+  isStartFinish
+}
+```
+
+Formato checkpoint generato dalle piste spline:
+
+```js
+{
+  id,
+  name,
+  position,
+  rotationY,
+  size,
+  tangent
+}
+```
+
+I checkpoint vengono normalizzati prima dell'uso:
+
+- `order` usa `checkpoint.order`, oppure `checkpoint.id`;
+- `radius` usa `checkpoint.radius`, oppure viene derivato da `checkpoint.size`;
+- `isStartFinish` usa `checkpoint.isStartFinish`, oppure `checkpoint.id === 0`.
+
+Checkpoint senza `position.x`, `position.z` o un ordine numerico vengono ignorati.
+
+Regole:
+
+- `RaceManager` non deve dipendere direttamente da mesh o DOM;
+- deve funzionare anche con `trackInfo.checkpoints = []`;
+- un giro completo si chiude sulla start/finish line dopo aver attraversato i checkpoint intermedi;
+- `race` abilita logica futura per AI;
+- in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
+- `time-trial` non deve richiedere AI;
+- record, best lap e storico lap usano localStorage quando i checkpoint reali sono presenti.
+
+## Checkpoint Utils
+
+File: `src/systems/checkpointUtils.js`
+
+Contratto:
+
+```js
+getOrderedCheckpoints(trackInfo) -> Checkpoint[]
+isInsideCheckpoint(position, checkpoint) -> boolean
+isValidCheckpoint(checkpoint) -> boolean
+```
+
+Regole:
+
+- `getOrderedCheckpoints()` non deve mutare `trackInfo.checkpoints`;
+- i checkpoint validi devono avere `position.x`, `position.z` e `order`/`id` numerici;
+- `radius` e opzionale se e presente `size`.
+
+## Race Records
+
+File: `src/systems/raceRecords.js`
+
+Contratto:
+
+```js
+getRaceRecordKey({ trackId, vehicleId, mode }) -> string
+getRaceLapRecordsKey(recordKey) -> string
+readBestLapTime(storage, key) -> number | null
+writeBestLapTime(storage, key, lapTime)
+readLapRecords(storage, key) -> LapRecord[]
+appendLapRecord(storage, key, lapRecord) -> LapRecord[]
+ensureBestLapInRecords(storage, key, bestLapTime) -> LapRecord[]
+```
+
+Chiave prevista:
+
+```text
+trackId:vehicleId:mode
+```
+
+Chiave storico lap:
+
+```text
+trackId:vehicleId:mode:laps
+```
+
+`LapRecord`:
+
+```js
+{
+  lap,
+  time,
+  completedAt,
+  migrated
+}
+```
+
+`ensureBestLapInRecords()` serve a migrare i best lap salvati prima dello storico lap persistente.
+
+## Wrong Way Detector
+
+File: `src/systems/WrongWayDetector.js`
+
+Firma:
+
+```js
+const detector = new WrongWayDetector();
+```
+
+Contratto:
+
+```js
+detector.update(deltaTime, vehicleState, trackInfo) -> {
+  warning,
+  wrongWayTime,
+  progress,
+  headingDot
+}
+
+detector.reset()
+detector.getState()
+```
+
+Regole:
+
+- usa `trackInfo.centerline`;
+- calcola il progresso piu vicino al player;
+- confronta heading veicolo e heading pista con prodotto scalare;
+- mostra warning solo dopo una soglia temporale;
+- non segnala contromano a veicolo quasi fermo.
+
+## AI Vehicle Controller
+
+File: `src/systems/AiVehicleController.js`
+
+Firma:
+
+```js
+const aiController = new AiVehicleController(vehicle.performance, track.trackInfo);
+```
+
+Contratto:
+
+```js
+aiController.reset(trackInfo)
+aiController.update(deltaTime, trackInfo) -> AiVehicleState
+aiController.getState() -> AiVehicleState
+```
+
+`AiVehicleState`:
+
+```js
+{
+  position,
+  heading,
+  progress,
+  lap,
+  speed
+}
+```
+
+Regole:
+
+- usa `trackInfo.centerline`;
+- per ora non gestisce mesh;
+- usa la performance del veicolo selezionato per derivare velocita base;
+- serve come base per opponent visibile e classifica player vs AI.
+
 ## Vehicle Factory
 
 File: `src/vehicles/vehicleFactory.js`
+
+Classe base: `src/vehicles/BaseVehicle.js`
 
 Firma:
 
@@ -230,10 +474,20 @@ Contratto `Vehicle`:
 Porsche > Silvia > Kart
 ```
 
+I dati performance condivisi sono definiti in `src/config/vehiclePerformance.js`, separati dal controller fisico e dalla factory visuale. I valori di base sono:
+
+```text
+Porsche maxForwardSpeed 44
+Silvia maxForwardSpeed 39
+Kart maxForwardSpeed 32
+```
+
 Regole:
 
 - non esporre Formula 1 come veicolo selezionabile;
+- i veicoli concreti devono estendere o rispettare `BaseVehicle`;
 - il kart deve essere procedurale;
+- i veicoli con ruote animabili possono esporre `wheelRollGroups`, `frontSteeringPivots` e `wheelRadius`;
 - Porsche e Silvia possono usare asset importati, ma con cache loader;
 - non importare animazioni esterne;
 - ruote e fari devono essere animati/gestiti in JavaScript.
