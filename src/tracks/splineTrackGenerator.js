@@ -14,17 +14,21 @@ const ROAD_Y = 0.045;
 const GROUND_Y = -0.025;
 const SPAWN_Y = ROAD_Y + 0.1;
 const EDGE_WIDTH = 0.1;
+const NEON_EDGE_Y = 0.08;
+const NEON_EDGE_WIDTH = 0.5;
+const NEON_EDGE_LENGTH = 4;
+const NEON_EDGE_INTERVAL = 6;
 const ROAD_UV_SCALE = 8;
 const BARRIER_SAMPLE_STEP = 2;
-const CENTER_DASH_LENGTH = 1.45;
-const CENTER_DASH_WIDTH = 0.18;
-const CENTER_DASH_INTERVAL = 4.2;
-const START_LETTERS = {
-  S: ["111", "100", "100", "111", "001", "001", "111"],
-  T: ["111", "010", "010", "010", "010", "010", "010"],
-  A: ["010", "101", "101", "111", "101", "101", "101"],
-  R: ["110", "101", "101", "110", "101", "101", "101"]
-};
+const CENTER_DASH_LENGTH = 3.5;
+const CENTER_DASH_WIDTH = 0.5;
+const CENTER_DASH_HEIGHT = 0.06;
+const CENTER_DASH_INTERVAL = 12;
+const CURB_SAMPLE_STEP = 3;
+const CURB_WIDTH = 0.62;
+const CURB_LENGTH = 1.35;
+const CURVE_THRESHOLD = 0.075;
+const UP = new THREE.Vector3(0, 1, 0);
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -67,7 +71,8 @@ function createRoadGeometry(curve, roadWidth, segments) {
       tangent: tangent.clone(),
       normal: right.clone(),
       progress,
-      distance: cumulativeDistance
+      distance: cumulativeDistance,
+      roadHalfWidth: roadWidth * 0.5
     });
 
     previousCenter = center;
@@ -105,11 +110,11 @@ function createEdgeRibbonGeometry(edgeSamples, side, width = EDGE_WIDTH) {
   const indices = [];
 
   edgeSamples.forEach((sample) => {
-    const edge = side < 0 ? sample.left : sample.right;
+    const edge = sample.center.clone().addScaledVector(sample.normal, side * sample.roadHalfWidth);
     const inner = edge.clone().addScaledVector(sample.normal, -side * width * 0.5);
     const outer = edge.clone().addScaledVector(sample.normal, side * width * 0.5);
-    inner.y = ROAD_Y + 0.015;
-    outer.y = ROAD_Y + 0.015;
+    inner.y = ROAD_Y + 0.02;
+    outer.y = ROAD_Y + 0.02;
 
     vertices.push(inner.x, inner.y, inner.z, outer.x, outer.y, outer.z);
     uvs.push(0, sample.distance / ROAD_UV_SCALE, 1, sample.distance / ROAD_UV_SCALE);
@@ -129,6 +134,59 @@ function createEdgeRibbonGeometry(edgeSamples, side, width = EDGE_WIDTH) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function createNeonEdgeMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 1.15,
+    flatShading: true,
+    roughness: 0.24,
+    metalness: 0.04
+  });
+}
+
+function addSegmentedNeonRoadEdges(group, edgeSamples, definition) {
+  const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
+  const segmentCount = Math.floor(totalDistance / NEON_EDGE_INTERVAL);
+  const geometry = new THREE.BoxGeometry(NEON_EDGE_WIDTH, 0.035, NEON_EDGE_LENGTH);
+  const materials = [
+    createNeonEdgeMaterial(0xff2090),
+    createNeonEdgeMaterial(0x00e5ff)
+  ];
+  const matrices = [[], []];
+  const matrix = new THREE.Matrix4();
+
+  [-1, 1].forEach((side) => {
+    for (let index = 0; index < segmentCount; index += 1) {
+      const sample = sampleEdgeByDistance(edgeSamples, index * NEON_EDGE_INTERVAL + NEON_EDGE_LENGTH * 0.5);
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.normal, side * sample.roadHalfWidth);
+      const right = sample.normal.clone().multiplyScalar(side);
+      const tangent = sample.tangent.clone().setY(0).normalize();
+      const materialIndex = Math.floor(index / 3) % 2;
+
+      position.y = NEON_EDGE_Y;
+      matrix.makeBasis(right, UP, tangent.negate());
+      matrix.setPosition(position);
+      matrices[materialIndex].push(matrix.clone());
+    }
+  });
+
+  matrices.forEach((materialMatrices, materialIndex) => {
+    if (materialMatrices.length === 0) {
+      return;
+    }
+
+    const mesh = new THREE.InstancedMesh(geometry, materials[materialIndex], materialMatrices.length);
+    mesh.name = `${definition.name}:SegmentedNeonRoadEdge:${materialIndex}`;
+    mesh.receiveShadow = true;
+    materialMatrices.forEach((segmentMatrix, index) => mesh.setMatrixAt(index, segmentMatrix));
+    mesh.instanceMatrix.needsUpdate = true;
+    group.add(mesh);
+  });
 }
 
 function createGround(definition, material) {
@@ -153,26 +211,28 @@ function sampleEdgeByDistance(edgeSamples, distance) {
       const alpha = span === 0 ? 0 : (distance - previous.distance) / span;
       const center = previous.center.clone().lerp(current.center, alpha);
       const tangent = previous.tangent.clone().lerp(current.tangent, alpha).normalize();
+      const normal = previous.normal.clone().lerp(current.normal, alpha).normalize();
+      const roadHalfWidth = THREE.MathUtils.lerp(previous.roadHalfWidth, current.roadHalfWidth, alpha);
 
-      return { center, tangent };
+      return { center, tangent, normal, roadHalfWidth };
     }
   }
 
   const last = edgeSamples[edgeSamples.length - 1];
   return {
     center: last.center.clone(),
-    tangent: last.tangent.clone()
+    tangent: last.tangent.clone(),
+    normal: last.normal.clone(),
+    roadHalfWidth: last.roadHalfWidth
   };
 }
 
 function addCenterLineDashes(group, edgeSamples, definition, material) {
   const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
   const dashCount = Math.floor(totalDistance / CENTER_DASH_INTERVAL);
-  const geometry = new THREE.BoxGeometry(CENTER_DASH_WIDTH, 0.035, CENTER_DASH_LENGTH);
+  const geometry = new THREE.BoxGeometry(CENTER_DASH_WIDTH, CENTER_DASH_HEIGHT, CENTER_DASH_LENGTH);
   const dashes = new THREE.InstancedMesh(geometry, material, dashCount);
   const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion();
-  const scale = new THREE.Vector3(1, 1, 1);
 
   dashes.name = `${definition.name}:CenterLineDashes`;
   dashes.receiveShadow = true;
@@ -180,14 +240,82 @@ function addCenterLineDashes(group, edgeSamples, definition, material) {
   for (let index = 0; index < dashCount; index += 1) {
     const sample = sampleEdgeByDistance(edgeSamples, index * CENTER_DASH_INTERVAL + CENTER_DASH_INTERVAL * 0.5);
     const position = sample.center;
-    position.y = ROAD_Y + 0.04;
-    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), getHeading(sample.tangent));
-    matrix.compose(position, quaternion, scale);
+    const tangent = sample.tangent.clone().setY(0).normalize();
+    const right = getRightVector(tangent);
+
+    position.y = ROAD_Y + 0.06;
+    matrix.makeBasis(right, UP, tangent.clone().negate());
+    matrix.setPosition(position);
     dashes.setMatrixAt(index, matrix);
   }
 
   dashes.instanceMatrix.needsUpdate = true;
   group.add(dashes);
+}
+
+function getCurveSide(edgeSamples, index) {
+  const previous = edgeSamples[Math.max(0, index - 2)];
+  const next = edgeSamples[Math.min(edgeSamples.length - 1, index + 2)];
+  const turn = previous.tangent.x * next.tangent.z - previous.tangent.z * next.tangent.x;
+
+  if (Math.abs(turn) < CURVE_THRESHOLD) {
+    return 0;
+  }
+
+  return turn > 0 ? 1 : -1;
+}
+
+function addApexCurbs(group, edgeSamples, definition, materials) {
+  if (definition.id !== "vegas") {
+    return;
+  }
+
+  const curbGeometry = new THREE.BoxGeometry(CURB_WIDTH, 0.035, CURB_LENGTH);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+  const redMatrices = [];
+  const whiteMatrices = [];
+
+  for (let index = 3; index < edgeSamples.length - 3; index += CURB_SAMPLE_STEP) {
+    const curveSide = getCurveSide(edgeSamples, index);
+
+    if (curveSide === 0) {
+      continue;
+    }
+
+    const sample = edgeSamples[index];
+    const insideSide = -curveSide;
+    const position = sample.center
+      .clone()
+      .addScaledVector(sample.normal, insideSide * (sample.roadHalfWidth - CURB_WIDTH * 0.5));
+    position.y = ROAD_Y + 0.055;
+
+    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), getHeading(sample.tangent));
+    matrix.compose(position, quaternion, scale);
+
+    if ((index / CURB_SAMPLE_STEP) % 2 < 1) {
+      redMatrices.push(matrix.clone());
+    } else {
+      whiteMatrices.push(matrix.clone());
+    }
+  }
+
+  [
+    { matrices: redMatrices, material: materials.curbRed, name: "ApexCurbRed" },
+    { matrices: whiteMatrices, material: materials.curbWhite, name: "ApexCurbWhite" }
+  ].forEach(({ matrices, material, name }) => {
+    if (matrices.length === 0) {
+      return;
+    }
+
+    const curbs = new THREE.InstancedMesh(curbGeometry, material, matrices.length);
+    curbs.name = `${definition.name}:${name}`;
+    curbs.receiveShadow = true;
+    matrices.forEach((curbMatrix, curbIndex) => curbs.setMatrixAt(curbIndex, curbMatrix));
+    curbs.instanceMatrix.needsUpdate = true;
+    group.add(curbs);
+  });
 }
 
 function createBarrierSegment(material, start, end, height, thickness) {
@@ -288,35 +416,6 @@ function addStartLine(group, checkpoint, materials) {
   group.add(checkpointMarker);
 }
 
-function addStartSignLetters(sign, material) {
-  const geometry = new THREE.BoxGeometry(0.12, 0.12, 0.04);
-  const letters = ["S", "T", "A", "R", "T"];
-  const cell = 0.16;
-  const letterGap = 0.18;
-  const totalWidth = letters.length * 3 * cell + (letters.length - 1) * letterGap;
-  let cursor = -totalWidth * 0.5;
-
-  letters.forEach((letter) => {
-    START_LETTERS[letter].forEach((row, rowIndex) => {
-      row.split("").forEach((value, columnIndex) => {
-        if (value !== "1") {
-          return;
-        }
-
-        const dot = new THREE.Mesh(geometry, material);
-        dot.position.set(
-          cursor + columnIndex * cell + cell,
-          0.4 - rowIndex * cell,
-          0.095
-        );
-        sign.add(dot);
-      });
-    });
-
-    cursor += 3 * cell + letterGap;
-  });
-}
-
 function addStartGantry(group, checkpoint, materials) {
   const gantry = new THREE.Group();
   gantry.name = "StartGantry";
@@ -337,13 +436,13 @@ function addStartGantry(group, checkpoint, materials) {
   rightPost.position.set(span * 0.5, postHeight * 0.5, 0);
   top.position.set(0, postHeight, 0);
   sign.position.set(0, postHeight - 0.02, 0.32);
+  sign.rotation.y = Math.PI;
 
   [leftPost, rightPost, top, sign].forEach((mesh) => {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
   });
 
-  addStartSignLetters(sign, materials.startDark);
   gantry.add(leftPost, rightPost, top, sign);
   group.add(gantry);
 }
@@ -445,16 +544,23 @@ export function createSplineTrack(definition) {
   road.name = `${definition.name}:Road`;
   road.receiveShadow = true;
 
-  const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
-  leftEdge.name = `${definition.name}:LeftRoadEdge`;
-  leftEdge.receiveShadow = true;
+  group.add(ground, road);
 
-  const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
-  rightEdge.name = `${definition.name}:RightRoadEdge`;
-  rightEdge.receiveShadow = true;
+  if (definition.id === "vegas") {
+    addSegmentedNeonRoadEdges(group, roadData.edgeSamples, definition);
+  } else {
+    const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
+    leftEdge.name = `${definition.name}:LeftRoadEdge`;
+    leftEdge.receiveShadow = true;
 
-  group.add(ground, road, leftEdge, rightEdge);
+    const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
+    rightEdge.name = `${definition.name}:RightRoadEdge`;
+    rightEdge.receiveShadow = true;
+
+    group.add(leftEdge, rightEdge);
+  }
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
+  addApexCurbs(group, roadData.edgeSamples, definition, materials);
   const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
   const checkpoints = createCheckpoints(curve, definition);
   addStartLine(group, checkpoints[0], materials);

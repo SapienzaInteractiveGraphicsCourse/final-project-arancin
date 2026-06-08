@@ -5,9 +5,12 @@ export class InputManager {
     this.pendingActions = new Set();
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.clearHeldState = this.clearHeldState.bind(this);
 
     this.target.addEventListener("keydown", this.handleKeyDown);
     this.target.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("blur", this.clearHeldState);
+    document.addEventListener("visibilitychange", this.clearHeldState);
   }
 
   handleKeyDown(event) {
@@ -67,6 +70,11 @@ export class InputManager {
     return actions;
   }
 
+  clearHeldState() {
+    this.heldKeys.clear();
+    this.pendingActions.clear();
+  }
+
   dispose() {
     if (!this.target) {
       return;
@@ -74,6 +82,8 @@ export class InputManager {
 
     this.target.removeEventListener("keydown", this.handleKeyDown);
     this.target.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("blur", this.clearHeldState);
+    document.removeEventListener("visibilitychange", this.clearHeldState);
     this.heldKeys.clear();
     this.pendingActions.clear();
     this.target = null;

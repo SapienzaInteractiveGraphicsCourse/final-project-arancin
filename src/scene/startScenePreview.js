@@ -149,14 +149,19 @@ export function startScenePreview(container, setup, options = {}) {
   }
 
   function updateCameraFollow(state) {
-    const cameraTarget = new THREE.Vector3(
-      state.position.x + Math.sin(state.heading + Math.PI) * 8,
-      state.position.y + 5.5,
-      state.position.z + Math.cos(state.heading + Math.PI) * 8
+    const targetY = track.spawn.position.y;
+    const cameraDistance = 9.5;
+    const cameraHeight = 6.2;
+    cameraTarget.set(
+      state.position.x + Math.sin(state.heading + Math.PI) * cameraDistance,
+      targetY + cameraHeight,
+      state.position.z + Math.cos(state.heading + Math.PI) * cameraDistance
     );
 
     camera.position.lerp(cameraTarget, 0.08);
-    camera.lookAt(state.position.x, state.position.y + 0.7, state.position.z);
+    lookTarget.set(state.position.x, targetY + 0.75, state.position.z);
+    cameraLookAt.lerp(lookTarget, 0.16);
+    camera.lookAt(cameraLookAt);
   }
 
   function animate(timestamp) {
