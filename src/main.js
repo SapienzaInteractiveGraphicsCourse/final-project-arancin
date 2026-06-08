@@ -21,7 +21,7 @@ function setOverlayText({ phase, setup }) {
   const suffix = phase === APP_PHASES.LOADING ? " | Loading scene" : "";
 
   overlay.dataset.phase = phase;
-  overlay.textContent = `Track: ${labels.track} | Vehicle: ${labels.vehicle} | Color: ${labels.color} | Mode: ${labels.mode}${suffix}`;
+  overlay.textContent = `Track: ${labels.track} | Vehicle: ${labels.vehicle} | Mode: ${labels.mode}${suffix}`;
 }
 
 appState.addEventListener("change", (event) => {

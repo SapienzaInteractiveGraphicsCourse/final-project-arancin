@@ -82,6 +82,10 @@ async function runVerification() {
   await page.getByRole("button", { name: /^Start$/i }).click();
 
   await page.locator("canvas").waitFor({ state: "visible" });
+  await page.locator(".pre-race-color-picker").waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Electric Blue/i }).click();
+  await page.getByRole("button", { name: /Start Race/i }).click();
+  await page.locator(".race-overlay").waitFor({ state: "visible" });
   const countdownText = await page.locator(".race-overlay").textContent();
   const overlay = await page.locator(".status-overlay").textContent();
   const raceHud = await page.locator(".race-hud").textContent();
@@ -123,6 +127,8 @@ async function runVerification() {
   await page.getByRole("button", { name: /Race/i }).click();
   await page.getByRole("button", { name: /^Start$/i }).click();
   await page.locator("canvas").waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Start Race/i }).click();
+  await page.locator(".race-overlay").waitFor({ state: "visible" });
   const raceModeHud = await page.locator(".race-hud").textContent();
 
   if (!raceModeHud?.includes("Race") || !raceModeHud.includes("1/3") || !raceModeHud.includes("1/2")) {

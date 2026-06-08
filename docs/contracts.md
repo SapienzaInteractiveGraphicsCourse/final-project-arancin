@@ -15,7 +15,7 @@ Snapshot previsto:
     trackId: "vegas" | "beach" | "monaco",
     vehicleId: "kart" | "porsche" | "silvia",
     raceMode: "race" | "time-trial",
-    bodyColor: "#d6332f" // colore carrozzeria scelto dal menu setup
+    bodyColor: "#d6332f" // colore carrozzeria scelto nel passaggio pre-gara
   }
 }
 ```

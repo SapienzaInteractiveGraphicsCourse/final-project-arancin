@@ -3,6 +3,7 @@ import { createMainCamera } from "./createMainCamera.js";
 import { createRenderer } from "./createRenderer.js";
 import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
+import { VEHICLE_COLOR_OPTIONS } from "../config/raceOptions.js";
 import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
@@ -32,7 +33,8 @@ export function startScenePreview(container, setup, options = {}) {
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
-  vehicle.setBodyColor(setup.bodyColor);
+  let selectedBodyColor = setup.bodyColor ?? VEHICLE_COLOR_OPTIONS[0].value;
+  vehicle.setBodyColor(selectedBodyColor);
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const wrongWayDetector = new WrongWayDetector();
@@ -53,6 +55,18 @@ export function startScenePreview(container, setup, options = {}) {
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
   const wrongWayOverlay = createWrongWayOverlay();
+  const colorPicker = createPreRaceColorPicker({
+    selectedColor: selectedBodyColor,
+    onSelect: (color) => {
+      selectedBodyColor = color;
+      setup.bodyColor = color;
+      vehicle.setBodyColor(color);
+    },
+    onConfirm: () => {
+      colorPicker.hide();
+      raceManager.startCountdown();
+    }
+  });
   const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
@@ -73,10 +87,10 @@ export function startScenePreview(container, setup, options = {}) {
   container.appendChild(raceOverlay);
   container.appendChild(raceHud);
   container.appendChild(wrongWayOverlay);
+  container.appendChild(colorPicker.element);
   container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
-  raceManager.startCountdown();
 
   function resize() {
     const width = window.innerWidth;
@@ -193,12 +207,71 @@ export function startScenePreview(container, setup, options = {}) {
       raceOverlay.remove();
       raceHud.remove();
       wrongWayOverlay.remove();
+      colorPicker.element.remove();
       finishScreen.element.remove();
       pauseMenu.element.remove();
       checkpointHighlighter.dispose();
       track.dispose();
       vehicle.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
+    }
+  };
+}
+
+function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm }) {
+  const element = document.createElement("section");
+  element.className = "pre-race-color-picker";
+  element.setAttribute("aria-label", "Choose vehicle color");
+
+  const colorButtons = VEHICLE_COLOR_OPTIONS.map((option) => {
+    const button = document.createElement("button");
+    button.className = "pre-race-color-option";
+    button.type = "button";
+    button.dataset.color = option.value;
+    button.style.setProperty("--vehicle-color", option.value);
+    button.setAttribute("aria-label", option.name);
+    button.setAttribute("aria-pressed", String(option.value === selectedColor));
+    button.innerHTML = `
+      <span class="pre-race-color-swatch" aria-hidden="true"></span>
+      <strong>${option.name}</strong>
+    `;
+
+    button.addEventListener("click", () => {
+      selectedColor = option.value;
+      colorButtons.forEach((item) => {
+        item.setAttribute("aria-pressed", String(item.dataset.color === selectedColor));
+      });
+      onSelect?.(selectedColor);
+    });
+
+    return button;
+  });
+
+  const options = document.createElement("div");
+  options.className = "pre-race-color-options";
+  colorButtons.forEach((button) => options.appendChild(button));
+
+  const confirmButton = document.createElement("button");
+  confirmButton.className = "pre-race-start-button";
+  confirmButton.type = "button";
+  confirmButton.textContent = "Start Race";
+  confirmButton.addEventListener("click", () => {
+    onConfirm?.(selectedColor);
+  });
+
+  element.innerHTML = `
+    <div class="pre-race-color-copy">
+      <span>Vehicle Color</span>
+      <strong>Choose your livery</strong>
+    </div>
+  `;
+  element.appendChild(options);
+  element.appendChild(confirmButton);
+
+  return {
+    element,
+    hide: () => {
+      element.hidden = true;
     }
   };
 }

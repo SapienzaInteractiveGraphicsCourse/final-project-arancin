@@ -52,7 +52,7 @@ Il menu setup base, il pulsante Start, countdown, giri, tempi, finish screen e w
 
 ## Decisioni Di Prodotto
 
-- La selezione colore deve essere in stile gioco, con preset/swatch visivi subito prima della gara.
+- La selezione colore deve essere in stile gioco, con preset/swatch visivi in basso al centro dopo `Start` e subito prima del countdown.
 - La minimappa deve restare sempre visibile durante la guida.
 - La minimappa deve ruotare in base alla direzione del veicolo, mantenendo il player come riferimento centrale quando possibile.
 - Il marker AI va mostrato solo se possiamo usare dati gia disponibili nel branch senza forzare lavoro appartenente ad altre feature.
@@ -86,15 +86,16 @@ Commit suggerito:
 add hud ui minimap commit plan
 ```
 
-### 2. Setup UI Refinement
+### 2. Setup UI Refinement And Pre-Race Color
 
-Scopo: rendere piu completo e coerente il menu iniziale senza cambiare il flusso `setup -> loading -> preview/race`.
+Scopo: rendere piu completo e coerente il menu iniziale e spostare la scelta colore nel passaggio pre-gara, senza cambiare il flusso `setup -> loading -> preview/race`.
 
 Possibili file:
 
 - `src/ui/setupMenu.js`
 - `src/config/raceOptions.js`
 - `src/main.js`
+- `src/scene/startScenePreview.js`
 - `src/styles/main.css`
 
 Contenuto atteso:
@@ -102,7 +103,8 @@ Contenuto atteso:
 - menu pista leggibile;
 - menu veicolo leggibile;
 - selezione modalita invariata;
-- selezione colore con preset/swatch in stile gioco;
+- selezione colore con preset/swatch in stile gioco dopo Start;
+- countdown avviato solo dopo conferma colore;
 - pulsante Start sempre chiaro e accessibile;
 - stato scelto mostrato in modo compatto.
 
