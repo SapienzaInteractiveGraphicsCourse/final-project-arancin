@@ -130,9 +130,9 @@ O
 ### Nissan Silvia
 
 - [x] Importare asset FBX.
-- [ ] Creare loader dedicato.
-- [ ] Usare cache del modello caricato.
-- [ ] Clonare modello per player e AI.
+- [x] Creare loader dedicato.
+- [x] Usare cache del modello caricato.
+- [x] Clonare modello per player e AI.
 - [ ] Verificare scala.
 - [ ] Verificare orientamento.
 - [ ] Verificare origine/pivot.
