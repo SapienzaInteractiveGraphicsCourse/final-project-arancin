@@ -311,7 +311,7 @@ Regole:
 - `race` abilita logica futura per AI;
 - in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
-- record/best lap possono usare localStorage quando i checkpoint reali saranno disponibili.
+- record, best lap e storico lap usano localStorage quando i checkpoint reali sono presenti.
 
 ## Checkpoint Utils
 
@@ -371,6 +371,38 @@ trackId:vehicleId:mode:laps
 ```
 
 `ensureBestLapInRecords()` serve a migrare i best lap salvati prima dello storico lap persistente.
+
+## Wrong Way Detector
+
+File: `src/systems/WrongWayDetector.js`
+
+Firma:
+
+```js
+const detector = new WrongWayDetector();
+```
+
+Contratto:
+
+```js
+detector.update(deltaTime, vehicleState, trackInfo) -> {
+  warning,
+  wrongWayTime,
+  progress,
+  headingDot
+}
+
+detector.reset()
+detector.getState()
+```
+
+Regole:
+
+- usa `trackInfo.centerline`;
+- calcola il progresso piu vicino al player;
+- confronta heading veicolo e heading pista con prodotto scalare;
+- mostra warning solo dopo una soglia temporale;
+- non segnala contromano a veicolo quasi fermo.
 
 ## Vehicle Factory
 

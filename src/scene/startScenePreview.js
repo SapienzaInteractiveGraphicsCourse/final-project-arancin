@@ -9,6 +9,7 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
+import { WrongWayDetector } from "../systems/WrongWayDetector.js";
 import {
   appendLapRecord,
   ensureBestLapInRecords,
@@ -29,6 +30,7 @@ export function startScenePreview(container, setup, options = {}) {
   const vehicle = createVehicleById(setup.vehicleId);
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
+  const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
   const savedBestLapTime = readBestLapTime(window.localStorage, recordKey);
@@ -45,6 +47,7 @@ export function startScenePreview(container, setup, options = {}) {
   });
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
+  const wrongWayOverlay = createWrongWayOverlay();
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
     onExitToSetup: options.onExitToSetup
@@ -63,6 +66,7 @@ export function startScenePreview(container, setup, options = {}) {
   scene.add(track.group, vehicle.group);
   container.appendChild(raceOverlay);
   container.appendChild(raceHud);
+  container.appendChild(wrongWayOverlay);
   container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
@@ -89,6 +93,7 @@ export function startScenePreview(container, setup, options = {}) {
   function resetRace() {
     controller.reset(track.spawn);
     raceManager.reset();
+    wrongWayDetector.reset();
     raceManager.startCountdown();
     renderedFinishSignature = "";
     finishScreen.setVisible(false);
@@ -125,6 +130,7 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
+    updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
     updateRaceOverlay(raceOverlay, raceState);
     updateRaceHud(raceHud, raceState);
     renderedFinishSignature = updateFinishScreen(
@@ -170,6 +176,7 @@ export function startScenePreview(container, setup, options = {}) {
       renderer.domElement.remove();
       raceOverlay.remove();
       raceHud.remove();
+      wrongWayOverlay.remove();
       finishScreen.element.remove();
       pauseMenu.element.remove();
       track.dispose();
@@ -177,6 +184,19 @@ export function startScenePreview(container, setup, options = {}) {
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
     }
   };
+}
+
+function createWrongWayOverlay() {
+  const overlay = document.createElement("div");
+  overlay.className = "wrong-way-overlay";
+  overlay.hidden = true;
+  overlay.textContent = "WRONG WAY";
+  overlay.setAttribute("aria-live", "polite");
+  return overlay;
+}
+
+function updateWrongWayOverlay(overlay, wrongWayState) {
+  overlay.hidden = !wrongWayState.warning;
 }
 
 function createFinishScreen({ onRestart, onExitToSetup }) {

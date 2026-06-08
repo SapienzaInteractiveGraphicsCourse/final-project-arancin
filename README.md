@@ -22,7 +22,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
-- [ ] `feature/race-systems`: fisica, checkpoint, collisioni, AI.
+- [ ] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen; AI e contromano da completare.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
@@ -245,7 +245,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
 - [ ] Spingere fuori dalla barriera lungo la normale.
-- [ ] Ridurre/invertire velocita su impatto frontale.s
+- [ ] Ridurre/invertire velocita su impatto frontale.
 - [ ] Annullare boost su impatto importante.
 - [ ] Collisione player-bot.
 - [ ] Separare posizioni player/bot.
@@ -260,14 +260,14 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Documentare `docs/race-systems.md`.
 - [ ] Supportare modalita `race`:
   - [ ] gara contro AI;
-  - [ ] giri multipli;
-  - [ ] checkpoint in ordine;
-  - [ ] classifica semplice player vs AI.
-- [ ] Supportare modalita `time-trial`:
-  - [ ] solo player;
-  - [ ] giro veloce;
-  - [ ] cronometro;
-  - [ ] best lap locale.
+  - [x] giri multipli;
+  - [x] checkpoint in ordine;
+  - [x] classifica semplice player predisposta.
+- [x] Supportare modalita `time-trial`:
+  - [x] solo player;
+  - [x] giro veloce;
+  - [x] cronometro;
+  - [x] best lap locale.
 
 ### Race Manager
 
@@ -301,11 +301,11 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Cronometro totale.
 - [x] Cronometro giro.
 - [x] Checkpoint in ordine predisposti.
-- [ ] Giri.
+- [x] Giri.
 - [x] Best lap predisposto per time trial.
 - [x] Finish screen con classifica lap time.
 - [x] Storico lap completati in localStorage.
-- [ ] Restart gara.
+- [x] Restart gara.
 
 ### AI E Race Mode
 
@@ -321,11 +321,11 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Contromano
 
-- [ ] Avviso contromano:
-  - [ ] progresso piu vicino su centerline;
-  - [ ] heading pista da lookahead;
-  - [ ] prodotto scalare con forward veicolo;
-  - [ ] soglia temporale per evitare falsi positivi.
+- [x] Avviso contromano:
+  - [x] progresso piu vicino su centerline;
+  - [x] heading pista da lookahead;
+  - [x] prodotto scalare con forward veicolo;
+  - [x] soglia temporale per evitare falsi positivi.
 
 ### Contratti E Verifiche
 

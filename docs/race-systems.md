@@ -24,12 +24,12 @@ Obiettivo:
 - classifica semplice player vs AI;
 - finish quando il player completa i giri richiesti.
 
-Dipendenze future:
+Dipendenze:
 
-- `trackInfo.checkpoints`;
-- `trackInfo.centerline`;
-- veicolo AI creato con lo stesso `vehicleId` del player;
-- performance AI coerenti con il veicolo scelto.
+- [x] `trackInfo.checkpoints`;
+- [x] `trackInfo.centerline`;
+- [ ] veicolo AI creato con lo stesso `vehicleId` del player;
+- [ ] performance AI coerenti con il veicolo scelto.
 
 ### Time Trial
 
@@ -48,11 +48,11 @@ Obiettivo:
 - nessun bot obbligatorio;
 - utile per testare piste e veicoli.
 
-Dipendenze future:
+Dipendenze:
 
-- `trackInfo.checkpoints`;
-- localStorage per record;
-- eventuale ghost opzionale solo se il team decide di aggiungerlo piu avanti.
+- [x] `trackInfo.checkpoints`;
+- [x] localStorage per record;
+- [ ] eventuale ghost opzionale solo se il team decide di aggiungerlo piu avanti.
 
 ## Fuori Scope Iniziale
 
@@ -63,7 +63,7 @@ Dipendenze future:
 - classifica avanzata;
 - pit stop.
 
-Questi possono arrivare dopo checkpoint e piste reali.
+Questi possono arrivare dopo contromano, AI base e integrazione veicoli finali.
 
 ## Milestone 1: RaceManager Base
 
@@ -215,11 +215,18 @@ Task:
 
 Test automatici possibili:
 
-- menu -> Race -> Start -> countdown/running;
-- menu -> Time Trial -> Start -> countdown/running;
-- reset mantiene app funzionante.
+- [x] menu -> Race -> Start -> countdown/running;
+- [x] menu -> Time Trial -> Start -> countdown/running;
+- [x] reset mantiene app funzionante.
 
-Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e `bun run build`.
+La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, countdown, ritorno al menu e stato HUD base.
+
+## Milestone 7: Prossimi Step
+
+- [x] Implementare avviso contromano usando `trackInfo.centerline`.
+- [ ] Implementare AI opponent visibile usando `trackInfo.centerline`.
+- [ ] Integrare collisioni/barriere quando la sezione collisioni e pronta.
+- [ ] Rifinire HUD/minimap nel branch dedicato.
 
 ## Task Breakdown
 
@@ -242,6 +249,7 @@ Se la UI non espone ancora countdown in DOM stabile, lasciare verifica manuale e
 - [x] Preparare supporto race vs AI.
 - [x] Aggiungere finish screen con classifica lap time e gap dal best lap.
 - [x] Salvare storico lap completati per pista/veicolo/modalita.
+- [x] Implementare warning contromano.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
