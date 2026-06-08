@@ -3,6 +3,7 @@ import { createMainCamera } from "./createMainCamera.js";
 import { createRenderer } from "./createRenderer.js";
 import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
+import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
@@ -37,6 +38,8 @@ export function startScenePreview(container, setup, options = {}) {
   let animationFrameId = 0;
   let paused = false;
 
+  applyTrackSceneTheme(scene, track.trackInfo);
+  applyTrackLightingTheme(lights, track.trackInfo);
   timer.connect(document);
   scene.add(track.group, vehicle.group);
   container.appendChild(raceOverlay);
