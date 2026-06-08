@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createHeadlightBeam } from "./headlightEffects.js";
 import { PlaceholderVehicle } from "./PlaceholderVehicle.js";
 
 const WHEEL_NODE_NAMES = {
@@ -27,6 +28,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.wheelRollGroups = [];
     this.frontSteeringPivots = [];
     this.porscheHeadlights = [];
+    this.porscheHeadlightBeams = [];
     this.frontLightMaterials = [];
     this.rearLightMaterials = [];
     this.loadPromise = null;
@@ -66,6 +68,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.fitModelToVehicle(model);
     this.applyImportedMaterials(model);
     this.collectWheelNodes(model);
+    this.createHeadlightEffects();
     this.setHeadlights(this.headlightsEnabled);
   }
 
@@ -170,6 +173,33 @@ export class PorscheVehicle extends PlaceholderVehicle {
     });
   }
 
+  createHeadlightEffects() {
+    const lightPositions = [
+      [-0.55, 0.46, 1.98],
+      [0.55, 0.46, 1.98]
+    ];
+
+    lightPositions.forEach(([x, y, z], index) => {
+      const light = new THREE.SpotLight(0xffdfad, 0, 13, Math.PI * 0.2, 0.48, 1.1);
+      light.name = `PorscheHeadlight:${index}`;
+      light.position.set(x, y, z + 0.1);
+      light.target.position.set(x, 0.04, z + 6.2);
+      this.modelPivot.add(light, light.target);
+      this.porscheHeadlights.push(light);
+      this.headlights.push(light);
+
+      const beam = createHeadlightBeam({
+        name: `PorscheHeadlightBeam:${index}`,
+        width: 1.0,
+        length: 5.0,
+        opacity: 0.42
+      });
+      beam.position.set(x * 0.62, 0.035, z + 2.7);
+      this.modelPivot.add(beam);
+      this.porscheHeadlightBeams.push(beam);
+    });
+  }
+
   update(deltaTime, state = {}) {
     if (!this.importedModel) {
       super.update(deltaTime, state);
@@ -207,8 +237,18 @@ export class PorscheVehicle extends PlaceholderVehicle {
   setHeadlights(enabled) {
     super.setHeadlights(enabled);
 
+    this.porscheHeadlights.forEach((light) => {
+      light.intensity = this.headlightsEnabled ? 4.6 : 0;
+      light.visible = this.headlightsEnabled;
+    });
+
+    this.porscheHeadlightBeams.forEach((beam) => {
+      beam.visible = this.headlightsEnabled;
+      beam.material.opacity = this.headlightsEnabled ? 0.42 : 0;
+    });
+
     this.frontLightMaterials.forEach((material) => {
-      material.emissiveIntensity = this.headlightsEnabled ? 1.4 : 0;
+      material.emissiveIntensity = this.headlightsEnabled ? 2.6 : 0;
     });
 
     this.rearLightMaterials.forEach((material) => {

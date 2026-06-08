@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createHeadlightBeam } from "./headlightEffects.js";
 import { PlaceholderVehicle } from "./PlaceholderVehicle.js";
 
 const WHEEL_NODE_NAMES = {
@@ -26,6 +27,8 @@ export class SilviaVehicle extends PlaceholderVehicle {
     this.wheelRotation = 0;
     this.wheelRollGroups = [];
     this.frontSteeringPivots = [];
+    this.silviaHeadlights = [];
+    this.silviaHeadlightBeams = [];
     this.loadPromise = null;
 
     if (typeof window !== "undefined") {
@@ -175,12 +178,23 @@ export class SilviaVehicle extends PlaceholderVehicle {
     ];
 
     lightPositions.forEach(([x, y, z], index) => {
-      const light = new THREE.SpotLight(0xffe3a0, 0, 8, Math.PI * 0.16, 0.4, 1.2);
+      const light = new THREE.SpotLight(0xffe3a0, 0, 12, Math.PI * 0.2, 0.46, 1.1);
       light.name = `SilviaHeadlight:${index}`;
       light.position.set(x, y, z + 0.1);
-      light.target.position.set(x, y - 0.12, z + 4);
+      light.target.position.set(x, 0.04, z + 5.7);
       this.modelPivot.add(light, light.target);
+      this.silviaHeadlights.push(light);
       this.headlights.push(light);
+
+      const beam = createHeadlightBeam({
+        name: `SilviaHeadlightBeam:${index}`,
+        width: 0.9,
+        length: 4.6,
+        opacity: 0.44
+      });
+      beam.position.set(x * 0.62, 0.035, z + 2.45);
+      this.modelPivot.add(beam);
+      this.silviaHeadlightBeams.push(beam);
     });
   }
 
@@ -220,5 +234,15 @@ export class SilviaVehicle extends PlaceholderVehicle {
 
   setHeadlights(enabled) {
     super.setHeadlights(enabled);
+
+    this.silviaHeadlights.forEach((light) => {
+      light.intensity = this.headlightsEnabled ? 4.2 : 0;
+      light.visible = this.headlightsEnabled;
+    });
+
+    this.silviaHeadlightBeams.forEach((beam) => {
+      beam.visible = this.headlightsEnabled;
+      beam.material.opacity = this.headlightsEnabled ? 0.44 : 0;
+    });
   }
 }
