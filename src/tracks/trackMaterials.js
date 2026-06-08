@@ -7,7 +7,8 @@ export function createFlatStandardMaterial({
   roughness = 0.82,
   metalness = 0.02,
   transparent = false,
-  opacity = 1
+  opacity = 1,
+  side = THREE.FrontSide
 }) {
   const parameters = {
     color,
@@ -15,6 +16,7 @@ export function createFlatStandardMaterial({
     metalness,
     transparent,
     opacity,
+    side,
     flatShading: true
   };
 
@@ -32,18 +34,21 @@ export function createTrackMaterials(definition) {
   return {
     ground: createFlatStandardMaterial({
       color: palette.ground,
+      emissive: definition.id === "vegas" ? 0x0a0020 : undefined,
+      emissiveIntensity: definition.id === "vegas" ? 0.15 : 0,
       roughness: 0.92
     }),
     road: createFlatStandardMaterial({
       color: palette.road,
-      roughness: 0.8,
-      metalness: definition.id === "vegas" ? 0.08 : 0.02
+      roughness: definition.id === "vegas" ? 0.5 : 0.8,
+      metalness: definition.id === "vegas" ? 0.16 : 0.02
     }),
     roadEdge: createFlatStandardMaterial({
       color: palette.roadEdge,
       emissive: palette.roadEdge,
       emissiveIntensity: definition.id === "vegas" ? 2.8 : 0.12,
-      roughness: definition.id === "vegas" ? 0.32 : 0.58
+      roughness: definition.id === "vegas" ? 0.32 : 0.58,
+      side: THREE.DoubleSide
     }),
     centerLine: createFlatStandardMaterial({
       color: palette.centerLine ?? 0xf3f0dc,
@@ -55,6 +60,16 @@ export function createTrackMaterials(definition) {
       color: palette.barrier,
       roughness: 0.74,
       metalness: definition.id === "vegas" ? 0.12 : 0.04
+    }),
+    curbRed: createFlatStandardMaterial({
+      color: 0xc91f2d,
+      roughness: 0.64,
+      metalness: 0.02
+    }),
+    curbWhite: createFlatStandardMaterial({
+      color: 0xf3f0e8,
+      roughness: 0.66,
+      metalness: 0.02
     }),
     checkpoint: createFlatStandardMaterial({
       color: palette.checkpoint,
