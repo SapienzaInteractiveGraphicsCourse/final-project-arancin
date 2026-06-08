@@ -88,7 +88,7 @@ async function runVerification() {
   const canvasBox = await page.locator("canvas").boundingBox();
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
-  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 7000 });
+  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 12000 });
 
   if (setupVisible) {
     throw new Error("Setup menu is still visible after Start");

@@ -7,6 +7,7 @@ import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTr
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
@@ -24,6 +25,9 @@ export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
   const scene = createScene();
   const camera = createMainCamera();
+  const cameraTarget = new THREE.Vector3();
+  const cameraLookAt = new THREE.Vector3();
+  const lookTarget = new THREE.Vector3();
   const timer = new THREE.Timer();
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
@@ -48,6 +52,7 @@ export function startScenePreview(container, setup, options = {}) {
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
   const wrongWayOverlay = createWrongWayOverlay();
+  const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
     onExitToSetup: options.onExitToSetup
@@ -135,6 +140,7 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
+    checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);
     updateRaceHud(raceHud, raceState);
     renderedFinishSignature = updateFinishScreen(
@@ -188,11 +194,72 @@ export function startScenePreview(container, setup, options = {}) {
       wrongWayOverlay.remove();
       finishScreen.element.remove();
       pauseMenu.element.remove();
+      checkpointHighlighter.dispose();
       track.dispose();
       vehicle.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
     }
   };
+}
+
+function createCheckpointHighlighter(trackInfo) {
+  const checkpoints = getOrderedCheckpoints(trackInfo);
+  const inactiveMaterial = createCheckpointHighlightMaterial(0x34f4ff, 0.22, 0.28);
+  const activeMaterial = createCheckpointHighlightMaterial(0xfacc15, 1.8, 0.88);
+  let activeCheckpointOrder = null;
+
+  checkpoints.forEach((checkpoint) => {
+    setCheckpointGateMaterial(checkpoint, inactiveMaterial);
+  });
+
+  return {
+    update(raceState) {
+      if (raceState.finished || raceState.phase !== RACE_PHASES.RUNNING) {
+        setActiveCheckpoint(null);
+        return;
+      }
+
+      setActiveCheckpoint(raceState.currentCheckpoint);
+    },
+    dispose() {
+      inactiveMaterial.dispose();
+      activeMaterial.dispose();
+    }
+  };
+
+  function setActiveCheckpoint(checkpointOrder) {
+    if (activeCheckpointOrder === checkpointOrder) {
+      return;
+    }
+
+    activeCheckpointOrder = checkpointOrder;
+
+    checkpoints.forEach((checkpoint) => {
+      setCheckpointGateMaterial(
+        checkpoint,
+        checkpoint.order === checkpointOrder ? activeMaterial : inactiveMaterial
+      );
+    });
+  }
+}
+
+function createCheckpointHighlightMaterial(color, emissiveIntensity, opacity) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity,
+    roughness: 0.42,
+    transparent: true,
+    opacity
+  });
+}
+
+function setCheckpointGateMaterial(checkpoint, material) {
+  checkpoint.gate?.traverse((child) => {
+    if (child.isMesh) {
+      child.material = material;
+    }
+  });
 }
 
 function createWrongWayOverlay() {

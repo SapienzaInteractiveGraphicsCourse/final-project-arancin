@@ -301,6 +301,7 @@ O
 - [x] Cronometro totale.
 - [x] Cronometro giro.
 - [x] Checkpoint in ordine predisposti.
+- [x] Evidenziare checkpoint successivo.
 - [x] Giri.
 - [x] Best lap predisposto per time trial.
 - [x] Finish screen con classifica lap time.
