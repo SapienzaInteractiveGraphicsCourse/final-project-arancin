@@ -32,6 +32,7 @@ export function startScenePreview(container, setup, options = {}) {
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
+  vehicle.setBodyColor(setup.bodyColor);
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const wrongWayDetector = new WrongWayDetector();

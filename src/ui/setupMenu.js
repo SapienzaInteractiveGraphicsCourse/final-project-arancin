@@ -2,6 +2,7 @@ import {
   DEFAULT_RACE_SETUP,
   RACE_MODE_OPTIONS,
   TRACK_OPTIONS,
+  VEHICLE_COLOR_OPTIONS,
   VEHICLE_OPTIONS
 } from "../config/raceOptions.js";
 
@@ -40,6 +41,43 @@ function createOptionGroup(title, groupName, options, selectedId) {
   return fieldset;
 }
 
+function createColorButton(option, selectedColor) {
+  const button = document.createElement("button");
+  button.className = "setup-color-option";
+  button.type = "button";
+  button.dataset.group = "bodyColor";
+  button.dataset.value = option.value;
+  button.style.setProperty("--setup-color", option.value);
+  button.setAttribute("aria-label", option.name);
+  button.setAttribute("aria-pressed", String(option.value === selectedColor));
+
+  button.innerHTML = `
+    <span class="setup-color-swatch" aria-hidden="true"></span>
+    <strong>${option.name}</strong>
+  `;
+
+  return button;
+}
+
+function createColorGroup(selectedColor) {
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "setup-group setup-color-group";
+
+  const legend = document.createElement("legend");
+  legend.textContent = "Vehicle Color";
+  fieldset.appendChild(legend);
+
+  const list = document.createElement("div");
+  list.className = "setup-color-options";
+
+  VEHICLE_COLOR_OPTIONS.forEach((option) => {
+    list.appendChild(createColorButton(option, selectedColor));
+  });
+
+  fieldset.appendChild(list);
+  return fieldset;
+}
+
 function updatePressedState(menu, groupName, selectedValue) {
   const buttons = menu.querySelectorAll(`[data-group="${groupName}"]`);
 
@@ -64,6 +102,7 @@ export function createSetupMenu({ onStart }) {
   panel.appendChild(createOptionGroup("Track", "trackId", TRACK_OPTIONS, setup.trackId));
   panel.appendChild(createOptionGroup("Vehicle", "vehicleId", VEHICLE_OPTIONS, setup.vehicleId));
   panel.appendChild(createOptionGroup("Mode", "raceMode", RACE_MODE_OPTIONS, setup.raceMode));
+  panel.appendChild(createColorGroup(setup.bodyColor));
 
   const startButton = document.createElement("button");
   startButton.className = "start-button";

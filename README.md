@@ -348,10 +348,10 @@ O
 
 ## 8. HUD, UI E Minimap
 
-- [ ] Menu selezione pista.
-- [ ] Menu selezione veicolo.
-- [ ] Selezione colore veicolo.
-- [ ] Pulsante start.
+- [x] Menu selezione pista.
+- [x] Menu selezione veicolo.
+- [x] Selezione colore veicolo.
+- [x] Pulsante start.
 - [ ] HUD speed.
 - [ ] HUD lap.
 - [ ] HUD time.
