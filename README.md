@@ -22,7 +22,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
-- [ ] `feature/race-systems`: fisica, checkpoint, collisioni, AI.
+- [ ] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen; AI e contromano da completare.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
@@ -155,6 +155,7 @@ O
   - [x] C cambio camera;
   - [x] L luci;
   - [x] R restart.
+  - [x] Esc pausa/menu.
 - [x] Consumare one-shot una sola volta per frame.
 - [x] Bloccare scroll pagina per i tasti di gioco.
 - [x] Aggiungere `dispose()` a `InputManager`.
@@ -254,20 +255,63 @@ O
 
 ## 6. Gara E AI
 
-- [ ] Race manager.
-- [ ] Countdown iniziale.
-- [ ] Checkpoint in ordine.
-- [ ] Giri.
-- [ ] Cronometro.
-- [ ] Best lap.
-- [ ] Classifica semplice player vs AI.
-- [ ] Finish screen minimale.
-- [ ] Restart gara.
-- [ ] Avviso contromano:
-  - [ ] progresso piu vicino su centerline;
-  - [ ] heading pista da lookahead;
-  - [ ] prodotto scalare con forward veicolo;
-  - [ ] soglia temporale per evitare falsi positivi.
+### Modalita
+
+- [x] Documentare `docs/race-systems.md`.
+- [ ] Supportare modalita `race`:
+  - [ ] gara contro AI;
+  - [x] giri multipli;
+  - [x] checkpoint in ordine;
+  - [x] classifica semplice player predisposta.
+- [x] Supportare modalita `time-trial`:
+  - [x] solo player;
+  - [x] giro veloce;
+  - [x] cronometro;
+  - [x] best lap locale.
+
+### Race Manager
+
+- [x] Creare `RaceManager`.
+- [x] Definire fasi:
+  - [x] `idle`;
+  - [x] `countdown`;
+  - [x] `running`;
+  - [x] `finished`.
+- [x] Configurare `totalLaps` in base alla modalita:
+  - [x] `race`: 3 giri;
+  - [x] `time-trial`: 1 giro.
+- [x] Implementare `startCountdown()`.
+- [x] Implementare `startRace()`.
+- [x] Implementare `reset()`.
+- [x] Implementare `update(deltaTime, playerState, trackInfo)`.
+- [x] Esportare `getState()`.
+- [x] Non rompersi con `trackInfo.checkpoints = []`.
+
+### Countdown E Start Flow
+
+- [x] Countdown iniziale.
+- [x] Bloccare movimento durante countdown.
+- [x] Mostrare countdown in UI/overlay.
+- [x] Passare a gara running dopo `GO`.
+- [x] Menu pausa con `Esc`.
+- [x] Ritorno alla GUI iniziale dal menu pausa.
+
+### Tempi E Giri
+
+- [x] Cronometro totale.
+- [x] Cronometro giro.
+- [x] Checkpoint in ordine predisposti.
+- [x] Giri.
+- [x] Best lap predisposto per time trial.
+- [x] Finish screen con classifica lap time.
+- [x] Storico lap completati in localStorage.
+- [x] Restart gara.
+
+### AI E Race Mode
+
+- [x] Predisporre stato `aiEnabled`.
+- [x] Esporre posizione semplice player.
+- [x] Preparare controller logico AI su centerline.
 - [ ] AI opponent visibile.
 - [ ] AI usa stesso veicolo selezionato dal player.
 - [ ] Velocita AI dipendente dal veicolo.
@@ -275,6 +319,21 @@ O
 - [ ] AI accelera in uscita.
 - [ ] AI segue traiettoria con offset laterale.
 - [ ] AI competitiva ma battibile.
+
+### Contromano
+
+- [x] Avviso contromano:
+  - [x] progresso piu vicino su centerline;
+  - [x] heading pista da lookahead;
+  - [x] prodotto scalare con forward veicolo;
+  - [x] soglia temporale per evitare falsi positivi.
+
+### Contratti E Verifiche
+
+- [x] Aggiornare `docs/contracts.md` con contratto `RaceManager`.
+- [x] Aggiornare `docs/contracts.md` con contratto checkpoint.
+- [x] Aggiornare `verify:scene` se il countdown ha DOM stabile.
+- [x] Verificare `bun run build`.
 
 ## 7. Camera
 

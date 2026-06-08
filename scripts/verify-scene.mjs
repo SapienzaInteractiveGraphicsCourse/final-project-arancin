@@ -82,11 +82,13 @@ async function runVerification() {
   await page.getByRole("button", { name: /^Start$/i }).click();
 
   await page.locator("canvas").waitFor({ state: "visible" });
+  const countdownText = await page.locator(".race-overlay").textContent();
   const overlay = await page.locator(".status-overlay").textContent();
+  const raceHud = await page.locator(".race-hud").textContent();
   const canvasBox = await page.locator("canvas").boundingBox();
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
-  await browser.close();
+  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 7000 });
 
   if (setupVisible) {
     throw new Error("Setup menu is still visible after Start");
@@ -100,6 +102,33 @@ async function runVerification() {
     throw new Error(`Overlay does not include selected setup: ${overlay}`);
   }
 
+  if (!raceHud?.includes("Time Trial") || !raceHud.includes("1/1")) {
+    throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
+  }
+
+  if (!/^[123]$/.test(countdownText ?? "")) {
+    throw new Error(`Countdown overlay did not show expected value: ${countdownText}`);
+  }
+
+  await page.keyboard.press("Escape");
+  await page.locator(".pause-menu").waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Main Menu/i }).click();
+  await page.locator(".setup-menu").waitFor({ state: "visible" });
+  const canvasCountAfterExit = await page.locator("canvas").count();
+
+  if (canvasCountAfterExit !== 0) {
+    throw new Error(`Canvas was not disposed after returning to setup: ${canvasCountAfterExit}`);
+  }
+
+  await page.getByRole("button", { name: /Race/i }).click();
+  await page.getByRole("button", { name: /^Start$/i }).click();
+  await page.locator("canvas").waitFor({ state: "visible" });
+  const raceModeHud = await page.locator(".race-hud").textContent();
+
+  if (!raceModeHud?.includes("Race") || !raceModeHud.includes("1/3") || !raceModeHud.includes("1/2")) {
+    throw new Error(`Race HUD does not include expected race state: ${raceModeHud}`);
+  }
+
   if (!canvasBox || canvasBox.width < 300 || canvasBox.height < 200) {
     throw new Error(`Canvas did not render at expected size: ${JSON.stringify(canvasBox)}`);
   }
@@ -109,6 +138,8 @@ async function runVerification() {
       `Browser errors detected:\n${[...pageErrors, ...consoleErrors].join("\n")}`
     );
   }
+
+  await browser.close();
 
   console.log("Scene verification passed.");
 }
