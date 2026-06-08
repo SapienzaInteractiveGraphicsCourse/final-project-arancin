@@ -93,19 +93,19 @@ O
 ### Kart Procedurale
 
 - [x] Costruire kart da zero con primitive Three.js.
-- [ ] Creare gerarchia:
+- [x] Creare gerarchia:
   - [x] root group;
   - [x] telaio;
   - [x] carrozzeria;
   - [x] sedile;
-  - [ ] volante;
-  - [ ] pilota opzionale;
+  - [x] volante;
+  - [x] pilota opzionale;
   - [x] assi;
   - [x] quattro ruote;
-  - [ ] fari.
+  - [x] fari.
 - [ ] Ruote anteriori sterzanti con pivot separati.
 - [ ] Ruote animate in base a distanza percorsa.
-- [ ] Colore carrozzeria modificabile.
+- [x] Colore carrozzeria modificabile.
 - [ ] Headlights toggle.
 - [x] Materiali con roughness/metalness coerenti.
 - [ ] Piccole animazioni gerarchiche JS:
