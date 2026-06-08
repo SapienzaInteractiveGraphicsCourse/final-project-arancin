@@ -43,6 +43,10 @@ export function startScenePreview(container, setup) {
       controller.reset(track.spawn);
     }
 
+    if (actions.lights) {
+      vehicle.toggleHeadlights();
+    }
+
     const state = controller.update(deltaTime, inputManager.getHeldState(), {
       surfaceType: "asphalt",
       surfaceGrip: 1,
