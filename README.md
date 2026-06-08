@@ -71,7 +71,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
 - [x] Verificare `bun run build`.
-
+O
 ## 2. Veicoli
 
 ### Interfaccia Comune
