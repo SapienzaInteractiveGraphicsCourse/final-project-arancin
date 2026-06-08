@@ -9,6 +9,10 @@ export class KartVehicle extends BaseVehicle {
       bodyColor: 0xd6332f
     });
 
+    this.wheelRadius = 0.34;
+    this.wheelRotation = 0;
+    this.wheelRollGroups = [];
+    this.frontSteeringPivots = [];
     this.materials = this.createMaterials();
     this.buildKart();
   }
@@ -78,10 +82,10 @@ export class KartVehicle extends BaseVehicle {
     this.addAxle("KartFrontAxle", [0, 0.38, 0.88]);
     this.addAxle("KartRearAxle", [0, 0.38, -0.92]);
 
-    this.addWheel("KartWheelFrontLeft", [-1.08, 0.38, 0.88]);
-    this.addWheel("KartWheelFrontRight", [1.08, 0.38, 0.88]);
-    this.addWheel("KartWheelRearLeft", [-1.08, 0.38, -0.92]);
-    this.addWheel("KartWheelRearRight", [1.08, 0.38, -0.92]);
+    this.addWheel("KartWheelFrontLeft", [-1.08, 0.38, 0.88], true);
+    this.addWheel("KartWheelFrontRight", [1.08, 0.38, 0.88], true);
+    this.addWheel("KartWheelRearLeft", [-1.08, 0.38, -0.92], false);
+    this.addWheel("KartWheelRearRight", [1.08, 0.38, -0.92], false);
 
     this.addDriver();
     this.addSteeringWheel();
@@ -113,10 +117,13 @@ export class KartVehicle extends BaseVehicle {
     return axle;
   }
 
-  addWheel(name, position) {
-    const wheelGroup = new THREE.Group();
-    wheelGroup.name = `${name}Assembly`;
-    wheelGroup.position.set(...position);
+  addWheel(name, position, steerable) {
+    const steeringPivot = new THREE.Group();
+    steeringPivot.name = steerable ? `${name}SteeringPivot` : `${name}Mount`;
+    steeringPivot.position.set(...position);
+
+    const rollGroup = new THREE.Group();
+    rollGroup.name = `${name}RollPivot`;
 
     const wheel = new THREE.Mesh(
       new THREE.CylinderGeometry(0.34, 0.34, 0.28, 24),
@@ -136,9 +143,16 @@ export class KartVehicle extends BaseVehicle {
     hub.castShadow = true;
     hub.receiveShadow = true;
 
-    wheelGroup.add(wheel, hub);
-    this.chassisGroup.add(wheelGroup);
-    return wheelGroup;
+    rollGroup.add(wheel, hub);
+    steeringPivot.add(rollGroup);
+    this.chassisGroup.add(steeringPivot);
+    this.wheelRollGroups.push(rollGroup);
+
+    if (steerable) {
+      this.frontSteeringPivots.push(steeringPivot);
+    }
+
+    return steeringPivot;
   }
 
   addDriver() {
@@ -234,5 +248,52 @@ export class KartVehicle extends BaseVehicle {
       this.headlights.push(light);
       this.chassisGroup.add(lens, light, target);
     });
+  }
+
+  update(deltaTime, state = {}) {
+    const distance = state.distanceThisFrame ?? 0;
+    const steering = state.steering ?? 0;
+    const speedRatio = state.speedRatio ?? 0;
+    const speed = state.speed ?? 0;
+
+    this.updateWheelRotation(distance);
+    this.updateSteeringVisuals(steering);
+    this.updateBodyMotion(deltaTime, steering, speedRatio, speed);
+  }
+
+  updateWheelRotation(distanceTravelled) {
+    this.wheelRotation += distanceTravelled / this.wheelRadius;
+
+    this.wheelRollGroups.forEach((rollGroup) => {
+      rollGroup.rotation.x = this.wheelRotation;
+    });
+  }
+
+  updateSteeringVisuals(steeringValue) {
+    const wheelAngle = steeringValue * Math.PI * 0.22;
+
+    this.frontSteeringPivots.forEach((pivot) => {
+      pivot.rotation.y = wheelAngle;
+    });
+
+    if (this.steeringWheelPivot) {
+      this.steeringWheelPivot.rotation.z = steeringValue * Math.PI * 0.55;
+    }
+  }
+
+  updateBodyMotion(deltaTime, steeringValue, speedRatio, speed) {
+    const bounce = Math.sin(this.wheelRotation * 2.1) * speedRatio * 0.018;
+
+    this.chassisGroup.position.y = bounce;
+    this.chassisGroup.rotation.z = -steeringValue * speedRatio * 0.1;
+    this.chassisGroup.rotation.x = Math.abs(steeringValue) * speedRatio * 0.035;
+
+    if (this.driverRoot) {
+      this.driverRoot.rotation.z = -steeringValue * speedRatio * 0.05;
+    }
+
+    if (Math.abs(speed) < 0.1 && deltaTime > 0) {
+      this.chassisGroup.position.y *= 0.9;
+    }
   }
 }

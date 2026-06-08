@@ -103,15 +103,15 @@ O
   - [x] assi;
   - [x] quattro ruote;
   - [x] fari.
-- [ ] Ruote anteriori sterzanti con pivot separati.
-- [ ] Ruote animate in base a distanza percorsa.
+- [x] Ruote anteriori sterzanti con pivot separati.
+- [x] Ruote animate in base a distanza percorsa.
 - [x] Colore carrozzeria modificabile.
-- [ ] Headlights toggle.
+- [x] Headlights toggle.
 - [x] Materiali con roughness/metalness coerenti.
-- [ ] Piccole animazioni gerarchiche JS:
-  - [ ] volante;
-  - [ ] ruote;
-  - [ ] possibile oscillazione telaio/sospensioni.
+- [x] Piccole animazioni gerarchiche JS:
+  - [x] volante;
+  - [x] ruote;
+  - [x] possibile oscillazione telaio/sospensioni.
 
 ### Porsche
 

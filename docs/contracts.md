@@ -245,6 +245,7 @@ Regole:
 - non esporre Formula 1 come veicolo selezionabile;
 - i veicoli concreti devono estendere o rispettare `BaseVehicle`;
 - il kart deve essere procedurale;
+- i veicoli con ruote animabili possono esporre `wheelRollGroups`, `frontSteeringPivots` e `wheelRadius`;
 - Porsche e Silvia possono usare asset importati, ma con cache loader;
 - non importare animazioni esterne;
 - ruote e fari devono essere animati/gestiti in JavaScript.
