@@ -311,6 +311,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 - [x] Predisporre stato `aiEnabled`.
 - [x] Esporre posizione semplice player.
+- [x] Preparare controller logico AI su centerline.
 - [ ] AI opponent visibile.
 - [ ] AI usa stesso veicolo selezionato dal player.
 - [ ] Velocita AI dipendente dal veicolo.

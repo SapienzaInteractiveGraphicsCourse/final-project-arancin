@@ -404,6 +404,43 @@ Regole:
 - mostra warning solo dopo una soglia temporale;
 - non segnala contromano a veicolo quasi fermo.
 
+## AI Vehicle Controller
+
+File: `src/systems/AiVehicleController.js`
+
+Firma:
+
+```js
+const aiController = new AiVehicleController(vehicle.performance, track.trackInfo);
+```
+
+Contratto:
+
+```js
+aiController.reset(trackInfo)
+aiController.update(deltaTime, trackInfo) -> AiVehicleState
+aiController.getState() -> AiVehicleState
+```
+
+`AiVehicleState`:
+
+```js
+{
+  position,
+  heading,
+  progress,
+  lap,
+  speed
+}
+```
+
+Regole:
+
+- usa `trackInfo.centerline`;
+- per ora non gestisce mesh;
+- usa la performance del veicolo selezionato per derivare velocita base;
+- serve come base per opponent visibile e classifica player vs AI.
+
 ## Vehicle Factory
 
 File: `src/vehicles/vehicleFactory.js`

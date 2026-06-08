@@ -224,6 +224,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 ## Milestone 7: Prossimi Step
 
 - [x] Implementare avviso contromano usando `trackInfo.centerline`.
+- [x] Preparare controller logico AI usando `trackInfo.centerline`.
 - [ ] Implementare AI opponent visibile usando `trackInfo.centerline`.
 - [ ] Integrare collisioni/barriere quando la sezione collisioni e pronta.
 - [ ] Rifinire HUD/minimap nel branch dedicato.
@@ -250,6 +251,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Aggiungere finish screen con classifica lap time e gap dal best lap.
 - [x] Salvare storico lap completati per pista/veicolo/modalita.
 - [x] Implementare warning contromano.
+- [x] Preparare controller logico AI.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
