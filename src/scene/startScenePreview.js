@@ -6,6 +6,7 @@ import { createSceneLights } from "./createSceneLights.js";
 import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
+import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
@@ -32,8 +33,10 @@ export function startScenePreview(container, setup, options = {}) {
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
+  const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
+  const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
@@ -69,6 +72,12 @@ export function startScenePreview(container, setup, options = {}) {
   applyTrackLightingTheme(lights, track.trackInfo);
   timer.connect(document);
   scene.add(track.group, vehicle.group);
+
+  if (aiVehicle && aiController) {
+    scene.add(aiVehicle.group);
+    applyAiVehicleTransform(aiVehicle, aiController.getState());
+  }
+
   container.appendChild(raceOverlay);
   container.appendChild(raceHud);
   container.appendChild(wrongWayOverlay);
@@ -97,6 +106,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   function resetRace() {
     controller.reset(track.spawn);
+    aiController?.reset(track.trackInfo);
     raceManager.reset();
     wrongWayDetector.reset();
     raceManager.startCountdown();
@@ -138,6 +148,15 @@ export function startScenePreview(container, setup, options = {}) {
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
+
+    if (aiVehicle && aiController) {
+      const aiState = raceState.phase === RACE_PHASES.RUNNING && !raceState.finished
+        ? aiController.update(deltaTime, track.trackInfo)
+        : aiController.getState();
+      applyAiVehicleTransform(aiVehicle, aiState);
+      aiVehicle.update(deltaTime, aiState);
+    }
+
     updateCameraFollow(state);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
     checkpointHighlighter.update(raceState);
@@ -197,9 +216,21 @@ export function startScenePreview(container, setup, options = {}) {
       checkpointHighlighter.dispose();
       track.dispose();
       vehicle.dispose();
+      aiVehicle?.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
+
+      if (aiVehicle) {
+        scene.remove(aiVehicle.group);
+      }
     }
   };
+}
+
+function applyAiVehicleTransform(vehicle, aiState) {
+  vehicle.setTransform(
+    new THREE.Vector3(aiState.position.x, aiState.position.y, aiState.position.z),
+    aiState.heading
+  );
 }
 
 function createCheckpointHighlighter(trackInfo) {

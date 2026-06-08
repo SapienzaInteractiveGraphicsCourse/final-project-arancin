@@ -225,7 +225,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 
 - [x] Implementare avviso contromano usando `trackInfo.centerline`.
 - [x] Preparare controller logico AI usando `trackInfo.centerline`.
-- [ ] Implementare AI opponent visibile usando `trackInfo.centerline`.
+- [x] Implementare AI opponent visibile usando `trackInfo.centerline`.
 - [ ] Integrare collisioni/barriere quando la sezione collisioni e pronta.
 - [ ] Rifinire HUD/minimap nel branch dedicato.
 
@@ -253,6 +253,9 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Salvare storico lap completati per pista/veicolo/modalita.
 - [x] Implementare warning contromano.
 - [x] Preparare controller logico AI.
+- [x] Aggiungere opponent AI visibile.
+- [x] Rendere velocita AI dipendente dal veicolo.
+- [x] Aggiungere accelerazione progressiva e rallentamento in curva.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.

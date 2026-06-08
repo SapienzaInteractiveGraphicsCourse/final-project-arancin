@@ -440,6 +440,8 @@ Regole:
 - per ora non gestisce mesh;
 - usa la performance del veicolo selezionato per derivare velocita base;
 - serve come base per opponent visibile e classifica player vs AI.
+- la scena puo usare `createVehicleById(setup.vehicleId)` per renderizzare l'opponent con lo stesso veicolo del player.
+- non deve viaggiare sempre alla velocita massima: accelera gradualmente e riduce il target speed in base alla curva davanti.
 
 ## Vehicle Factory
 

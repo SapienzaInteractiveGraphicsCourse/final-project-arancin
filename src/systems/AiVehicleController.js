@@ -1,16 +1,28 @@
 import { offsetProgress, samplePathAtProgress } from "../tracks/centerline.js";
 
 const DEFAULT_MAX_FORWARD_SPEED = 30;
-const DEFAULT_SPEED_FACTOR = 0.72;
+const DEFAULT_ACCELERATION = 10;
+const DEFAULT_BRAKING = 24;
+const DEFAULT_SPEED_FACTOR = 0.60;
+const DEFAULT_CURVE_LOOKAHEAD_METERS = 14;
+const DEFAULT_MIN_CURVE_SPEED_FACTOR = 0.52;
 const DEFAULT_SPAWN_OFFSET_METERS = -11;
 
 export class AiVehicleController {
   constructor(performance = {}, trackInfo = {}, {
     speedFactor = DEFAULT_SPEED_FACTOR,
+    acceleration = DEFAULT_ACCELERATION,
+    braking = DEFAULT_BRAKING,
+    curveLookaheadMeters = DEFAULT_CURVE_LOOKAHEAD_METERS,
+    minCurveSpeedFactor = DEFAULT_MIN_CURVE_SPEED_FACTOR,
     spawnOffsetMeters = DEFAULT_SPAWN_OFFSET_METERS
   } = {}) {
     this.performance = performance;
     this.speedFactor = speedFactor;
+    this.acceleration = acceleration;
+    this.braking = braking;
+    this.curveLookaheadMeters = curveLookaheadMeters;
+    this.minCurveSpeedFactor = minCurveSpeedFactor;
     this.spawnOffsetMeters = spawnOffsetMeters;
     this.progress = 0;
     this.lap = 1;
@@ -46,7 +58,15 @@ export class AiVehicleController {
       return this.getState();
     }
 
-    this.speed = getAiSpeed(this.performance, this.speedFactor);
+    const curveSpeedFactor = getCurveSpeedFactor(
+      centerline,
+      this.progress,
+      this.curveLookaheadMeters,
+      this.minCurveSpeedFactor
+    );
+    const targetSpeed = getAiSpeed(this.performance, this.speedFactor) * curveSpeedFactor;
+    const speedStep = (targetSpeed >= this.speed ? this.acceleration : this.braking) * Math.max(0, deltaTime);
+    this.speed = approachValue(this.speed, targetSpeed, speedStep);
     const nextProgress = offsetProgress(centerline, this.progress, this.speed * Math.max(0, deltaTime));
 
     if (nextProgress < this.progress && this.hasCrossedStartLine) {
@@ -95,6 +115,35 @@ function getSpawnProgress(trackInfo, centerline, spawnOffsetMeters) {
 
 function getAiSpeed(performance, speedFactor) {
   return (performance.maxForwardSpeed ?? DEFAULT_MAX_FORWARD_SPEED) * speedFactor;
+}
+
+function approachValue(currentValue, targetValue, maxStep) {
+  if (currentValue < targetValue) {
+    return Math.min(currentValue + maxStep, targetValue);
+  }
+
+  return Math.max(currentValue - maxStep, targetValue);
+}
+
+function getCurveSpeedFactor(centerline, progress, lookaheadMeters, minCurveSpeedFactor) {
+  const current = samplePathAtProgress(centerline, progress);
+  const ahead = samplePathAtProgress(centerline, offsetProgress(centerline, progress, lookaheadMeters));
+  const headingDelta = Math.abs(getShortestAngleDelta(current.heading, ahead.heading));
+  const curveSeverity = Math.min(headingDelta / (Math.PI / 2), 1);
+
+  return 1 - curveSeverity * (1 - minCurveSpeedFactor);
+}
+
+function getShortestAngleDelta(currentAngle, targetAngle) {
+  let delta = targetAngle - currentAngle;
+
+  if (delta > Math.PI) {
+    delta -= Math.PI * 2;
+  } else if (delta < -Math.PI) {
+    delta += Math.PI * 2;
+  }
+
+  return delta;
 }
 
 function findClosestCheckpointProgress(centerline, checkpoint) {

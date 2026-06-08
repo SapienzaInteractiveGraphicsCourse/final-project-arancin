@@ -313,11 +313,11 @@ O
 - [x] Predisporre stato `aiEnabled`.
 - [x] Esporre posizione semplice player.
 - [x] Preparare controller logico AI su centerline.
-- [ ] AI opponent visibile.
-- [ ] AI usa stesso veicolo selezionato dal player.
-- [ ] Velocita AI dipendente dal veicolo.
-- [ ] AI frena prima delle curve.
-- [ ] AI accelera in uscita.
+- [x] AI opponent visibile.
+- [x] AI usa stesso veicolo selezionato dal player.
+- [x] Velocita AI dipendente dal veicolo.
+- [x] AI frena prima delle curve.
+- [x] AI accelera in uscita.
 - [ ] AI segue traiettoria con offset laterale.
 - [ ] AI competitiva ma battibile.
 
