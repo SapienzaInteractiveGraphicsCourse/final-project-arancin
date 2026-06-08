@@ -125,7 +125,7 @@ O
 - [x] Correggere luci anteriori.
 - [x] Identificare o ricreare ruote animate.
 - [x] Applicare colore carrozzeria se possibile.
-- [ ] Documentare fonte/licenza asset.
+- [x] Documentare fonte/licenza asset.
 
 ### Nissan Silvia
 
