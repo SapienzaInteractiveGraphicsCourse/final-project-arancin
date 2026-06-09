@@ -319,7 +319,7 @@ O
 - [x] Velocita AI dipendente dal veicolo.
 - [x] AI frena prima delle curve.
 - [x] AI accelera in uscita.
-- [ ] AI segue traiettoria con offset laterale.
+- [x] AI segue traiettoria con offset laterale.
 - [ ] AI competitiva ma battibile.
 
 ### Contromano

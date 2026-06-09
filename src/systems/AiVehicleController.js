@@ -7,6 +7,7 @@ const DEFAULT_SPEED_FACTOR = 0.60;
 const DEFAULT_CURVE_LOOKAHEAD_METERS = 14;
 const DEFAULT_MIN_CURVE_SPEED_FACTOR = 0.52;
 const DEFAULT_SPAWN_OFFSET_METERS = -11;
+const DEFAULT_LATERAL_OFFSET_METERS = -1.35;
 
 export class AiVehicleController {
   constructor(performance = {}, trackInfo = {}, {
@@ -15,7 +16,8 @@ export class AiVehicleController {
     braking = DEFAULT_BRAKING,
     curveLookaheadMeters = DEFAULT_CURVE_LOOKAHEAD_METERS,
     minCurveSpeedFactor = DEFAULT_MIN_CURVE_SPEED_FACTOR,
-    spawnOffsetMeters = DEFAULT_SPAWN_OFFSET_METERS
+    spawnOffsetMeters = DEFAULT_SPAWN_OFFSET_METERS,
+    lateralOffsetMeters = DEFAULT_LATERAL_OFFSET_METERS
   } = {}) {
     this.performance = performance;
     this.speedFactor = speedFactor;
@@ -24,6 +26,7 @@ export class AiVehicleController {
     this.curveLookaheadMeters = curveLookaheadMeters;
     this.minCurveSpeedFactor = minCurveSpeedFactor;
     this.spawnOffsetMeters = spawnOffsetMeters;
+    this.lateralOffsetMeters = lateralOffsetMeters;
     this.progress = 0;
     this.lap = 1;
     this.speed = 0;
@@ -43,11 +46,7 @@ export class AiVehicleController {
     this.lap = 1;
     this.speed = 0;
     this.hasCrossedStartLine = false;
-    this.position = {
-      x: sample.x,
-      y: trackInfo.spawn?.position?.y ?? 0.42,
-      z: sample.z
-    };
+    this.position = getOffsetPosition(sample, this.lateralOffsetMeters, trackInfo.spawn?.position?.y ?? 0.42);
     this.heading = sample.heading;
   }
 
@@ -77,11 +76,7 @@ export class AiVehicleController {
 
     const sample = samplePathAtProgress(centerline, nextProgress);
     this.progress = sample.progress;
-    this.position = {
-      x: sample.x,
-      y: trackInfo.spawn?.position?.y ?? 0.42,
-      z: sample.z
-    };
+    this.position = getOffsetPosition(sample, this.lateralOffsetMeters, trackInfo.spawn?.position?.y ?? 0.42);
     this.heading = sample.heading;
 
     return this.getState();
@@ -115,6 +110,14 @@ function getSpawnProgress(trackInfo, centerline, spawnOffsetMeters) {
 
 function getAiSpeed(performance, speedFactor) {
   return (performance.maxForwardSpeed ?? DEFAULT_MAX_FORWARD_SPEED) * speedFactor;
+}
+
+function getOffsetPosition(sample, lateralOffsetMeters, y) {
+  return {
+    x: sample.x + Math.cos(sample.heading) * lateralOffsetMeters,
+    y,
+    z: sample.z - Math.sin(sample.heading) * lateralOffsetMeters
+  };
 }
 
 function approachValue(currentValue, targetValue, maxStep) {

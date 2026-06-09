@@ -257,6 +257,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Aggiungere opponent AI visibile.
 - [x] Rendere velocita AI dipendente dal veicolo.
 - [x] Aggiungere accelerazione progressiva e rallentamento in curva.
+- [x] Applicare offset laterale alla traiettoria AI.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
