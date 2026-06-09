@@ -28,8 +28,8 @@ Dipendenze:
 
 - [x] `trackInfo.checkpoints`;
 - [x] `trackInfo.centerline`;
-- [ ] veicolo AI creato con lo stesso `vehicleId` del player;
-- [ ] performance AI coerenti con il veicolo scelto.
+- [x] veicolo AI creato con lo stesso `vehicleId` del player;
+- [x] performance AI coerenti con il veicolo scelto.
 
 ### Time Trial
 
@@ -56,7 +56,7 @@ Dipendenze:
 
 ## Fuori Scope Iniziale
 
-- AI completa;
+- tuning avanzato AI;
 - collisione player-bot;
 - record persistenti complessi;
 - ghost lap;
@@ -225,7 +225,7 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 
 - [x] Implementare avviso contromano usando `trackInfo.centerline`.
 - [x] Preparare controller logico AI usando `trackInfo.centerline`.
-- [ ] Implementare AI opponent visibile usando `trackInfo.centerline`.
+- [x] Implementare AI opponent visibile usando `trackInfo.centerline`.
 - [ ] Integrare collisioni/barriere quando la sezione collisioni e pronta.
 - [ ] Rifinire HUD/minimap nel branch dedicato.
 
@@ -249,10 +249,15 @@ La UI espone countdown e HUD in DOM stabile; `verify:scene` copre avvio scena, c
 - [x] Evidenziare checkpoint successivo.
 - [x] Preparare supporto best lap time trial.
 - [x] Preparare supporto race vs AI.
+- [x] Aggiornare posizione player confrontando progresso player e AI.
 - [x] Aggiungere finish screen con classifica lap time e gap dal best lap.
 - [x] Salvare storico lap completati per pista/veicolo/modalita.
 - [x] Implementare warning contromano.
 - [x] Preparare controller logico AI.
+- [x] Aggiungere opponent AI visibile.
+- [x] Rendere velocita AI dipendente dal veicolo.
+- [x] Aggiungere accelerazione progressiva e rallentamento in curva.
+- [x] Applicare offset laterale alla traiettoria AI.
 - [x] Aggiornare `docs/contracts.md`.
 - [x] Aggiornare `README.md`.
 - [x] Eseguire `bun run build`.
