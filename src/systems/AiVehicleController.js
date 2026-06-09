@@ -8,6 +8,8 @@ const DEFAULT_CURVE_LOOKAHEAD_METERS = 14;
 const DEFAULT_MIN_CURVE_SPEED_FACTOR = 0.52;
 const DEFAULT_SPAWN_OFFSET_METERS = -11;
 const DEFAULT_LATERAL_OFFSET_METERS = -1.35;
+const COLLISION_SLOWDOWN_FACTOR = 0.18;
+const COLLISION_SLOWDOWN_SECONDS = 1.25;
 
 export class AiVehicleController {
   constructor(performance = {}, trackInfo = {}, {
@@ -30,6 +32,7 @@ export class AiVehicleController {
     this.progress = 0;
     this.lap = 1;
     this.speed = 0;
+    this.collisionSlowdownTimer = 0;
     this.position = { x: 0, y: 0.42, z: 0 };
     this.heading = 0;
     this.hasCrossedStartLine = false;
@@ -45,6 +48,7 @@ export class AiVehicleController {
     this.progress = sample.progress;
     this.lap = 1;
     this.speed = 0;
+    this.collisionSlowdownTimer = 0;
     this.hasCrossedStartLine = false;
     this.position = getOffsetPosition(sample, this.lateralOffsetMeters, trackInfo.spawn?.position?.y ?? 0.42);
     this.heading = sample.heading;
@@ -63,7 +67,10 @@ export class AiVehicleController {
       this.curveLookaheadMeters,
       this.minCurveSpeedFactor
     );
-    const targetSpeed = getAiSpeed(this.performance, this.speedFactor) * curveSpeedFactor;
+    this.collisionSlowdownTimer = Math.max(0, this.collisionSlowdownTimer - Math.max(0, deltaTime));
+
+    const collisionSpeedFactor = this.collisionSlowdownTimer > 0 ? COLLISION_SLOWDOWN_FACTOR : 1;
+    const targetSpeed = getAiSpeed(this.performance, this.speedFactor) * curveSpeedFactor * collisionSpeedFactor;
     const speedStep = (targetSpeed >= this.speed ? this.acceleration : this.braking) * Math.max(0, deltaTime);
     this.speed = approachValue(this.speed, targetSpeed, speedStep);
     const nextProgress = offsetProgress(centerline, this.progress, this.speed * Math.max(0, deltaTime));
@@ -90,6 +97,10 @@ export class AiVehicleController {
       lap: this.lap,
       speed: this.speed
     };
+  }
+
+  registerCollision() {
+    this.collisionSlowdownTimer = COLLISION_SLOWDOWN_SECONDS;
   }
 }
 

@@ -153,7 +153,8 @@ Regole:
 - non deve conoscere direttamente mesh, DOM, HUD o AI;
 - `update()` deve restituire uno stato adatto a `vehicle.setTransform()` e `vehicle.update()`;
 - `distanceThisFrame` serve all'animazione ruote;
-- `surfaceGrip`, `boostFactor` e collisioni reali verranno forniti da sistemi pista/collisione futuri;
+- `surfaceGrip` influenza trazione e sterzata;
+- `boostFactor` e collisioni reali vengono forniti da sistemi pista/collisione;
 - `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
 
 ## Track Factory
@@ -336,6 +337,53 @@ Regole:
 - `getOrderedCheckpoints()` non deve mutare `trackInfo.checkpoints`;
 - i checkpoint validi devono avere `position.x`, `position.z` e `order`/`id` numerici;
 - `radius` e opzionale se e presente `size`.
+
+## Track Interaction System
+
+File: `src/systems/TrackInteractionSystem.js`
+
+Firma:
+
+```js
+const trackInteraction = new TrackInteractionSystem();
+```
+
+Contratto:
+
+```js
+trackInteraction.update(playerState, trackInfo, options) -> EnvironmentState
+trackInteraction.reset()
+```
+
+`EnvironmentState` prodotto:
+
+```js
+{
+  surfaceType,
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided,
+  correction,
+  impact
+}
+```
+
+Regole:
+
+- legge `trackInfo.centerline`, `trackInfo.roadHalfWidth`, `trackInfo.boostPads` e `trackInfo.barrierColliders`;
+- restituisce default asfaltati quando i dati pista mancano;
+- usa distanza da `centerline` e `roadHalfWidth` per distinguere asphalt/off-road;
+- fuori strada riduce `surfaceGrip` e `speedLimitMultiplier`;
+- usa `trackInfo.boostPads` per applicare un boost temporaneo con cooldown breve;
+- usa `trackInfo.barrierColliders` per produrre `collided`, `correction` e `impact`;
+- puo ricevere `options.opponentStates` per collisione player-opponent semplificata;
+- un impatto `opponent` applica separazione minima al player e rallenta temporaneamente l'AI, ma non implica avoidance intelligente;
+- non deve conoscere mesh, DOM, HUD o classi veicolo;
+- non deve modificare direttamente la mesh del player;
+- la scena usa l'output per aggiornare `ArcadeVehicleController`;
+- la risposta fisica a una barriera deve essere continua ogni frame di intersezione;
+- eventuali cooldown servono solo per feedback futuri, non per bloccare la correzione fisica.
 
 ## Race Records
 

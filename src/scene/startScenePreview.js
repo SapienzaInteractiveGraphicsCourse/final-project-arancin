@@ -12,6 +12,7 @@ import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
+import { TrackInteractionSystem } from "../systems/TrackInteractionSystem.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
 import {
   appendLapRecord,
@@ -38,6 +39,7 @@ export function startScenePreview(container, setup, options = {}) {
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
+  const trackInteraction = new TrackInteractionSystem();
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
@@ -108,6 +110,7 @@ export function startScenePreview(container, setup, options = {}) {
   function resetRace() {
     controller.reset(track.spawn);
     aiController?.reset(track.trackInfo);
+    trackInteraction.reset();
     raceManager.reset();
     wrongWayDetector.reset();
     raceManager.startCountdown();
@@ -137,15 +140,18 @@ export function startScenePreview(container, setup, options = {}) {
     const currentVehicleState = controller.getState();
     const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
+    const opponentStates = aiController ? [aiController.getState()] : [];
+    const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, {
+      deltaTime,
+      opponentStates
+    });
+    if (environmentState.impact?.type === "opponent") {
+      aiController?.registerCollision();
+    }
+
     const state = updatedRaceState.finished
       ? controller.getState()
-      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, {
-        surfaceType: "asphalt",
-        surfaceGrip: 1,
-        speedLimitMultiplier: 1,
-        boostFactor: 1,
-        collided: false
-      });
+      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, environmentState);
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);

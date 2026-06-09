@@ -241,17 +241,43 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 5. Collisioni
 
-- [ ] Collisione player-barriere.
-- [ ] Applicare correzione fisica ogni frame di intersezione.
+- [x] Documentare `docs/collisions.md`.
+
+### Track Interaction System
+
+- [x] Creare `TrackInteractionSystem`.
+- [x] Sostituire `environmentState` hardcoded nella scena.
+- [x] Gestire default robusti se la pista non espone dati completi.
+- [x] Aggiornare `docs/contracts.md`.
+
+### Off-road
+
+- [x] Rilevamento off-road tramite `centerline` e `roadHalfWidth`.
+- [x] Ridurre `surfaceGrip` fuori strada.
+- [x] Ridurre `speedLimitMultiplier` fuori strada.
+- [x] Esporre `surfaceType` per HUD futuro.
+
+### Boost Pad
+
+- [x] Rilevamento boost pad.
+- [x] Applicare `boostFactor`.
+- [x] Cooldown breve boost.
+- [x] Annullare boost su impatto importante.
+
+### Barriere
+
+- [x] Collisione player-barriere.
+- [x] Test punto/veicolo contro collider oriented box 2D.
+- [x] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
-- [ ] Spingere fuori dalla barriera lungo la normale.
-- [ ] Ridurre/invertire velocita su impatto frontale.
-- [ ] Annullare boost su impatto importante.
-- [ ] Collisione player-bot.
-- [ ] Separare posizioni player/bot.
-- [ ] Penalita o feedback collisione.
-- [ ] Rilevamento off-road.
-- [ ] Rilevamento boost pad.
+- [x] Spingere fuori dalla barriera lungo la normale.
+- [x] Ridurre/invertire velocita su impatto frontale.
+
+### Player Vs AI
+
+- [x] Collisione player-bot.
+- [x] Separare posizioni player/bot.
+- [x] Penalita o feedback collisione.
 
 ## 6. Gara E AI
 
