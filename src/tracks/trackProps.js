@@ -2,6 +2,19 @@ import * as THREE from "three";
 import { createFlatStandardMaterial } from "./trackMaterials.js";
 import crowdTextureUrl from "../assets/textures/grandstand_crowd.png";
 
+const ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS = false;
+
+function addDecorativePointLight(parent, color, intensity, distance, decay, position) {
+  if (!ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS) {
+    return null;
+  }
+
+  const light = new THREE.PointLight(color, intensity, distance, decay);
+  light.position.copy(position);
+  parent.add(light);
+  return light;
+}
+
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
 }
@@ -80,29 +93,71 @@ function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfW
   const tangent = curve.getTangentAt(progress % 1.0).setY(0).normalize();
   const normal = getRightVector(tangent);
   
-  let currentOffset = initialOffset;
-  let position = point.clone().addScaledVector(normal, side * currentOffset);
+  // Determine absolute minimum clearance to prevent physical clipping, scaled with minClearance
+  const safeClearance = Math.max(16, minClearance * 0.35);
+  const absoluteMinClearance = roadHalfWidth + safeClearance;
   
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    let tooClose = false;
-    for (let index = 0; index <= 120; index += 1) {
-      const trackPoint = curve.getPointAt(index / 120);
-      const distSq = (position.x - trackPoint.x) ** 2 + (position.z - trackPoint.z) ** 2;
-      if (distSq < (roadHalfWidth + minClearance) ** 2) {
-        tooClose = true;
-        break;
+  let bestPos = null;
+  let bestDist = -1;
+  
+  const sidesToTry = [side, -side];
+  
+  for (const s of sidesToTry) {
+    let currentOffset = initialOffset;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const testPos = point.clone().addScaledVector(normal, s * currentOffset);
+      
+      // Calculate minimum distance from testPos to the entire track
+      let minTrackDist = Infinity;
+      for (let index = 0; index <= 120; index += 1) {
+        const trackPoint = curve.getPointAt(index / 120);
+        const dist = Math.sqrt((testPos.x - trackPoint.x) ** 2 + (testPos.z - trackPoint.z) ** 2);
+        if (dist < minTrackDist) {
+          minTrackDist = dist;
+        }
       }
+      
+      // If this position is safe from physical road clipping
+      if (minTrackDist >= absoluteMinClearance) {
+        // If it also satisfies the desired minClearance, return it immediately
+        if (minTrackDist >= roadHalfWidth + minClearance) {
+          return testPos;
+        }
+        
+        // Otherwise, keep track of the one that is furthest from the road
+        if (minTrackDist > bestDist) {
+          bestDist = minTrackDist;
+          bestPos = testPos;
+        }
+      }
+      
+      currentOffset += 20;
     }
-    
-    if (!tooClose) {
-      return position;
-    }
-    
-    currentOffset += 20;
-    position = point.clone().addScaledVector(normal, side * currentOffset);
   }
   
-  return position;
+  // If we found a position that doesn't clip, return it
+  if (bestPos) {
+    return bestPos;
+  }
+  
+  // Fallback to roadside position with safe clear distance
+  for (const s of [side, -side]) {
+    const safeNearPos = point.clone().addScaledVector(normal, s * (roadHalfWidth + safeClearance + 2));
+    let minTrackDist = Infinity;
+    for (let index = 0; index <= 120; index += 1) {
+      const trackPoint = curve.getPointAt(index / 120);
+      const dist = Math.sqrt((safeNearPos.x - trackPoint.x) ** 2 + (safeNearPos.z - trackPoint.z) ** 2);
+      if (dist < minTrackDist) {
+        minTrackDist = dist;
+      }
+    }
+    if (minTrackDist >= roadHalfWidth + 6) {
+      return safeNearPos;
+    }
+  }
+  
+  // Ultimate fallback to initial offset
+  return point.clone().addScaledVector(normal, side * initialOffset);
 }
 
 const windowMaterialCache = new Map();
@@ -581,15 +636,15 @@ function generateCitySkyline(curve, group, definition) {
     
     // Wider, taller, and more proportioned buildings
     const height = 32 + pseudoRandom(buildingIndex + 4.2) * 33;
-    const width = 10 + pseudoRandom(buildingIndex + 8.6) * 5;
-    const depth = 10 + pseudoRandom(buildingIndex + 13.1) * 5;
+    const width = 8 + pseudoRandom(buildingIndex + 8.6) * 4;
+    const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 4;
     
     // Position them further out so they are in the background and don't intersect other props
-    const skylineOffset = definition.roadWidth * 0.5 + 40 + pseudoRandom(buildingIndex + 21.5) * 15;
+    const skylineOffset = definition.roadWidth * 0.5 + 82 + pseudoRandom(buildingIndex + 21.5) * 32;
     const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
     
     // Dynamically calculate a safe position that is guaranteed not to overlap ANY part of the track
-    const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 25);
+    const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 62);
 
     const building = createVegasBuilding({
       position,
@@ -647,9 +702,7 @@ function addVegasTunnel(group, curve, definition, baseProgress, tunnelIndex, arc
     arch.add(left, right, roof);
 
     if (segment % 4 === 0) {
-      const light = new THREE.PointLight(color, 1.25, 17, 1.7);
-      light.position.set(0, 2.7, 0);
-      arch.add(light);
+      addDecorativePointLight(arch, color, 1.25, 17, 1.7, new THREE.Vector3(0, 2.7, 0));
     }
 
     tunnel.add(arch);
@@ -1266,7 +1319,7 @@ function isNearGrandstand(progress, side, threshold = 0.05) {
 
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.08, 0.28, 0.45, 0.59, 0.74, 0.87];
+  const progressPoints = [0.10, 0.28, 0.45, 0.59, 0.74, 0.87];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -1305,10 +1358,10 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
     typeBuilders[index % typeBuilders.length](sign, color, contrastColor, index);
 
     // Adjusted light intensity/range/position for smaller sign
-    const light = new THREE.PointLight(color, 10, 15, 1.8);
-    light.name = `VegasBillboardLight:${index}`;
-    light.position.set(0, 6, 1.2);
-    sign.add(light);
+    const light = addDecorativePointLight(sign, color, 10, 15, 1.8, new THREE.Vector3(0, 6, 1.2));
+    if (light) {
+      light.name = `VegasBillboardLight:${index}`;
+    }
     group.add(sign);
   });
 }
@@ -2144,9 +2197,9 @@ function addVegasF1Venue(group, curve, definition) {
     const side = index % 2 === 0 ? 1 : -1;
     const position = point
       .clone()
-      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 15))
+      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 38))
       .addScaledVector(tangent, pseudoRandom(index + 2.2) * 8 - 4);
-    clampPropPosition(curve, position, roadHalfWidth);
+    clampPropPosition(curve, position, roadHalfWidth, 200, 30, 35);
 
     group.add(createGrandstand({
       position,
@@ -2385,11 +2438,12 @@ function addVegasLightPosts(group, curve, definition) {
     head.position.set(0, 9.2, 0);
     head.receiveShadow = true;
 
-    const light = new THREE.PointLight(lampColor, 25, 20, 2);
-    light.name = `VegasStreetLampLight:${index}`;
-    light.position.copy(head.position);
+    const light = addDecorativePointLight(lamp, lampColor, 25, 20, 2, head.position);
+    if (light) {
+      light.name = `VegasStreetLampLight:${index}`;
+    }
 
-    lamp.add(pole, head, light);
+    lamp.add(pole, head);
     group.add(lamp);
   }
 }
@@ -2439,19 +2493,17 @@ function addFacadeNeonSign(parent, { position, seed, color, lineCount = 4 }) {
     sign.add(segment);
   }
 
-  const light = new THREE.PointLight(color, 12, 15, 2);
-  light.position.set(0, -lineCount, 2.2);
-  sign.add(light);
+  addDecorativePointLight(sign, color, 12, 15, 2, new THREE.Vector3(0, -lineCount, 2.2));
   parent.add(sign);
 }
 
 function buildCaesarsPalace(group, curve, roadHalfWidth) {
   const palace = new THREE.Group();
   palace.name = "VegasSkyline:CaesarsPalace";
-  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 110, roadHalfWidth, 45);
+  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 145, roadHalfWidth, 70);
   palace.position.copy(transform.position);
   palace.rotation.y = transform.rotationY;
-  palace.scale.set(0.6, 0.6, 0.6);
+  palace.scale.set(0.52, 0.52, 0.52);
 
   const cream = createVegasMaterial({ color: 0xc8b89a });
   const domeMaterial = createVegasMaterial({ color: 0xb8a882, roughness: 0.68 });
@@ -2571,10 +2623,10 @@ function buildMgmGrand(group, curve, roadHalfWidth) {
 function buildBellagio(group, curve, roadHalfWidth) {
   const bellagio = new THREE.Group();
   bellagio.name = "VegasSkyline:Bellagio";
-  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 120, roadHalfWidth, 50);
+  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 175, roadHalfWidth, 90);
   bellagio.position.copy(transform.position);
   bellagio.rotation.y = transform.rotationY;
-  bellagio.scale.set(0.5, 0.5, 0.5);
+  bellagio.scale.set(0.42, 0.42, 0.42);
 
   const facadeMaterial = createVegasMaterial({ color: 0xe0d0b8 });
   const glassMaterial = createVegasMaterial({ color: 0x1a3050, roughness: 0.42, metalness: 0.1 });
@@ -2640,11 +2692,12 @@ function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
   
-  // Place it a bit further down the road (progress = 0.045) so it is clearly visible from the starting grid
-  // Angled 35 degrees towards the starting grid so the player sees it oncoming at spawn/start
-  const transform = getRoadsideTransform(curve, 0.045, -1, roadHalfWidth + 10.5, roadHalfWidth, 8);
+  // progress=0.055 → midway between start (0) and first grandstand (0.1), right side of track.
+  // offset roadHalfWidth+18 = 23.25u clears absoluteMinClearance from the approach track segment.
+  // rotation +PI*0.5: front face points toward the road center so it's readable while driving.
+  const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
   signGroup.position.copy(transform.position);
-  signGroup.rotation.y = transform.rotationY + Math.PI * 0.18; 
+  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5; 
 
   const welcomeTex = getCachedWelcomeToVegasTexture();
   const welcomeMat = new THREE.MeshStandardMaterial({
@@ -2660,14 +2713,12 @@ function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
     metalness: 0.08
   });
 
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), welcomeMat);
-  plane.position.y = 8; // rests perfectly on the ground
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), welcomeMat);
+  plane.position.y = 10; // rests on the ground, 20m tall
   signGroup.add(plane);
 
   // Spotlight to illuminate the sign at night
-  const light = new THREE.PointLight(0xffffff, 8, 15, 1.5);
-  light.position.set(0, 8, 3.5);
-  signGroup.add(light);
+  addDecorativePointLight(signGroup, 0xffffff, 8, 15, 1.5, new THREE.Vector3(0, 8, 3.5));
 
   group.add(signGroup);
 }
@@ -2789,9 +2840,7 @@ function buildEiffelTower(group, curve, roadHalfWidth) {
   beacon.position.set(0, 65.5, 0);
   tower.add(beacon);
 
-  const beaconLight = new THREE.PointLight(0xffffff, 25, 45, 1.2);
-  beaconLight.position.set(0, 65.5, 0);
-  tower.add(beaconLight);
+  addDecorativePointLight(tower, 0xffffff, 25, 45, 1.2, new THREE.Vector3(0, 65.5, 0));
 
   group.add(tower);
 }
@@ -2909,9 +2958,7 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
     cabinGroup.add(cabinBox);
 
     // Light inside/under the cabin
-    const cabinLight = new THREE.PointLight(cabinColor, 3, 5, 2.0);
-    cabinLight.position.set(0, -0.6, 0);
-    cabinGroup.add(cabinLight);
+    addDecorativePointLight(cabinGroup, cabinColor, 3, 5, 2.0, new THREE.Vector3(0, -0.6, 0));
 
     rotatingPart.add(cabinGroup);
   }
@@ -2919,9 +2966,7 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
   ferrisGroup.add(rotatingPart);
 
   // Center hub light
-  const hubLight = new THREE.PointLight(0x00ffcc, 15, 25, 1.5);
-  hubLight.position.set(0, 28, 0);
-  ferrisGroup.add(hubLight);
+  addDecorativePointLight(ferrisGroup, 0x00ffcc, 15, 25, 1.5, new THREE.Vector3(0, 28, 0));
 
   group.add(ferrisGroup);
 }
@@ -2984,6 +3029,79 @@ function buildVegasSkyline(group, curve, roadHalfWidth) {
   buildFerrisWheel(group, curve, roadHalfWidth);
 }
 
+function resolvePropClipping(propsGroup, curve, roadHalfWidth) {
+  propsGroup.children.forEach((child) => {
+    const name = child.name || "";
+    // Skip objects that are meant to span the road (tunnels, gantries, start line, checkpoint gates)
+    // or roadside lamps that are already carefully placed close to the road.
+    if (
+      name.includes("Tunnel") || 
+      name.includes("Gantry") || 
+      name.includes("Checkpoint") || 
+      name.includes("Start") ||
+      name.includes("StreetLamp") ||
+      name.includes("LightPost")
+    ) {
+      return;
+    }
+
+    // Determine safety clearance based on the type of prop
+    let minSafeDistance = roadHalfWidth + 3.0; // default for small props
+
+    if (name.includes("CaesarsPalace") || name.includes("MGMGrand") || name.includes("Bellagio") || name.includes("EiffelTower") || name.includes("FerrisWheel")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("BackgroundTower") || name.includes("Skyscraper")) {
+      minSafeDistance = roadHalfWidth + 25.0;
+    } else if (name.includes("Grandstand") || name.includes("LuxorPyramid") || name.includes("Paddock")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("Billboard")) {
+      minSafeDistance = roadHalfWidth + 7.5;
+    } else if (name.includes("WelcomeToLasVegasSign")) {
+      minSafeDistance = roadHalfWidth + 9.0;
+    } else if (name.includes("HologramDie")) {
+      if (child.position.y < 3.0) {
+        minSafeDistance = roadHalfWidth + 3.0;
+      } else {
+        return;
+      }
+    }
+
+    const pos = child.position;
+    
+    // We run up to 3 relaxation iterations to resolve clipping from all parts of the track
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      let closestPoint = null;
+      let minTrackDist = Infinity;
+      let closestT = 0;
+
+      for (let index = 0; index <= 120; index += 1) {
+        const t = index / 120;
+        const trackPoint = curve.getPointAt(t);
+        const dist = Math.sqrt((pos.x - trackPoint.x) ** 2 + (pos.z - trackPoint.z) ** 2);
+        if (dist < minTrackDist) {
+          minTrackDist = dist;
+          closestPoint = trackPoint;
+          closestT = t;
+        }
+      }
+
+      if (minTrackDist < minSafeDistance) {
+        const pushDir = new THREE.Vector3(pos.x - closestPoint.x, 0, pos.z - closestPoint.z);
+        if (pushDir.lengthSq() < 0.0001) {
+          const tangent = curve.getTangentAt(closestT).setY(0).normalize();
+          pushDir.copy(getRightVector(tangent));
+        } else {
+          pushDir.normalize();
+        }
+        pos.x = closestPoint.x + pushDir.x * minSafeDistance;
+        pos.z = closestPoint.z + pushDir.z * minSafeDistance;
+      } else {
+        break;
+      }
+    }
+  });
+}
+
 function disableDecorativeCastShadows(group) {
   group.traverse((child) => {
     if (child.isMesh || child.isInstancedMesh) {
@@ -3005,6 +3123,10 @@ function addVegasProps(group, curve, definition) {
   addVegasLightPosts(propsGroup, curve, definition);
   addNeonPalms(propsGroup, curve, definition);
   addCasinoDice(propsGroup, curve, definition);
+
+  // Clean up and resolve any remaining prop intersections/clipping
+  resolvePropClipping(propsGroup, curve, definition.roadWidth * 0.5);
+
   disableDecorativeCastShadows(propsGroup);
   group.add(propsGroup);
 }

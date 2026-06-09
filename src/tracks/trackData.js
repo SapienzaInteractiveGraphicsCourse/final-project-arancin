@@ -18,7 +18,7 @@ export const TRACK_DEFINITIONS = {
     barrierHeight: 0.72,
     barrierThickness: 0.42,
     checkpointTs: [0, 0.24, 0.46, 0.67, 0.84],
-    boostTs: [],
+    boostTs: [0.16, 0.52, 0.78],
     spawnOffsetMeters: -4.2,
     lightingMode: "vegas",
     skyboxTheme: "vegas",

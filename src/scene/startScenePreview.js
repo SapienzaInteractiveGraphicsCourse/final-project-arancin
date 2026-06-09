@@ -74,6 +74,12 @@ export function startScenePreview(container, setup, options = {}) {
     scene.add(lights.sun.target);
   }
 
+  // Debug globals for programmatic scene verification
+  window.gameScene = scene;
+  window.gameTrack = track;
+  window.gameVehicle = vehicle;
+  window.gameController = controller;
+
   // Cache references to animating props and start lights to avoid costly traversals in the frame loop
   const animatingProps = [];
   const gantryStartLights = [];

@@ -345,32 +345,30 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
   }
 }
 
-function createBarrierSegment(material, start, end, height, thickness) {
+function createBarrierCollider(start, end, height, thickness) {
   const dx = end.x - start.x;
   const dz = end.z - start.z;
   const length = Math.hypot(dx, dz);
   const visualLength = length + 0.08;
-  const segment = new THREE.Mesh(new THREE.BoxGeometry(visualLength, height, thickness), material);
 
-  segment.position.set((start.x + end.x) * 0.5, height * 0.5, (start.z + end.z) * 0.5);
-  segment.rotation.y = -Math.atan2(dz, dx);
-  segment.castShadow = true;
-  segment.receiveShadow = true;
-  segment.userData.collider = {
-    center: segment.position.clone(),
-    rotationY: segment.rotation.y,
+  return {
+    center: new THREE.Vector3((start.x + end.x) * 0.5, height * 0.5, (start.z + end.z) * 0.5),
+    rotationY: -Math.atan2(dz, dx),
     halfLength: visualLength * 0.5,
     halfThickness: thickness * 0.5
   };
-
-  return segment;
 }
 
 function addBarriers(group, edgeSamples, definition, material) {
-  const barrierMeshes = [];
+  const colliders = [];
+  const matrices = [];
   const offset = definition.barrierOffset ?? 0.85;
   const height = definition.barrierHeight ?? 0.68;
   const thickness = definition.barrierThickness ?? 0.44;
+  const geometry = new THREE.BoxGeometry(1, height, thickness);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
 
   for (let index = 0; index < edgeSamples.length - 1; index += BARRIER_SAMPLE_STEP) {
     const current = edgeSamples[index];
@@ -379,16 +377,27 @@ function addBarriers(group, edgeSamples, definition, material) {
     const leftEnd = next.left.clone().addScaledVector(next.normal, -offset);
     const rightStart = current.right.clone().addScaledVector(current.normal, offset);
     const rightEnd = next.right.clone().addScaledVector(next.normal, offset);
-    const left = createBarrierSegment(material, leftStart, leftEnd, height, thickness);
-    const right = createBarrierSegment(material, rightStart, rightEnd, height, thickness);
+    const left = createBarrierCollider(leftStart, leftEnd, height, thickness);
+    const right = createBarrierCollider(rightStart, rightEnd, height, thickness);
 
-    left.name = `${definition.name}:LeftBarrier`;
-    right.name = `${definition.name}:RightBarrier`;
-    barrierMeshes.push(left, right);
-    group.add(left, right);
+    [left, right].forEach((collider) => {
+      quaternion.setFromAxisAngle(UP, collider.rotationY);
+      scale.set(collider.halfLength * 2, 1, 1);
+      matrix.compose(collider.center, quaternion, scale);
+      matrices.push(matrix.clone());
+      colliders.push(collider);
+    });
   }
 
-  return barrierMeshes;
+  const barriers = new THREE.InstancedMesh(geometry, material, matrices.length);
+  barriers.name = `${definition.name}:Barriers`;
+  barriers.castShadow = definition.id !== "vegas";
+  barriers.receiveShadow = true;
+  matrices.forEach((barrierMatrix, index) => barriers.setMatrixAt(index, barrierMatrix));
+  barriers.instanceMatrix.needsUpdate = true;
+  group.add(barriers);
+
+  return colliders;
 }
 
 function createCheckpoints(curve, definition) {
@@ -407,7 +416,7 @@ function createCheckpoints(curve, definition) {
   });
 }
 
-function addStartLine(group, checkpoint, materials) {
+function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
   const startLine = new THREE.Group();
   startLine.name = "StartFinishLine";
   startLine.position.copy(checkpoint.position);
@@ -431,26 +440,29 @@ function addStartLine(group, checkpoint, materials) {
 
   group.add(startLine);
 
-  // Add starting grid slots/boxes behind the finish line
-  const tangent = checkpoint.tangent.clone().setY(0).normalize();
-  const normal = new THREE.Vector3(-tangent.z, 0, tangent.x);
-  const gridPositions = [
-    { dist: 4.8, side: 1 },
-    { dist: 8.8, side: -1 },
-    { dist: 12.8, side: 1 },
-    { dist: 16.8, side: -1 }
-  ];
+  // Add starting grid slots/boxes behind the finish line.
+  // Sample the curve at each slot distance so slots follow the track curvature.
+  const startT = 0; // checkpoint is always at t=0
+  const totalLength = curve.getLength();
+  const gridDistances = [4.8, 8.8, 12.8, 16.8];
+  const gridSides = [1, -1, 1, -1];
 
-  gridPositions.forEach(({ dist, side }, idx) => {
-    const gridPos = checkpoint.position.clone()
-      .addScaledVector(tangent, -dist)
-      .addScaledVector(normal, side * (checkpoint.size.x * 0.22));
-    gridPos.y = ROAD_Y + 0.051;
+  gridDistances.forEach((dist, idx) => {
+    // Walk backwards along the curve by 'dist' meters
+    const backT = ((startT - dist / totalLength) + 1) % 1;
+    const slotPoint = curve.getPointAt(backT);
+    const slotTangent = curve.getTangentAt(backT).setY(0).normalize();
+    const slotNormal = new THREE.Vector3(-slotTangent.z, 0, slotTangent.x);
+    const side = gridSides[idx];
+    const sideOffset = side * roadHalfWidth * 0.44;
+
+    const slotPos = slotPoint.clone().addScaledVector(slotNormal, sideOffset);
+    slotPos.y = ROAD_Y + 0.051;
 
     const slotGroup = new THREE.Group();
     slotGroup.name = `StartGridSlot:${idx}`;
-    slotGroup.position.copy(gridPos);
-    slotGroup.rotation.y = checkpoint.rotationY;
+    slotGroup.position.copy(slotPos);
+    slotGroup.rotation.y = getHeading(slotTangent);
 
     const bracketMaterial = materials.startWhite;
     const line = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.08), bracketMaterial);
@@ -655,9 +667,9 @@ export function createSplineTrack(definition) {
   group.add(leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
-  const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
+  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
   const checkpoints = createCheckpoints(curve, definition);
-  addStartLine(group, checkpoints[0], materials);
+  addStartLine(group, checkpoints[0], materials, curve, roadHalfWidth);
   addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
@@ -672,7 +684,7 @@ export function createSplineTrack(definition) {
     centerline,
     checkpoints,
     boostPads,
-    barrierColliders: barrierMeshes.map((mesh) => mesh.userData.collider),
+    barrierColliders,
     minimapBounds: getMinimapBounds(centerline, roadHalfWidth + 8),
     lightingMode: definition.lightingMode,
     skyboxTheme: definition.skyboxTheme,

@@ -24,6 +24,8 @@ This register tracks assets that are not authored procedurally by the team.
 | Asset | Method | Current status |
 | --- | --- | --- |
 | Procedural Kart | Three.js primitives | Integrated as team-authored hierarchical model |
+| Eiffel Tower | Three.js primitives | Stylized glowing neon landmark on Vegas Neon track |
+| Ferris Wheel | Three.js primitives | Rotating neon Ferris wheel with upright cabins on Vegas Neon track |
 
 ## Follow-up Checks
 

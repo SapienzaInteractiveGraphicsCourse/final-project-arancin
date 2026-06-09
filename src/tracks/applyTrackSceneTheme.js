@@ -144,6 +144,6 @@ export function applyTrackLightingTheme(lights, trackInfo) {
   }
 
   lights.sun.castShadow = true;
-  lights.sun.shadow.mapSize.set(2048, 2048);
+  lights.sun.shadow.mapSize.set(theme.shadowMapSize ?? 1024, theme.shadowMapSize ?? 1024);
   lights.sun.shadow.camera.updateProjectionMatrix();
 }
