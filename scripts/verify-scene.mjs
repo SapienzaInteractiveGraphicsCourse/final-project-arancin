@@ -77,7 +77,9 @@ async function runVerification() {
   await page.goto(BASE_URL, { waitUntil: "networkidle" });
 
   await page.getByRole("button", { name: /Tropical Beach/i }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
   await page.getByRole("button", { name: /Silvia/i }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
   await page.getByRole("button", { name: /Time Trial/i }).click();
   await page.getByRole("button", { name: /^Start$/i }).click();
 
