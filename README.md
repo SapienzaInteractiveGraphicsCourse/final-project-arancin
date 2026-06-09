@@ -357,7 +357,7 @@ O
 - [x] HUD time.
 - [x] HUD checkpoint.
 - [x] HUD surface.
-- [x] HUD status/wrong way.
+- [x] HUD countdown/wrong way overlay.
 - [x] HUD posizione/gap.
 - [x] Minimap canvas.
 - [x] Disegnare centerline su minimap.

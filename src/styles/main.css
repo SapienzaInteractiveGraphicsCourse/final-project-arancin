@@ -31,15 +31,20 @@ canvas {
 .race-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   place-items: center;
-  color: #ffffff;
-  font-size: 92px;
+  color: #f8fafc;
+  font-family: "Arial Black", Impact, system-ui, sans-serif;
+  font-size: 96px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
-  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+  text-shadow:
+    0 6px 0 rgba(8, 12, 20, 0.86),
+    0 0 28px rgba(56, 189, 248, 0.46),
+    0 18px 44px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
@@ -51,10 +56,66 @@ canvas {
   color: #facc15;
 }
 
+.race-overlay[data-state="ready"] {
+  color: #bae6fd;
+  font-size: 70px;
+}
+
+.race-overlay[data-state="countdown"] {
+  color: #ffffff;
+  font-size: 118px;
+  -webkit-text-stroke: 3px rgba(8, 12, 20, 0.82);
+  animation: countdownPop 0.34s ease-out;
+}
+
+.race-overlay[data-state="go"] {
+  color: #facc15;
+  font-size: 118px;
+  -webkit-text-stroke: 3px rgba(8, 12, 20, 0.82);
+  animation: countdownGo 0.65s ease-out;
+}
+
 .race-hud {
+  --hud-primary: #38bdf8;
+  --hud-secondary: #facc15;
+  --hud-speed-mid: #fef08a;
+  --hud-speed-end: #f97316;
+  --hud-track-mid: #38bdf8;
+  --hud-panel-rgb: 8, 12, 20;
+  --hud-glow-rgb: 56, 189, 248;
   z-index: 1;
   color: #f8fafc;
   pointer-events: none;
+}
+
+.race-hud[data-track-theme="vegas"] {
+  --hud-primary: #c084fc;
+  --hud-secondary: #facc15;
+  --hud-speed-mid: #e879f9;
+  --hud-speed-end: #facc15;
+  --hud-track-mid: #a855f7;
+  --hud-panel-rgb: 16, 8, 28;
+  --hud-glow-rgb: 192, 132, 252;
+}
+
+.race-hud[data-track-theme="beach"] {
+  --hud-primary: #22d3ee;
+  --hud-secondary: #facc15;
+  --hud-speed-mid: #67e8f9;
+  --hud-speed-end: #facc15;
+  --hud-track-mid: #06b6d4;
+  --hud-panel-rgb: 6, 36, 44;
+  --hud-glow-rgb: 34, 211, 238;
+}
+
+.race-hud[data-track-theme="monaco"] {
+  --hud-primary: #f8fafc;
+  --hud-secondary: #ef4444;
+  --hud-speed-mid: #f87171;
+  --hud-speed-end: #b91c1c;
+  --hud-track-mid: #f8fafc;
+  --hud-panel-rgb: 8, 10, 14;
+  --hud-glow-rgb: 239, 68, 68;
 }
 
 .race-hud-cluster {
@@ -71,17 +132,63 @@ canvas {
 .race-hud-top-left {
   left: 16px;
   top: 56px;
-  flex-wrap: wrap;
-  max-width: 560px;
-  padding: 9px 10px;
-  border-left: 5px solid #38bdf8;
+  display: grid;
+  grid-template-columns: 218px 138px;
+  grid-auto-rows: minmax(28px, auto);
+  align-items: center;
+  gap: 6px 14px;
+  max-width: min(392px, calc(100vw - 236px));
+  padding: 10px 12px;
+  border-left: 5px solid var(--hud-primary);
   border-radius: 7px;
   background:
-    linear-gradient(90deg, rgba(8, 12, 20, 0.76), rgba(15, 23, 42, 0.5)),
-    rgba(8, 12, 20, 0.62);
+    linear-gradient(90deg, rgba(var(--hud-panel-rgb), 0.62), rgba(15, 23, 42, 0.32)),
+    rgba(var(--hud-panel-rgb), 0.38);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 16px 36px rgba(0, 0, 0, 0.28);
+    0 16px 36px rgba(0, 0, 0, 0.22);
+}
+
+.race-hud-track {
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%) skewX(-8deg);
+}
+
+.race-hud-track-name {
+  min-height: 36px;
+  padding: 0 10px;
+  color: #7dd3fc;
+  background: linear-gradient(180deg, #ffffff 0%, #bae6fd 32%, var(--hud-track-mid) 68%, #111827 100%);
+  background-clip: text;
+  font-size: 28px;
+  font-style: italic;
+  text-align: center;
+  text-transform: uppercase;
+  -webkit-background-clip: text;
+  -webkit-text-stroke: 0.8px rgba(8, 12, 20, 0.72);
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 3px 0 rgba(8, 12, 20, 0.82),
+    0 0 18px rgba(var(--hud-glow-rgb), 0.48);
+}
+
+.race-hud[data-track-theme="vegas"] .race-hud-track-name {
+  background: linear-gradient(180deg, #ffffff 0%, #e9d5ff 24%, #a855f7 58%, #111827 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.race-hud[data-track-theme="beach"] .race-hud-track-name {
+  background: linear-gradient(180deg, #ffffff 0%, #cffafe 25%, #06b6d4 58%, #facc15 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.race-hud[data-track-theme="monaco"] .race-hud-track-name {
+  background: linear-gradient(180deg, #ffffff 0%, #e5e7eb 24%, #ef4444 64%, #050505 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
 }
 
 .race-hud-position {
@@ -91,14 +198,25 @@ canvas {
   align-items: flex-end;
   gap: 7px;
   padding: 8px 10px;
-  border-right: 5px solid #facc15;
+  border-right: 5px solid var(--hud-secondary);
   border-radius: 7px;
   background:
-    linear-gradient(270deg, rgba(8, 12, 20, 0.86), rgba(15, 23, 42, 0.5)),
-    rgba(8, 12, 20, 0.68);
+    linear-gradient(270deg, rgba(var(--hud-panel-rgb), 0.86), rgba(15, 23, 42, 0.48)),
+    rgba(var(--hud-panel-rgb), 0.66);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 16px 36px rgba(0, 0, 0, 0.26);
+}
+
+.race-hud[data-track-theme="vegas"] .race-hud-position {
+  border-right-color: #c084fc;
+  background:
+    linear-gradient(270deg, rgba(45, 16, 74, 0.9), rgba(15, 10, 28, 0.54)),
+    rgba(16, 8, 28, 0.76);
+  box-shadow:
+    inset 0 1px 0 rgba(233, 213, 255, 0.18),
+    0 16px 36px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(168, 85, 247, 0.18);
 }
 
 .race-hud-value {
@@ -119,30 +237,36 @@ canvas {
 }
 
 .race-hud-speed {
-  min-width: 176px;
-  min-height: 52px;
+  justify-content: flex-start;
+  min-width: 210px;
+  min-height: 58px;
   color: #fff7ad;
-  background: linear-gradient(180deg, #ffffff 0%, #fef9c3 38%, #facc15 70%, #fb923c 100%);
+  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--hud-primary) 36%, white) 22%, var(--hud-speed-mid) 52%, var(--hud-speed-end) 100%);
   background-clip: text;
-  font-size: 34px;
+  font-size: 43px;
   text-align: left;
   -webkit-background-clip: text;
-  -webkit-text-stroke: 0.6px rgba(8, 12, 20, 0.58);
+  -webkit-text-stroke: 0.9px rgba(8, 12, 20, 0.78);
   -webkit-text-fill-color: transparent;
   animation: speedPulse 1.4s ease-in-out infinite;
 }
 
 .race-hud-time {
-  min-width: 98px;
-  min-height: 34px;
+  min-width: 132px;
+  min-height: 42px;
   color: #dff6ff;
-  font-size: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--hud-primary) 44%, white) 54%, var(--hud-primary) 100%);
+  background-clip: text;
+  font-size: 28px;
+  -webkit-background-clip: text;
+  -webkit-text-stroke: 0.45px rgba(8, 12, 20, 0.7);
+  -webkit-text-fill-color: transparent;
 }
 
 .race-hud-place {
   min-width: 120px;
   min-height: 62px;
-  color: #fde047;
+  color: var(--hud-secondary);
   font-family: Impact, "Arial Black", system-ui, sans-serif;
   font-size: 43px;
   font-style: italic;
@@ -155,11 +279,11 @@ canvas {
   width: 20px;
   height: 20px;
   margin-right: 8px;
-  border: 2px solid #facc15;
+  border: 2px solid var(--hud-secondary);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 38%, #facc15 0 22%, transparent 23%),
-    linear-gradient(135deg, transparent 0 38%, #facc15 39% 61%, transparent 62%),
+    radial-gradient(circle at 50% 38%, var(--hud-secondary) 0 22%, transparent 23%),
+    linear-gradient(135deg, transparent 0 38%, var(--hud-secondary) 39% 61%, transparent 62%),
     #1e1b4b;
   box-shadow: 0 0 0 2px rgba(8, 12, 20, 0.72);
   content: "";
@@ -219,8 +343,9 @@ canvas {
   transform: rotate(45deg);
 }
 
-.race-hud-map {
-  color: #bae6fd;
+.race-hud-top-left .race-hud-surface {
+  grid-column: 1;
+  justify-self: start;
 }
 
 .race-hud-surface {
@@ -240,12 +365,37 @@ canvas {
   }
 }
 
-.race-hud-status {
-  color: #fde68a;
-}
-
 .race-hud-gap {
   color: #c4b5fd;
+}
+
+@keyframes countdownPop {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes countdownGo {
+  from {
+    opacity: 0;
+    transform: scale(0.72) rotate(-4deg);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1.08) rotate(1deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
 }
 
 .wrong-way-overlay {
@@ -790,11 +940,32 @@ canvas {
   .race-hud-top-left {
     left: 12px;
     top: 58px;
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     max-width: min(230px, calc(100vw - 166px));
     gap: 6px;
     padding: 8px;
+  }
+
+  .race-hud-top-left .race-hud-speed,
+  .race-hud-top-left .race-hud-time,
+  .race-hud-top-left .race-hud-surface {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .race-hud-track {
+    top: 10px;
+    max-width: min(240px, calc(100vw - 180px));
+  }
+
+  .race-hud-track-name {
+    min-height: 28px;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .race-hud-position {
@@ -803,15 +974,15 @@ canvas {
   }
 
   .race-hud-speed {
-    min-width: 96px;
+    min-width: 128px;
     min-height: 40px;
-    font-size: 19px;
+    font-size: 25px;
   }
 
   .race-hud-time {
-    min-width: 104px;
+    min-width: 112px;
     min-height: 36px;
-    font-size: 17px;
+    font-size: 21px;
   }
 
   .race-hud-place {
@@ -832,6 +1003,14 @@ canvas {
     top: 76px;
     min-width: 150px;
     font-size: 15px;
+  }
+
+  .race-overlay,
+  .race-overlay[data-state="ready"],
+  .race-overlay[data-state="countdown"],
+  .race-overlay[data-state="go"] {
+    font-size: 58px;
+    -webkit-text-stroke-width: 2px;
   }
 
   .race-minimap-panel {

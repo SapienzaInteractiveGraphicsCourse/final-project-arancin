@@ -515,7 +515,7 @@ Firma:
 ```js
 createRaceHud() -> {
   element,
-  update({ raceState, vehicleState, wrongWayState }),
+  update({ raceState, vehicleState, wrongWayState, trackId, trackName }),
   remove()
 }
 ```
@@ -527,9 +527,8 @@ speed
 lap
 totalTime
 checkpoint
-map
+track
 surface
-status
 position
 gap
 ```
@@ -539,7 +538,7 @@ Regole:
 - il componente crea il DOM una sola volta;
 - `update()` aggiorna solo i valori testuali dei campi;
 - deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
-- il warning contromano deve comparire nel campo `status` quando `wrongWayState.warning` e' attivo.
+- il warning contromano e gli stati di partenza devono usare overlay dedicati, non chip persistenti nell'HUD.
 
 ## Minimap System
 

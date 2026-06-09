@@ -1,14 +1,16 @@
-import { RACE_PHASES } from "../systems/RaceManager.js";
-
 const HUD_GROUPS = [
   {
     className: "race-hud-top-left",
     fields: [
       { id: "speed", className: "race-hud-speed" },
       { id: "totalTime", className: "race-hud-time" },
-      { id: "map", className: "race-hud-chip race-hud-map" },
-      { id: "surface", className: "race-hud-chip race-hud-surface" },
-      { id: "status", className: "race-hud-chip race-hud-status" }
+      { id: "surface", className: "race-hud-chip race-hud-surface" }
+    ]
+  },
+  {
+    className: "race-hud-track",
+    fields: [
+      { id: "track", className: "race-hud-track-name" }
     ]
   },
   {
@@ -49,14 +51,14 @@ export function createRaceHud() {
 
   return {
     element,
-    update({ raceState, vehicleState, wrongWayState, trackName } = {}) {
+    update({ raceState, vehicleState, wrongWayState, trackId, trackName } = {}) {
+      element.dataset.trackTheme = normalizeTrackTheme(trackId);
       values.get("speed").textContent = formatSpeed(vehicleState?.speed);
       values.get("lap").textContent = formatLap(raceState);
       values.get("totalTime").textContent = formatRaceTime(raceState?.totalTime);
       values.get("checkpoint").textContent = formatCheckpoint(raceState);
-      values.get("map").textContent = formatMap(trackName);
+      values.get("track").textContent = trackName ?? "--";
       values.get("surface").textContent = formatSurface(vehicleState?.surfaceType);
-      values.get("status").textContent = formatStatus(raceState, wrongWayState);
       values.get("position").textContent = formatPosition(raceState);
       values.get("gap").textContent = formatGap(raceState);
     },
@@ -64,6 +66,14 @@ export function createRaceHud() {
       element.remove();
     }
   };
+}
+
+function normalizeTrackTheme(trackId) {
+  if (trackId === "vegas" || trackId === "beach" || trackId === "monaco") {
+    return trackId;
+  }
+
+  return "default";
 }
 
 function formatSpeed(speed) {
@@ -90,40 +100,12 @@ function formatCheckpoint(raceState) {
   return `Checkpoint ${raceState.currentCheckpoint + 1}/${raceState.checkpointCount}`;
 }
 
-function formatMap(trackName) {
-  return `Map: ${trackName ?? "--"}`;
-}
-
 function formatSurface(surfaceType) {
   if (!surfaceType) {
     return "Surface --";
   }
 
   return `Grip: ${surfaceType.charAt(0).toUpperCase()}${surfaceType.slice(1)}`;
-}
-
-function formatStatus(raceState, wrongWayState) {
-  if (wrongWayState?.warning) {
-    return "Wrong Way";
-  }
-
-  if (!raceState) {
-    return "Ready";
-  }
-
-  if (raceState.finished || raceState.phase === RACE_PHASES.FINISHED) {
-    return "Finished";
-  }
-
-  if (raceState.phase === RACE_PHASES.COUNTDOWN) {
-    return "Countdown";
-  }
-
-  if (raceState.phase === RACE_PHASES.RUNNING) {
-    return raceState.mode === "time-trial" ? "Time Trial" : "Race";
-  }
-
-  return "Ready";
 }
 
 function formatPosition(raceState) {

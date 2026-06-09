@@ -27,7 +27,7 @@ Questa pianificazione copre la sezione 8 del README:
 - HUD time;
 - HUD checkpoint;
 - HUD surface;
-- HUD status/wrong way;
+- HUD countdown/wrong way overlay;
 - HUD posizione/gap;
 - minimap canvas;
 - centerline su minimap;
@@ -164,7 +164,7 @@ Contenuto atteso:
 
 - velocita in km/h;
 - surface;
-- wrong way/status;
+- countdown e wrong way in overlay dedicati;
 - posizione/gap quando `race` o AI sono disponibili;
 - fallback leggibili quando checkpoint, AI o bounds non esistono.
 

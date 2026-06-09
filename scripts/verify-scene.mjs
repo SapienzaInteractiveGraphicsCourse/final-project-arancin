@@ -119,14 +119,14 @@ async function runVerification() {
     throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
-  for (const field of ["speed", "checkpoint", "map", "surface", "status", "position", "gap"]) {
+  for (const field of ["speed", "checkpoint", "track", "surface", "position", "gap"]) {
     const fieldCount = await page.locator(`[data-hud-field="${field}"]`).count();
     if (fieldCount !== 1) {
       throw new Error(`Race HUD is missing stable ${field} field`);
     }
   }
 
-  if (!/^[123]$/.test(countdownText ?? "")) {
+  if (!/^(Ready\?|[123]|GO!)$/.test(countdownText ?? "")) {
     throw new Error(`Countdown overlay did not show expected value: ${countdownText}`);
   }
 

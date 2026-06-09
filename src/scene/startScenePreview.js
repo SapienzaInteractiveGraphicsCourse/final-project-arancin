@@ -46,6 +46,7 @@ export function startScenePreview(container, setup, options = {}) {
   let savedLapRecords = ensureBestLapInRecords(window.localStorage, lapRecordsKey, savedBestLapTime);
   const raceManager = new RaceManager({
     mode: setup.raceMode,
+    countdownSeconds: 4,
     bestLapTime: savedBestLapTime,
     onLapComplete: (lapRecord) => {
       savedLapRecords = appendLapRecord(window.localStorage, lapRecordsKey, lapRecord);
@@ -149,6 +150,7 @@ export function startScenePreview(container, setup, options = {}) {
         raceState: raceManager.getState(),
         vehicleState: state,
         wrongWayState: wrongWayDetector.getState(),
+        trackId: track.trackInfo.id,
         trackName: track.trackInfo.name
       });
       minimap.update({ playerState: state });
@@ -187,6 +189,7 @@ export function startScenePreview(container, setup, options = {}) {
       raceState,
       vehicleState: state,
       wrongWayState,
+      trackId: track.trackInfo.id,
       trackName: track.trackInfo.name
     });
     minimap.update({ playerState: state });
@@ -595,23 +598,29 @@ function createRaceOverlay() {
 
 function updateRaceOverlay(overlay, raceState) {
   if (raceState.phase === RACE_PHASES.COUNTDOWN) {
+    if (raceState.countdown > 3) {
+      setRaceOverlayText(overlay, raceState, "Ready?", "ready");
+      return;
+    }
+
     const countdownNumber = Math.max(1, Math.ceil(raceState.countdown));
-    setRaceOverlayText(overlay, raceState, String(countdownNumber));
+    setRaceOverlayText(overlay, raceState, String(countdownNumber), "countdown");
     return;
   }
 
   if (raceState.phase === RACE_PHASES.RUNNING && raceState.totalTime < 0.65) {
-    setRaceOverlayText(overlay, raceState, "GO");
+    setRaceOverlayText(overlay, raceState, "GO!", "go");
     return;
   }
 
-  setRaceOverlayText(overlay, raceState, "");
+  setRaceOverlayText(overlay, raceState, "", "");
 }
 
-function setRaceOverlayText(overlay, raceState, text) {
+function setRaceOverlayText(overlay, raceState, text, state) {
   overlay.textContent = text;
   overlay.hidden = text.length === 0;
   overlay.dataset.phase = raceState.phase;
+  overlay.dataset.state = state;
 }
 
 function formatMode(mode) {
