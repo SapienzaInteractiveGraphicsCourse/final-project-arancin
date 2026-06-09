@@ -14,6 +14,7 @@ export class MinimapSystem {
 
   setTrack(trackInfo = {}) {
     this.centerline = Array.isArray(trackInfo.centerline) ? trackInfo.centerline : [];
+    this.checkpoints = Array.isArray(trackInfo.checkpoints) ? trackInfo.checkpoints : [];
     this.bounds = normalizeBounds(trackInfo.minimapBounds, this.centerline);
   }
 
@@ -34,7 +35,7 @@ export class MinimapSystem {
     this.context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
   }
 
-  update({ playerState } = {}) {
+  update({ playerState, aiState } = {}) {
     this.clear();
     this.drawBackground();
 
@@ -45,7 +46,10 @@ export class MinimapSystem {
 
     const transform = this.createTransform(playerState);
     this.drawCenterline(transform);
+    this.drawCheckpoints(transform);
+    this.drawAiMarker(transform, aiState);
     this.drawPlayerMarker();
+    this.drawLegend();
   }
 
   clear() {
@@ -153,15 +157,96 @@ export class MinimapSystem {
 
     this.context.fillStyle = "#fde047";
     this.context.strokeStyle = "rgba(8, 12, 20, 0.9)";
-    this.context.lineWidth = 2.2;
+    this.context.lineWidth = 2.8;
     this.context.beginPath();
-    this.context.moveTo(x, y - 10);
-    this.context.lineTo(x + 8, y + 8);
-    this.context.lineTo(x, y + 4);
-    this.context.lineTo(x - 8, y + 8);
+    this.context.moveTo(x, y - 13);
+    this.context.lineTo(x + 10, y + 10);
+    this.context.lineTo(x, y + 5);
+    this.context.lineTo(x - 10, y + 10);
     this.context.closePath();
     this.context.fill();
     this.context.stroke();
+  }
+
+  drawCheckpoints(project) {
+    this.checkpoints.forEach((checkpoint) => {
+      if (!checkpoint?.position) {
+        return;
+      }
+
+      const point = project(checkpoint.position);
+      const isStart = checkpoint.isStartFinish || checkpoint.id === 0 || checkpoint.order === 0;
+
+      this.context.strokeStyle = "rgba(8, 12, 20, 0.88)";
+      this.context.lineWidth = 2;
+
+      if (isStart) {
+        this.context.fillStyle = "#f8fafc";
+        this.context.fillRect(point.x - 7, point.y - 7, 14, 14);
+        this.context.fillStyle = "#111827";
+        this.context.fillRect(point.x - 7, point.y - 7, 7, 7);
+        this.context.fillRect(point.x, point.y, 7, 7);
+        this.context.strokeRect(point.x - 7, point.y - 7, 14, 14);
+        return;
+      }
+
+      this.context.fillStyle = "rgba(56, 189, 248, 0.28)";
+      this.context.beginPath();
+      this.context.arc(point.x, point.y, 7, 0, Math.PI * 2);
+      this.context.fill();
+      this.context.fillStyle = "#67e8f9";
+      this.context.beginPath();
+      this.context.arc(point.x, point.y, 3.7, 0, Math.PI * 2);
+      this.context.fill();
+      this.context.beginPath();
+      this.context.arc(point.x, point.y, 7, 0, Math.PI * 2);
+      this.context.stroke();
+    });
+  }
+
+  drawAiMarker(project, aiState) {
+    if (!hasVisibleAiModel(aiState)) {
+      return;
+    }
+
+    const point = project(aiState.position);
+
+    this.context.fillStyle = "rgba(249, 115, 22, 0.28)";
+    this.context.strokeStyle = "rgba(8, 12, 20, 0.9)";
+    this.context.lineWidth = 2;
+    this.context.beginPath();
+    this.context.arc(point.x, point.y, 9, 0, Math.PI * 2);
+    this.context.fill();
+    this.context.fillStyle = "#fb923c";
+    this.context.beginPath();
+    this.context.arc(point.x, point.y, 5.4, 0, Math.PI * 2);
+    this.context.fill();
+    this.context.stroke();
+  }
+
+  drawLegend() {
+    const x = 14;
+    const y = this.cssHeight - 22;
+
+    this.context.fillStyle = "rgba(8, 12, 20, 0.62)";
+    this.context.beginPath();
+    this.context.roundRect(x - 7, y - 11, 72, 18, 6);
+    this.context.fill();
+
+    this.context.fillStyle = "#fde047";
+    this.context.beginPath();
+    this.context.arc(x, y - 1, 3.5, 0, Math.PI * 2);
+    this.context.fill();
+
+    this.context.fillStyle = "#fb923c";
+    this.context.beginPath();
+    this.context.arc(x + 25, y - 1, 3.5, 0, Math.PI * 2);
+    this.context.fill();
+
+    this.context.fillStyle = "#67e8f9";
+    this.context.beginPath();
+    this.context.arc(x + 50, y - 1, 3.5, 0, Math.PI * 2);
+    this.context.fill();
   }
 
   clipToCircle() {
@@ -213,4 +298,12 @@ function normalizeBounds(bounds, points) {
     minZ: Infinity,
     maxZ: -Infinity
   });
+}
+
+function hasVisibleAiModel(aiState) {
+  if (!aiState?.position) {
+    return false;
+  }
+
+  return aiState.visible === true || aiState.hasVisibleModel === true;
 }

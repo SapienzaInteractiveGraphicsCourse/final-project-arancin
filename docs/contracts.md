@@ -528,6 +528,7 @@ lap
 totalTime
 checkpoint
 map
+surface
 status
 position
 gap
@@ -550,7 +551,7 @@ Firma:
 const minimap = new MinimapSystem(canvas);
 minimap.setTrack(trackInfo);
 minimap.resize();
-minimap.update({ playerState });
+minimap.update({ playerState, aiState });
 ```
 
 Contratto:
@@ -560,6 +561,9 @@ Contratto:
 - ruota la mappa in base a `playerState.heading`;
 - usa `playerState.position` come centro quando disponibile;
 - gestisce `devicePixelRatio` in `resize()`;
+- puo ricevere `aiState` per mostrare il marker AI quando disponibile;
+- disegna il marker AI solo se `aiState.position` esiste e `aiState.visible === true` oppure `aiState.hasVisibleModel === true`;
+- mostra marker start/finish e checkpoint usando `trackInfo.checkpoints`;
 - deve mostrare un fallback leggibile se centerline o bounds mancano.
 
 ## Branch Responsibilities

@@ -7,6 +7,7 @@ const HUD_GROUPS = [
       { id: "speed", className: "race-hud-speed" },
       { id: "totalTime", className: "race-hud-time" },
       { id: "map", className: "race-hud-chip race-hud-map" },
+      { id: "surface", className: "race-hud-chip race-hud-surface" },
       { id: "status", className: "race-hud-chip race-hud-status" }
     ]
   },
@@ -54,6 +55,7 @@ export function createRaceHud() {
       values.get("totalTime").textContent = formatRaceTime(raceState?.totalTime);
       values.get("checkpoint").textContent = formatCheckpoint(raceState);
       values.get("map").textContent = formatMap(trackName);
+      values.get("surface").textContent = formatSurface(vehicleState?.surfaceType);
       values.get("status").textContent = formatStatus(raceState, wrongWayState);
       values.get("position").textContent = formatPosition(raceState);
       values.get("gap").textContent = formatGap(raceState);
@@ -90,6 +92,14 @@ function formatCheckpoint(raceState) {
 
 function formatMap(trackName) {
   return `Map: ${trackName ?? "--"}`;
+}
+
+function formatSurface(surfaceType) {
+  if (!surfaceType) {
+    return "Surface --";
+  }
+
+  return `Grip: ${surfaceType.charAt(0).toUpperCase()}${surfaceType.slice(1)}`;
 }
 
 function formatStatus(raceState, wrongWayState) {

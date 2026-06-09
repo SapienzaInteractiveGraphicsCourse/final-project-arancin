@@ -55,7 +55,7 @@ Il menu setup base, il pulsante Start, countdown, giri, tempi, finish screen e w
 - La selezione colore deve essere in stile gioco, con preset/swatch visivi in basso al centro dopo `Start` e subito prima del countdown.
 - La minimappa deve restare sempre visibile durante la guida.
 - La minimappa deve ruotare in base alla direzione del veicolo, mantenendo il player come riferimento centrale quando possibile.
-- Il marker AI va mostrato solo se possiamo usare dati gia disponibili nel branch senza forzare lavoro appartenente ad altre feature.
+- Il marker AI va mostrato solo quando esiste anche un bot 3D visibile; non deve rappresentare un avversario solo logico.
 - Posizione e gap devono restare visibili anche in `time-trial`, con fallback o valori coerenti in stile Formula 1.
 
 ## Ordine Consigliato Per La Sezione
@@ -224,7 +224,7 @@ Possibili file:
 Contenuto atteso:
 
 - marker player;
-- marker AI quando lo stato AI esiste senza dipendere da feature esterne;
+- marker AI automatico solo quando lo stato AI corrisponde a un bot 3D visibile (`visible` o `hasVisibleModel`);
 - marker checkpoint;
 - marker start/finish distinto;
 - possibile orientamento del marker player.

@@ -223,6 +223,10 @@ canvas {
   color: #bae6fd;
 }
 
+.race-hud-surface {
+  color: #bbf7d0;
+}
+
 @keyframes speedPulse {
   0%,
   100% {
@@ -788,7 +792,9 @@ canvas {
     top: 58px;
     flex-direction: column;
     align-items: flex-start;
+    max-width: min(230px, calc(100vw - 166px));
     gap: 6px;
+    padding: 8px;
   }
 
   .race-hud-position {
@@ -816,7 +822,10 @@ canvas {
 
   .race-hud-chip {
     min-height: 24px;
+    max-width: 100%;
     font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .wrong-way-overlay {

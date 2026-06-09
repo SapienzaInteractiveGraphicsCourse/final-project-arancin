@@ -356,16 +356,16 @@ O
 - [x] HUD lap.
 - [x] HUD time.
 - [x] HUD checkpoint.
-- [ ] HUD surface.
+- [x] HUD surface.
 - [x] HUD status/wrong way.
 - [x] HUD posizione/gap.
 - [x] Minimap canvas.
 - [x] Disegnare centerline su minimap.
 - [x] Marker player.
 - [ ] Marker AI.
-- [ ] Marker checkpoint/start.
-- [ ] UI responsive.
-- [ ] Evitare testo sovrapposto su mobile.
+- [x] Marker checkpoint/start.
+- [x] UI responsive.
+- [x] Evitare testo sovrapposto su mobile.
 
 ## 9. Audio
 
