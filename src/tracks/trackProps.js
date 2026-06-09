@@ -75,6 +75,36 @@ function clampPropPosition(curve, propPos, roadHalfWidth, samples = 200, clearan
   return propPos;
 }
 
+function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfWidth, minClearance = 20) {
+  const point = curve.getPointAt(progress % 1.0);
+  const tangent = curve.getTangentAt(progress % 1.0).setY(0).normalize();
+  const normal = getRightVector(tangent);
+  
+  let currentOffset = initialOffset;
+  let position = point.clone().addScaledVector(normal, side * currentOffset);
+  
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let tooClose = false;
+    for (let index = 0; index <= 120; index += 1) {
+      const trackPoint = curve.getPointAt(index / 120);
+      const distSq = (position.x - trackPoint.x) ** 2 + (position.z - trackPoint.z) ** 2;
+      if (distSq < (roadHalfWidth + minClearance) ** 2) {
+        tooClose = true;
+        break;
+      }
+    }
+    
+    if (!tooClose) {
+      return position;
+    }
+    
+    currentOffset += 20;
+    position = point.clone().addScaledVector(normal, side * currentOffset);
+  }
+  
+  return position;
+}
+
 const windowMaterialCache = new Map();
 function getCachedWindowMaterial(color, lit) {
   const key = `${color}_${lit}`;
@@ -558,12 +588,8 @@ function generateCitySkyline(curve, group, definition) {
     const skylineOffset = definition.roadWidth * 0.5 + 40 + pseudoRandom(buildingIndex + 21.5) * 15;
     const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
     
-    const position = point
-      .clone()
-      .addScaledVector(normal, side * skylineOffset);
-
-    // Clamp to ensure they never clip through the road or barriers
-    clampPropPosition(curve, position, definition.roadWidth * 0.5, 200, 35, 45);
+    // Dynamically calculate a safe position that is guaranteed not to overlap ANY part of the track
+    const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 25);
 
     const building = createVegasBuilding({
       position,
@@ -1053,7 +1079,7 @@ function isNearGrandstand(progress, side, threshold = 0.05) {
 
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.05, 0.14, 0.28, 0.45, 0.58, 0.72, 0.88];
+  const progressPoints = [0.01, 0.28, 0.45, 0.59, 0.74, 0.87];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -2181,12 +2207,10 @@ function addVegasLightPosts(group, curve, definition) {
   }
 }
 
-function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth) {
+function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth, minClearance = 20) {
   const point = curve.getPointAt(progress);
   const tangent = curve.getTangentAt(progress).setY(0).normalize();
-  const normal = getRightVector(tangent);
-  const position = point.clone().addScaledVector(normal, side * offset);
-  clampPropPosition(curve, position, roadHalfWidth);
+  const position = getSafeRoadsidePosition(curve, progress, side, offset, roadHalfWidth, minClearance);
   const rotationY = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
 
   return { position, rotationY };
@@ -2237,9 +2261,8 @@ function addFacadeNeonSign(parent, { position, seed, color, lineCount = 4 }) {
 function buildCaesarsPalace(group, curve, roadHalfWidth) {
   const palace = new THREE.Group();
   palace.name = "VegasSkyline:CaesarsPalace";
-  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 110, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 110, roadHalfWidth, 45);
   palace.position.copy(transform.position);
-  clampPropPosition(curve, palace.position, roadHalfWidth, 200, 45, 60);
   palace.rotation.y = transform.rotationY;
   palace.scale.set(0.6, 0.6, 0.6);
 
@@ -2294,9 +2317,8 @@ function buildCaesarsPalace(group, curve, roadHalfWidth) {
 function buildMgmGrand(group, curve, roadHalfWidth) {
   const mgm = new THREE.Group();
   mgm.name = "VegasSkyline:MGMGrand";
-  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 110, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 110, roadHalfWidth, 45);
   mgm.position.copy(transform.position);
-  clampPropPosition(curve, mgm.position, roadHalfWidth, 200, 45, 60);
   mgm.rotation.y = transform.rotationY;
   mgm.scale.set(0.5, 0.5, 0.5);
 
@@ -2362,9 +2384,8 @@ function buildMgmGrand(group, curve, roadHalfWidth) {
 function buildBellagio(group, curve, roadHalfWidth) {
   const bellagio = new THREE.Group();
   bellagio.name = "VegasSkyline:Bellagio";
-  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 120, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 120, roadHalfWidth, 50);
   bellagio.position.copy(transform.position);
-  clampPropPosition(curve, bellagio.position, roadHalfWidth, 200, 50, 70);
   bellagio.rotation.y = transform.rotationY;
   bellagio.scale.set(0.5, 0.5, 0.5);
 
@@ -2431,9 +2452,8 @@ function buildBellagio(group, curve, roadHalfWidth) {
 function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
-  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 40, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 40, roadHalfWidth, 25);
   signGroup.position.copy(transform.position);
-  clampPropPosition(curve, signGroup.position, roadHalfWidth, 200, 20, 30);
   signGroup.rotation.y = transform.rotationY;
 
   const goldMaterial = createVegasMaterial({
@@ -2490,17 +2510,16 @@ function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
     const width = 20 + pseudoRandom(index + 1.2) * 20;
     const height = 60 + pseudoRandom(index + 2.4) * 90;
     const depth = 20 + pseudoRandom(index + 3.6) * 20;
-    const distance = 80 + pseudoRandom(index + 4.8) * 70;
-    const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth);
+    const distance = 85 + pseudoRandom(index + 4.8) * 65;
+    const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth, 65);
     const material = createVegasMaterial({ color: colors[index % colors.length], roughness: 0.62, metalness: 0.08 });
     const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material));
 
     tower.position.copy(transform.position);
     tower.position.addScaledVector(
       curve.getTangentAt(progress).setY(0).normalize(),
-      (pseudoRandom(index + 9) - 0.5) * 32
+      (pseudoRandom(index + 9) - 0.5) * 20
     );
-    clampPropPosition(curve, tower.position, roadHalfWidth, 200, 80, 92);
     tower.rotation.y = transform.rotationY;
     body.position.y = height * 0.5;
     tower.add(body);
