@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "./trackMaterials.js";
+import crowdTextureUrl from "../assets/textures/grandstand_crowd.png";
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -85,28 +86,33 @@ function createWindowMaterial(color, lit) {
 }
 
 function addWindowGrid(group, block, neonColors, seed, face) {
-  const columns = face === "front" ? 4 : 3;
-  const rows = face === "front" ? 8 : 6;
-  const windowWidth = face === "front" ? Math.min(0.7, block.width / (columns * 2.1)) : 0.075;
-  const windowDepth = face === "front" ? 0.075 : Math.min(0.65, block.depth / (columns * 2.1));
-  const windowHeight = Math.min(0.38, block.height / (rows * 3.6));
+  const isFront = face === "front";
+  const columns = Math.max(3, Math.floor((isFront ? block.width : block.depth) / 1.6));
+  const rows = Math.max(6, Math.floor(block.height / 2.2));
+
+  const windowWidth = isFront ? Math.min(0.5, block.width / (columns * 2.2)) : 0.08;
+  const windowDepth = isFront ? 0.08 : Math.min(0.5, block.depth / (columns * 2.2));
+  const windowHeight = Math.min(0.45, block.height / (rows * 2.8));
+
   const xStep = block.width / (columns + 1);
   const zStep = block.depth / (columns + 1);
   const yStep = block.height / (rows + 1);
-  const litMaterial = createWindowMaterial(neonColors[seed % neonColors.length], true);
+
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
   const darkMaterial = createWindowMaterial(0x070811, false);
   const geometry = new THREE.BoxGeometry(windowWidth, windowHeight, windowDepth);
-  const litMatrices = [];
+  
+  const litMatricesByColor = colorsList.map(() => []);
   const darkMatrices = [];
   const matrix = new THREE.Matrix4();
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
-      const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (face === "front" ? 0 : 17));
-      const lit = noise > 0.42;
+      const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (isFront ? 0 : 17));
+      const lit = noise > 0.35;
       const position = new THREE.Vector3();
 
-      if (face === "front") {
+      if (isFront) {
         position.set(
           block.x + (column + 1) * xStep - block.width * 0.5,
           block.y - block.height * 0.5 + (row + 1) * yStep,
@@ -121,31 +127,44 @@ function addWindowGrid(group, block, neonColors, seed, face) {
       }
 
       matrix.makeTranslation(position.x, position.y, position.z);
-      (lit ? litMatrices : darkMatrices).push(matrix.clone());
+      if (lit) {
+        const colorIndex = Math.floor(pseudoRandom(seed + row * 13.3 + column * 7.7) * colorsList.length);
+        litMatricesByColor[colorIndex].push(matrix.clone());
+      } else {
+        darkMatrices.push(matrix.clone());
+      }
     }
   }
 
-  [
-    { matrices: litMatrices, material: litMaterial, name: "LitWindows" },
-    { matrices: darkMatrices, material: darkMaterial, name: "DarkWindows" }
-  ].forEach(({ matrices, material, name }) => {
+  colorsList.forEach((color, colorIndex) => {
+    const matrices = litMatricesByColor[colorIndex];
     if (matrices.length === 0) {
       return;
     }
-
-    const windows = new THREE.InstancedMesh(geometry, material, matrices.length);
-    windows.name = name;
+    const litMaterial = createWindowMaterial(color, true);
+    const windows = new THREE.InstancedMesh(geometry, litMaterial, matrices.length);
+    windows.name = `LitWindows_${colorIndex}`;
     windows.receiveShadow = true;
     matrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
     windows.instanceMatrix.needsUpdate = true;
     group.add(windows);
   });
+
+  if (darkMatrices.length > 0) {
+    const windows = new THREE.InstancedMesh(geometry, darkMaterial, darkMatrices.length);
+    windows.name = "DarkWindows";
+    windows.receiveShadow = true;
+    darkMatrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
+    windows.instanceMatrix.needsUpdate = true;
+    group.add(windows);
+  }
 }
 
 function addVerticalEdgeHighlights(group, block, material) {
-  const edgeGeometry = new THREE.BoxGeometry(0.12, block.height * 1.02, 0.12);
-  const x = block.width * 0.5 + 0.04;
-  const z = block.depth * 0.5 + 0.04;
+  const thickness = 0.22;
+  const edgeGeometry = new THREE.BoxGeometry(thickness, block.height * 1.01, thickness);
+  const x = block.width * 0.5 + thickness * 0.45;
+  const z = block.depth * 0.5 + thickness * 0.45;
   const corners = [
     [-x, -z],
     [x, -z],
@@ -218,6 +237,106 @@ function addRoofDetail(group, topY, width, depth, neonColor, variant) {
   ring.rotation.x = Math.PI / 2;
   ring.position.y = topY + 0.12;
   group.add(ring);
+}
+
+function addRoofBillboard(group, block, neonColors, seed) {
+  const topY = block.y + block.height * 0.5;
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
+  
+  // Size scales with the top block (blocks[2] crown)
+  const billboardWidth = Math.max(3.0, block.width * 1.25);
+  const billboardHeight = billboardWidth * 0.5;
+  const billboardDepth = 0.28;
+  const poleHeight = Math.max(1.0, billboardHeight * 0.35);
+
+  const billboardGroup = new THREE.Group();
+  billboardGroup.position.set(block.x, topY, block.z);
+
+  const neonColor = colorsList[seed % colorsList.length];
+  const neonColorHex = colorToHexStr(neonColor);
+
+  // 1. Support poles
+  const poleMaterial = createBillboardMaterial({ color: 0x1a1a24, roughness: 0.68, metalness: 0.2 });
+  const leftPole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, poleHeight, 6), poleMaterial));
+  leftPole.position.set(-billboardWidth * 0.28, poleHeight * 0.5, 0);
+  const rightPole = leftPole.clone();
+  rightPole.position.x = billboardWidth * 0.28;
+  billboardGroup.add(leftPole, rightPole);
+
+  // 2. Billboard backing & frame
+  const frameMaterial = createBillboardMaterial({ color: 0x0a0a0f, roughness: 0.5, metalness: 0.1 });
+  const backing = markShadow(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(billboardWidth, billboardHeight, billboardDepth),
+      frameMaterial
+    )
+  );
+  backing.position.y = poleHeight + billboardHeight * 0.5;
+  billboardGroup.add(backing);
+
+  // 3. Neon glowing borders
+  const borderMaterial = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 4.8,
+    roughness: 0.15
+  });
+  
+  const borderThickness = 0.08;
+  const topBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  topBorder.position.set(0, poleHeight + billboardHeight + borderThickness * 0.5, 0);
+  
+  const bottomBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  bottomBorder.position.set(0, poleHeight - borderThickness * 0.5, 0);
+  billboardGroup.add(topBorder, bottomBorder);
+
+  // 4. Advertising Titles
+  const vegasTitles = [
+    { title: "JACKPOT", subtitle: "SPIN & WIN" },
+    { title: "CASINO", subtitle: "PLAY NOW" },
+    { title: "777 SLOTS", subtitle: "$1,000,000" },
+    { title: "LAS VEGAS", subtitle: "WELCOME" },
+    { title: "ARANCIN GP", subtitle: "RACING TONIGHT" },
+    { title: "NEON CLUB", subtitle: "OPEN 24H" },
+    { title: "SAPIENZA", subtitle: "GRAPHICS LAB" },
+    { title: "HIGH ROLLER", subtitle: "POKER ROOM" },
+    { title: "HOTEL NEON", subtitle: "VACANCY" },
+    { title: "VIP LOUNGE", subtitle: "FREE DRINKS" }
+  ];
+  const ad = vegasTitles[seed % vegasTitles.length];
+
+  // 5. Canvas Text Texture with black background
+  const textTexture = createVegasCanvasTexture(512, 256, ad.title, ad.subtitle, neonColorHex, "#ffffff");
+  const textMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: textTexture,
+    emissive: 0xffffff,
+    emissiveMap: textTexture,
+    emissiveIntensity: 1.8,
+    roughness: 0.25,
+    metalness: 0.08,
+    flatShading: true
+  });
+
+  const textPlaneFront = new THREE.Mesh(
+    new THREE.PlaneGeometry(billboardWidth - 0.2, billboardHeight - 0.2),
+    textMaterial
+  );
+  textPlaneFront.position.set(0, poleHeight + billboardHeight * 0.5, billboardDepth * 0.5 + 0.01);
+  
+  const textPlaneBack = textPlaneFront.clone();
+  textPlaneBack.rotation.y = Math.PI;
+  textPlaneBack.position.z = -(billboardDepth * 0.5 + 0.01);
+
+  billboardGroup.add(textPlaneFront, textPlaneBack);
+
+  group.add(billboardGroup);
 }
 
 function addSkyLaser(group, topY, neonColor, variant) {
@@ -317,10 +436,10 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
 
   const bodyMaterial = createFlatStandardMaterial({
     color,
-    roughness: 0.52,
-    metalness: 0.12,
-    emissive: 0x050006,
-    emissiveIntensity: 0.08
+    roughness: 0.65,
+    metalness: 0.25,
+    emissive: 0x020204,
+    emissiveIntensity: 0.2
   });
 
   const edgeMaterial = createFlatStandardMaterial({
@@ -368,27 +487,26 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
     mesh.position.set(block.x, block.y, block.z);
     group.add(mesh);
 
-    if (blockIndex === 1) {
+    // Add window grids to tower (block 1) and crown (block 2) on both front and side
+    if (blockIndex === 1 || blockIndex === 2) {
       addWindowGrid(group, block, neonColors, index * 31 + blockIndex * 7, "front");
-      addNeonFacadeStrips(group, block, neonColors, index * 17 + blockIndex);
-    }
-    if (blockIndex === 1 && index % 4 === 0) {
       addWindowGrid(group, block, neonColors, index * 43 + blockIndex * 11, "side");
     }
   });
 
+  // Outline both the tower and the crown with glowing vertical corner LEDs
   addVerticalEdgeHighlights(group, blocks[1], edgeMaterial);
-  addRoofDetail(group, height * 1.04, width, depth, neonColor, index);
+  addVerticalEdgeHighlights(group, blocks[2], edgeMaterial);
+
+  // Alternate between roof billboard (50%) and traditional roof details (antennas/rings)
+  if (index % 2 === 0) {
+    addRoofBillboard(group, blocks[2], neonColors, index);
+  } else {
+    addRoofDetail(group, height * 1.04, width, depth, neonColor, index);
+  }
 
   if ([0, 12, 28, 44].includes(index)) {
     addSkyLaser(group, height * 1.06, neonColors[(index + 1) % neonColors.length], index);
-  }
-
-  if (height > 7.2) {
-    addMegaScreen(group, blocks[1], neonColors[(index + 1) % neonColors.length], "front", index);
-  }
-  if (index % 2 === 0 && height > 9) {
-    addMegaScreen(group, blocks[0], neonColors[(index + 2) % neonColors.length], "side", index + 1);
   }
 
   return group;
@@ -397,41 +515,51 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
 function generateCitySkyline(curve, group, definition) {
   const colors = definition.palette.neon;
   const bodyColors = [0x050508, 0x07070b, 0x090812, 0x08050c];
-  const sampleCount = 30;
+  const sampleCount = 20;
 
   for (let index = 0; index < sampleCount; index += 1) {
-    const progress = index / sampleCount;
+    // Alternate left and right side of the track
+    const side = index % 2 === 0 ? 1 : -1;
+    
+    // Spaced out progress with a small jitter to keep it natural but prevent overlap
+    const progressJitter = (pseudoRandom(index + 13.7) * 0.4 - 0.2) / sampleCount;
+    const progress = ((index + 0.5) / sampleCount + progressJitter + 1.0) % 1.0;
+    
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const progressJitter = pseudoRandom(index + 19.4) * 16 - 8;
 
-    [-1, 1].forEach((side) => {
-      const buildingIndex = index * 2 + (side > 0 ? 1 : 0);
-      const height = 34 + pseudoRandom(buildingIndex + 4.2) * 82;
-      const width = 8 + pseudoRandom(buildingIndex + 8.6) * 10;
-      const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 12;
-      const skylineOffset = definition.roadWidth * 0.5 + 16 + pseudoRandom(buildingIndex + 21.5) * 22;
-      const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-      const position = point
-        .clone()
-        .addScaledVector(normal, side * skylineOffset)
-        .addScaledVector(tangent, progressJitter);
+    const buildingIndex = index;
+    
+    // Wider, taller, and more proportioned buildings
+    const height = 32 + pseudoRandom(buildingIndex + 4.2) * 33;
+    const width = 10 + pseudoRandom(buildingIndex + 8.6) * 5;
+    const depth = 10 + pseudoRandom(buildingIndex + 13.1) * 5;
+    
+    // Position them further out so they are in the background and don't intersect other props
+    const skylineOffset = definition.roadWidth * 0.5 + 40 + pseudoRandom(buildingIndex + 21.5) * 15;
+    const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+    
+    const position = point
+      .clone()
+      .addScaledVector(normal, side * skylineOffset);
 
-      const building = createVegasBuilding({
-        position,
-        rotationY: heading,
-        height,
-        width,
-        depth,
-        color: bodyColors[buildingIndex % bodyColors.length],
-        neonColor: colors[buildingIndex % colors.length],
-        neonColors: colors,
-        index: buildingIndex
-      });
+    // Clamp to ensure they never clip through the road or barriers
+    clampPropPosition(curve, position, definition.roadWidth * 0.5, 200, 35, 45);
 
-      group.add(building);
+    const building = createVegasBuilding({
+      position,
+      rotationY: heading,
+      height,
+      width,
+      depth,
+      color: bodyColors[buildingIndex % bodyColors.length],
+      neonColor: colors[buildingIndex % colors.length],
+      neonColors: colors,
+      index: buildingIndex
     });
+
+    group.add(building);
   }
 }
 
@@ -486,6 +614,89 @@ function addVegasTunnel(group, curve, definition, baseProgress, tunnelIndex, arc
   group.add(tunnel);
 }
 
+function colorToHexStr(color) {
+  return "#" + color.toString(16).padStart(6, "0");
+}
+
+function createVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, width, height);
+
+  // Border
+  ctx.strokeStyle = themeColorHex || "#ff2090";
+  ctx.lineWidth = Math.min(width, height) * 0.08;
+  ctx.strokeRect(ctx.lineWidth * 0.5, ctx.lineWidth * 0.5, width - ctx.lineWidth, height - ctx.lineWidth);
+
+  // Inner border
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.min(width, height) * 0.02;
+  ctx.strokeRect(ctx.lineWidth * 2.5, ctx.lineWidth * 2.5, width - ctx.lineWidth * 5, height - ctx.lineWidth * 5);
+
+  // Text
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = textColorHex || "#ffffff";
+  ctx.shadowColor = themeColorHex || "#ff2090";
+  ctx.shadowBlur = Math.min(width, height) * 0.1;
+
+  if (subtitle) {
+    ctx.font = `bold ${Math.floor(height * 0.28)}px Arial Black, Arial, sans-serif`;
+    ctx.fillText(title, width * 0.5, height * 0.4);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `italic ${Math.floor(height * 0.14)}px Georgia, serif`;
+    ctx.fillText(subtitle, width * 0.5, height * 0.72);
+  } else {
+    ctx.font = `bold ${Math.floor(height * 0.38)}px Arial Black, Arial, sans-serif`;
+    ctx.fillText(title, width * 0.5, height * 0.5);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createVegasVerticalCanvasTexture(width, height, text, themeColorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = themeColorHex || "#00e5ff";
+  ctx.lineWidth = width * 0.08;
+  ctx.strokeRect(ctx.lineWidth * 0.5, ctx.lineWidth * 0.5, width - ctx.lineWidth, height - ctx.lineWidth);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const fontSize = Math.floor(height / (text.length * 1.35));
+  const startY = (height - (text.length - 1) * fontSize * 1.15) * 0.5;
+  
+  for (let i = 0; i < text.length; i++) {
+    ctx.font = `bold ${fontSize}px Arial Black, Arial, sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = themeColorHex || "#00e5ff";
+    ctx.shadowBlur = fontSize * 0.35;
+    ctx.fillText(text[i], width * 0.5, startY + i * fontSize * 1.15);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function createBillboardMaterial({ color, emissive, emissiveIntensity = 0, roughness = 0.38, metalness = 0.04 }) {
   return new THREE.MeshStandardMaterial({
     color,
@@ -498,55 +709,117 @@ function createBillboardMaterial({ color, emissive, emissiveIntensity = 0, rough
 }
 
 function addClassicVegasPylonSign(sign, color, contrastColor) {
-  const panelMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.7 });
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
+  const panelMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const brightMaterial = createBillboardMaterial({
     color: contrastColor,
     emissive: contrastColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.4
   });
   const darkMaterial = createBillboardMaterial({ color: 0x07070b, roughness: 0.62 });
   const whiteMaterial = createBillboardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 1.2
+    emissiveIntensity: 1.0
   });
   const poleMaterial = createBillboardMaterial({ color: 0x161620, roughness: 0.72, metalness: 0.12 });
 
-  const panel = markShadow(new THREE.Mesh(new THREE.BoxGeometry(10, 16, 0.6), panelMaterial));
-  const marquee = new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.8), brightMaterial);
-  const reader = markShadow(new THREE.Mesh(new THREE.BoxGeometry(10, 3, 0.5), darkMaterial));
-  const pole = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.2, 8, 1.2), poleMaterial));
+  // 0.55x scaled sizes
+  const panelWidth = 5.5;
+  const panelHeight = 8.8;
+  const panelDepth = 0.35;
+  const panelMesh = markShadow(new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth), panelMaterial));
+  panelMesh.position.y = 7.7;
+  sign.add(panelMesh);
 
-  panel.position.y = 14;
-  marquee.position.y = 24;
-  reader.position.y = 5;
-  pole.position.y = 0.2;
-  sign.add(panel, marquee, reader, pole);
+  const marqueeWidth = 6.6;
+  const marqueeHeight = 2.2;
+  const marqueeDepth = 0.45;
+  const marquee = new THREE.Mesh(new THREE.BoxGeometry(marqueeWidth, marqueeHeight, marqueeDepth), brightMaterial);
+  marquee.position.y = 13.2;
+  sign.add(marquee);
 
-  for (let line = 0; line < 3; line += 1) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 0.12), whiteMaterial);
-    stripe.position.set(0, 5.7 - line * 0.8, 0.36);
-    sign.add(stripe);
-  }
+  const readerWidth = 5.5;
+  const readerHeight = 1.65;
+  const readerDepth = 0.3;
+  const reader = markShadow(new THREE.Mesh(new THREE.BoxGeometry(readerWidth, readerHeight, readerDepth), darkMaterial));
+  reader.position.y = 2.75;
+  sign.add(reader);
 
+  const pole = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.66, 4.4, 0.66), poleMaterial));
+  pole.position.y = 0.1;
+  sign.add(pole);
+
+  // Text Planes on front faces (z offset slightly)
+  const panelTex = createVegasCanvasTexture(256, 512, "JACKPOT", "SPIN & WIN", contrastHex, "#ffeb3b");
+  const panelTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: panelTex,
+    emissive: 0xffffff,
+    emissiveMap: panelTex,
+    emissiveIntensity: 1.5,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const panelTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 0.2, panelHeight - 0.2), panelTextMat);
+  panelTextPlane.position.set(0, 7.7, panelDepth * 0.5 + 0.02);
+  sign.add(panelTextPlane);
+
+  const marqueeTex = createVegasCanvasTexture(256, 128, "777", "SLOTS", themeHex, "#ffffff");
+  const marqueeTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: marqueeTex,
+    emissive: 0xffffff,
+    emissiveMap: marqueeTex,
+    emissiveIntensity: 1.6,
+    roughness: 0.2,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const marqueeTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(marqueeWidth - 0.2, marqueeHeight - 0.2), marqueeTextMat);
+  marqueeTextPlane.position.set(0, 13.2, marqueeDepth * 0.5 + 0.02);
+  sign.add(marqueeTextPlane);
+
+  const readerTex = createVegasCanvasTexture(256, 128, "PLAY NOW", null, "#39ff14", "#39ff14");
+  const readerTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: readerTex,
+    emissive: 0xffffff,
+    emissiveMap: readerTex,
+    emissiveIntensity: 1.2,
+    roughness: 0.3,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const readerTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(readerWidth - 0.2, readerHeight - 0.2), readerTextMat);
+  readerTextPlane.position.set(0, 2.75, readerDepth * 0.5 + 0.02);
+  sign.add(readerTextPlane);
+
+  // Scaled coordinates for stars
   [
-    [-4.4, 21.5],
-    [4.4, 21.5],
-    [-4.4, 6.5],
-    [4.4, 6.5]
+    [-2.42, 11.82],
+    [2.42, 11.82],
+    [-2.42, 3.57],
+    [2.42, 3.57]
   ].forEach(([x, y]) => {
-    const star = new THREE.Mesh(new THREE.SphereGeometry(0.4, 4, 3), whiteMaterial);
-    star.position.set(x, y, 0.45);
+    const star = new THREE.Mesh(new THREE.SphereGeometry(0.22, 4, 3), whiteMaterial);
+    star.position.set(x, y, 0.25);
     sign.add(star);
   });
 }
 
 function addCasinoNameBoardSign(sign, color, contrastColor) {
-  const boardMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.75 });
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
+  const boardMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const frameMaterial = createBillboardMaterial({
     color: contrastColor,
     emissive: contrastColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.5
   });
   const poleMaterial = createBillboardMaterial({ color: 0x171724, roughness: 0.72, metalness: 0.12 });
   const bulbMaterial = createBillboardMaterial({
@@ -557,76 +830,123 @@ function addCasinoNameBoardSign(sign, color, contrastColor) {
   const underMaterial = createBillboardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 1.5
+    emissiveIntensity: 1.2
   });
 
-  const board = markShadow(new THREE.Mesh(new THREE.BoxGeometry(22, 8, 0.5), boardMaterial));
-  board.position.y = 10;
+  const boardWidth = 12.0;
+  const boardHeight = 4.4;
+  const boardDepth = 0.3;
+  const board = markShadow(new THREE.Mesh(new THREE.BoxGeometry(boardWidth, boardHeight, boardDepth), boardMaterial));
+  board.position.y = 5.5;
   sign.add(board);
 
+  // Frames
   [
-    [0, 14.15, 23.2, 0.35],
-    [0, 5.85, 23.2, 0.35],
-    [-11.15, 10, 0.35, 8.6],
-    [11.15, 10, 0.35, 8.6]
-  ].forEach(([x, y, width, height]) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.62), frameMaterial);
-    frame.position.set(x, y, 0.08);
+    [0, 7.8, boardWidth + 0.6, 0.2],
+    [0, 3.2, boardWidth + 0.6, 0.2],
+    [-(boardWidth * 0.5 + 0.15), 5.5, 0.2, boardHeight + 4.8],
+    [boardWidth * 0.5 + 0.15, 5.5, 0.2, boardHeight + 4.8]
+  ].forEach(([x, y, w, h]) => {
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.36), frameMaterial);
+    frame.position.set(x, y, 0.04);
     sign.add(frame);
   });
 
-  [-7.4, 7.4].forEach((x) => {
-    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 10, 5), poleMaterial));
-    pole.position.set(x, 2.5, -0.1);
+  [-4.0, 4.0].forEach((x) => {
+    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5.5, 5), poleMaterial));
+    pole.position.set(x, 2.75, -0.05);
     sign.add(pole);
   });
 
+  // Text Plane
+  const boardTex = createVegasCanvasTexture(512, 128, "CASINO", "ROYALE", themeHex, "#ffeb3b");
+  const boardTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: boardTex,
+    emissive: 0xffffff,
+    emissiveMap: boardTex,
+    emissiveIntensity: 1.6,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const boardTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(boardWidth - 0.2, boardHeight - 0.2), boardTextMat);
+  boardTextPlane.position.set(0, 5.5, boardDepth * 0.5 + 0.02);
+  sign.add(boardTextPlane);
+
   for (let index = 0; index < 12; index += 1) {
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 3), bulbMaterial);
-    bulb.position.set(-9.9 + index * 1.8, 14.72, 0.48);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 4, 3), bulbMaterial);
+    bulb.position.set(-(boardWidth * 0.45) + index * (boardWidth * 0.9 / 11), 7.9, 0.25);
     sign.add(bulb);
   }
 
-  const underLight = new THREE.Mesh(new THREE.BoxGeometry(20, 0.3, 0.5), underMaterial);
-  underLight.position.set(0, 5.55, 0.45);
+  const underLight = new THREE.Mesh(new THREE.BoxGeometry(boardWidth - 1, 0.15, 0.3), underMaterial);
+  underLight.position.set(0, 3.05, 0.22);
   sign.add(underLight);
 }
 
 function addSpectacularTowerSign(sign, color, contrastColor) {
-  const bodyMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.75 });
+  const themeHex = colorToHexStr(color);
+
+  const bodyMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const goldMaterial = createBillboardMaterial({
     color: 0xffd700,
     emissive: 0xffd700,
-    emissiveIntensity: 1.2,
+    emissiveIntensity: 0.8,
     roughness: 0.26
   });
   const baseMaterial = createBillboardMaterial({ color: 0x11111b, roughness: 0.72, metalness: 0.12 });
   const barMaterials = [color, contrastColor].map((barColor) => createBillboardMaterial({
     color: barColor,
     emissive: barColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.7
   }));
 
-  const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(6, 28, 0.5), bodyMaterial));
-  body.position.y = 14;
+  const bodyWidth = 3.3;
+  const bodyHeight = 15.4;
+  const bodyDepth = 0.3;
+  const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyDepth), bodyMaterial));
+  body.position.y = 7.7;
   sign.add(body);
 
-  [-8, 0, 8].forEach((yOffset, index) => {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 0.6), barMaterials[index % 2]);
-    bar.position.set(0, 14 + yOffset, 0.32);
+  [-4.4, 0, 4.4].forEach((yOffset, index) => {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.33, 0.35), barMaterials[index % 2]);
+    bar.position.set(0, 7.7 + yOffset, 0.18);
     sign.add(bar);
   });
 
-  const finial = new THREE.Mesh(new THREE.OctahedronGeometry(2, 0), goldMaterial);
-  finial.position.y = 29;
-  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8, 3, 3), baseMaterial));
-  base.position.y = 1.5;
+  const finial = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), goldMaterial);
+  finial.position.y = 15.95;
+  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.65, 1.65), baseMaterial));
+  base.position.y = 0.825;
   sign.add(finial, base);
+
+  // Vertical text Plane
+  const texts = ["SLOTS", "POKER", "VEGAS", "CASINO"];
+  // Let's pick a text based on the color to have variety
+  const textVal = texts[themeHex.charCodeAt(1) % texts.length];
+  const bodyTex = createVegasVerticalCanvasTexture(128, 512, textVal, themeHex);
+  const bodyTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: bodyTex,
+    emissive: 0xffffff,
+    emissiveMap: bodyTex,
+    emissiveIntensity: 1.5,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const bodyTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(bodyWidth - 0.2, bodyHeight - 0.2), bodyTextMat);
+  bodyTextPlane.position.set(0, 7.7, bodyDepth * 0.5 + 0.02);
+  sign.add(bodyTextPlane);
 }
 
 function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
   const pillarMaterial = createBillboardMaterial({ color: 0x171724, roughness: 0.68, metalness: 0.12 });
-  const barMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.8 });
+  const barMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
   const bulbMaterial = createBillboardMaterial({
     color: 0xffffaa,
     emissive: 0xffffaa,
@@ -634,39 +954,61 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
   });
   const glowColors = [color, contrastColor, 0xffe600];
 
-  [-6, 6].forEach((x) => {
-    const pillar = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.5, 12, 1.5), pillarMaterial));
-    pillar.position.set(x, 6, 0);
+  const pillarWidth = 0.8;
+  const pillarHeight = 6.6;
+  const pillarDepth = 0.8;
+  [-3.3, 3.3].forEach((x) => {
+    const pillar = markShadow(new THREE.Mesh(new THREE.BoxGeometry(pillarWidth, pillarHeight, pillarDepth), pillarMaterial));
+    pillar.position.set(x, 3.3, 0);
     sign.add(pillar);
   });
 
-  const topBar = new THREE.Mesh(new THREE.BoxGeometry(14, 1.5, 1.5), barMaterial);
-  topBar.position.y = 12;
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(7.7, 0.8, 0.8), barMaterial);
+  topBar.position.y = 6.6;
   sign.add(topBar);
+
+  const letters = ["W", "I", "N"];
+  const panelWidth = 1.65;
+  const panelHeight = 3.3;
+  const panelDepth = 0.16;
 
   for (let index = 0; index < 3; index += 1) {
     const panelColor = glowColors[(seed + index) % glowColors.length];
     const panelMaterial = createBillboardMaterial({
       color: panelColor,
       emissive: panelColor,
-      emissiveIntensity: 1.05
+      emissiveIntensity: 0.5
     });
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(3, 6, 0.3), panelMaterial);
-    panel.position.set((index - 1) * 3.4, 7.5, 0.7);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth), panelMaterial);
+    panel.position.set((index - 1) * 1.87, 4.12, 0.38);
     sign.add(panel);
-    
+
+    const letterTex = createVegasCanvasTexture(128, 256, letters[index], null, colorToHexStr(panelColor), "#ffffff");
+    const letterTextMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: letterTex,
+      emissive: 0xffffff,
+      emissiveMap: letterTex,
+      emissiveIntensity: 1.5,
+      roughness: 0.25,
+      metalness: 0.1,
+      flatShading: true
+    });
+    const letterTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 0.1, panelHeight - 0.1), letterTextMat);
+    letterTextPlane.position.set((index - 1) * 1.87, 4.12, 0.38 + panelDepth * 0.5 + 0.01);
+    sign.add(letterTextPlane);
   }
 
   for (let index = 0; index < 6; index += 1) {
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 4, 3), bulbMaterial);
-    bulb.position.set(-5 + index * 2, 11.0 - (index % 2) * 0.5, 0.95);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 4, 3), bulbMaterial);
+    bulb.position.set(-2.75 + index * 1.1, 6.05 - (index % 2) * 0.28, 0.52);
     sign.add(bulb);
   }
 }
 
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.08, 0.16, 0.28, 0.42, 0.52, 0.64, 0.74, 0.86];
+  const progressPoints = [0.05, 0.14, 0.28, 0.45, 0.58, 0.72, 0.88];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -678,23 +1020,34 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
+    
+    // Use opposite side of grandstands (which use index % 2 === 0 ? 1 : -1)
+    // to prevent overlap!
+    const side = index % 2 === 0 ? -1 : 1;
+    
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
-    const distance = roadHalfWidth + 12 + pseudoRandom(index * 19.3 + 2.8) * 8;
+    
+    // Scale down distance since billboards are smaller and we want them visible
+    const distance = roadHalfWidth + 9 + pseudoRandom(index * 19.3 + 2.8) * 4;
     const position = point.clone().addScaledVector(normal, side * distance);
     const sign = new THREE.Group();
 
     sign.name = `VegasBillboard:${index}`;
     sign.position.copy(position);
-    clampPropPosition(curve, sign.position, roadHalfWidth);
-    sign.lookAt(point.x, 10, point.z);
+    
+    // Clamp closer to road with custom clearance so it fits beautifully
+    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 8, 9);
+    
+    // Stand straight/upright! Point at the track horizontally (y = sign.position.y)
+    sign.lookAt(point.x, sign.position.y, point.z);
 
     typeBuilders[index % typeBuilders.length](sign, color, contrastColor, index);
 
-    const light = new THREE.PointLight(color, 18, 22, 2);
+    // Adjusted light intensity/range/position for smaller sign
+    const light = new THREE.PointLight(color, 10, 15, 1.8);
     light.name = `VegasBillboardLight:${index}`;
-    light.position.set(0, 11, 2.2);
+    light.position.set(0, 6, 1.2);
     sign.add(light);
     group.add(sign);
   });
@@ -1351,26 +1704,15 @@ function createGrandstand({ position, rotationY, width, rows, accentColor, index
 function addSeatedSpectators(stand, width, rows, seed) {
   const shirtColors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78, 0xf4f2e8, 0x6aa7ff, 0xff7a59];
   const skinColors = [0xf0c7a0, 0xd49a6a, 0x8b5a3c, 0xf4d2b5];
-  const shirtMaterials = shirtColors.map((color) => createFlatStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: 0.1,
-    roughness: 0.74
-  }));
-  const skinMaterials = skinColors.map((color) => createFlatStandardMaterial({
-    color,
-    roughness: 0.8,
-    metalness: 0
-  }));
-  const pantsMaterial = createFlatStandardMaterial({
-    color: 0x18202a,
-    roughness: 0.76,
-    metalness: 0.02
-  });
-  const torsoGeometry = new THREE.BoxGeometry(0.46, 0.68, 0.3);
-  const headGeometry = new THREE.DodecahedronGeometry(0.22, 0);
-  const legGeometry = new THREE.BoxGeometry(0.17, 0.16, 0.62);
-  const armGeometry = new THREE.BoxGeometry(0.11, 0.46, 0.1);
+  const shirtMaterials = shirtColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+  const skinMaterials = skinColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+  const pantsMaterial = new THREE.MeshBasicMaterial({ color: 0x18202a });
+
+  const torsoGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.68, 8);
+  const headGeometry = new THREE.SphereGeometry(0.22, 12, 12);
+  const legGeometry = new THREE.CylinderGeometry(0.1, 0.08, 0.62, 8);
+  const armGeometry = new THREE.CylinderGeometry(0.08, 0.06, 0.46, 8);
+
   const seatsPerRow = Math.max(7, Math.floor(width / 1.45));
   const torsoMatrices = shirtMaterials.map(() => []);
   const headMatrices = skinMaterials.map(() => []);
@@ -1378,10 +1720,12 @@ function addSeatedSpectators(stand, width, rows, seed) {
   const rightArmMatrices = skinMaterials.map(() => []);
   const leftLegMatrices = [];
   const rightLegMatrices = [];
+  
   const matrix = new THREE.Matrix4();
   const torsoQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0, 0));
   const headQuaternion = new THREE.Quaternion();
-  const legQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.28, 0, 0));
+  // Cylinders point along Y, legs point forward (Z) so rotate +90deg (PI/2) on X
+  const legQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 + 0.28, 0, 0));
   const leftArmQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, 0.26));
   const rightArmQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, -0.26));
   const variedScale = new THREE.Vector3();
@@ -1389,10 +1733,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
   for (let row = 0; row < rows; row += 1) {
     for (let seat = 0; seat < seatsPerRow; seat += 1) {
       const noise = pseudoRandom(seed * 19 + row * 7.3 + seat * 2.1);
-
-      if (noise < 0.08) {
-        continue;
-      }
+      if (noise < 0.08) continue;
 
       const jitter = (pseudoRandom(seed * 11 + row * 5.1 + seat * 3.7) - 0.5) * 0.12;
       const x = (seat / (seatsPerRow - 1) - 0.5) * width * 0.86 + jitter;
@@ -1403,6 +1744,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
       const scaleNoise = 1.04 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.18;
 
       variedScale.set(scaleNoise, scaleNoise, scaleNoise);
+      
       matrix.compose(new THREE.Vector3(x, y + 0.04, z), torsoQuaternion, variedScale);
       torsoMatrices[shirtIndex].push(matrix.clone());
 
@@ -1424,31 +1766,21 @@ function addSeatedSpectators(stand, width, rows, seed) {
   }
 
   torsoMatrices.forEach((matrices, materialIndex) => {
-    if (matrices.length === 0) {
-      return;
-    }
-
     addInstancedSpectatorPart(stand, torsoGeometry, shirtMaterials[materialIndex], matrices, `Torso:${materialIndex}`);
   });
-
   headMatrices.forEach((matrices, materialIndex) => {
     addInstancedSpectatorPart(stand, headGeometry, skinMaterials[materialIndex], matrices, `Head:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], leftArmMatrices[materialIndex], `LeftArm:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], rightArmMatrices[materialIndex], `RightArm:${materialIndex}`);
   });
-
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, leftLegMatrices, "LeftLeg");
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, rightLegMatrices, "RightLeg");
 }
 
 function addInstancedSpectatorPart(stand, geometry, material, matrices, name) {
-  if (matrices.length === 0) {
-    return;
-  }
-
+  if (matrices.length === 0) return;
   const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
   mesh.name = `VegasGrandstandSpectator${name}`;
-  mesh.receiveShadow = true;
   matrices.forEach((partMatrix, partIndex) => mesh.setMatrixAt(partIndex, partMatrix));
   mesh.instanceMatrix.needsUpdate = true;
   stand.add(mesh);
@@ -1791,10 +2123,10 @@ function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth) {
   return { position, rotationY };
 }
 
-function createVegasMaterial({ color, emissive, emissiveIntensity = 0, roughness = 0.85, metalness = 0.05 }) {
+function createVegasMaterial({ color, emissive, emissiveIntensity = 0.6, roughness = 0.85, metalness = 0.05 }) {
   return new THREE.MeshStandardMaterial({
     color,
-    emissive: emissive ?? 0x000000,
+    emissive: emissive ?? color,
     emissiveIntensity,
     roughness,
     metalness,
@@ -1836,9 +2168,11 @@ function addFacadeNeonSign(parent, { position, seed, color, lineCount = 4 }) {
 function buildCaesarsPalace(group, curve, roadHalfWidth) {
   const palace = new THREE.Group();
   palace.name = "VegasSkyline:CaesarsPalace";
-  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 55, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 110, roadHalfWidth);
   palace.position.copy(transform.position);
+  clampPropPosition(curve, palace.position, roadHalfWidth, 200, 45, 60);
   palace.rotation.y = transform.rotationY;
+  palace.scale.set(0.6, 0.6, 0.6);
 
   const cream = createVegasMaterial({ color: 0xc8b89a });
   const domeMaterial = createVegasMaterial({ color: 0xb8a882, roughness: 0.68 });
@@ -1891,9 +2225,11 @@ function buildCaesarsPalace(group, curve, roadHalfWidth) {
 function buildMgmGrand(group, curve, roadHalfWidth) {
   const mgm = new THREE.Group();
   mgm.name = "VegasSkyline:MGMGrand";
-  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 62, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 110, roadHalfWidth);
   mgm.position.copy(transform.position);
+  clampPropPosition(curve, mgm.position, roadHalfWidth, 200, 45, 60);
   mgm.rotation.y = transform.rotationY;
+  mgm.scale.set(0.5, 0.5, 0.5);
 
   const towerMaterial = createVegasMaterial({ color: 0x1a3d1a });
   const lionMaterial = createVegasMaterial({ color: 0xd4af37, roughness: 0.42, metalness: 0.16 });
@@ -1957,9 +2293,11 @@ function buildMgmGrand(group, curve, roadHalfWidth) {
 function buildBellagio(group, curve, roadHalfWidth) {
   const bellagio = new THREE.Group();
   bellagio.name = "VegasSkyline:Bellagio";
-  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 65, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 120, roadHalfWidth);
   bellagio.position.copy(transform.position);
+  clampPropPosition(curve, bellagio.position, roadHalfWidth, 200, 50, 70);
   bellagio.rotation.y = transform.rotationY;
+  bellagio.scale.set(0.5, 0.5, 0.5);
 
   const facadeMaterial = createVegasMaterial({ color: 0xe0d0b8 });
   const glassMaterial = createVegasMaterial({ color: 0x1a3050, roughness: 0.42, metalness: 0.1 });
@@ -2024,8 +2362,9 @@ function buildBellagio(group, curve, roadHalfWidth) {
 function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
-  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 28, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 40, roadHalfWidth);
   signGroup.position.copy(transform.position);
+  clampPropPosition(curve, signGroup.position, roadHalfWidth, 200, 20, 30);
   signGroup.rotation.y = transform.rotationY;
 
   const goldMaterial = createVegasMaterial({
@@ -2140,6 +2479,7 @@ function addVegasProps(group, curve, definition) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "VegasDecorativeProps";
 
+  generateCitySkyline(curve, propsGroup, definition);
   addVegasTunnel(propsGroup, curve, definition, 0.36, 0, 18, 0.009);
   buildVegasSkyline(propsGroup, curve, definition.roadWidth * 0.5);
   buildVegasBillboards(propsGroup, curve, definition.roadWidth * 0.5);

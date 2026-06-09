@@ -270,7 +270,12 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
     return;
   }
 
-  const curbGeometry = new THREE.BoxGeometry(CURB_WIDTH, 0.035, CURB_LENGTH);
+  const isVegas = definition.id === "vegas";
+  const curbWidth = isVegas ? 0.12 : CURB_WIDTH;
+  const curbHeight = isVegas ? 0.02 : 0.035;
+  const curbLength = isVegas ? CURB_LENGTH * 0.85 : CURB_LENGTH;
+  
+  const curbGeometry = new THREE.BoxGeometry(curbWidth, curbHeight, curbLength);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3(1, 1, 1);
@@ -293,8 +298,8 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
     const insideSide = -curveSide;
     const position = sample.center
       .clone()
-      .addScaledVector(sample.normal, insideSide * (sample.roadHalfWidth - CURB_WIDTH * 0.5));
-    position.y = ROAD_Y + 0.055;
+      .addScaledVector(sample.normal, insideSide * (sample.roadHalfWidth - curbWidth * 0.5));
+    position.y = ROAD_Y + (isVegas ? 0.02 : 0.055);
 
     quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), getHeading(sample.tangent));
     matrix.compose(position, quaternion, scale);
@@ -306,21 +311,38 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
     }
   }
 
-  [
-    { matrices: redMatrices, material: materials.curbRed, name: "ApexCurbRed" },
-    { matrices: whiteMatrices, material: materials.curbWhite, name: "ApexCurbWhite" }
-  ].forEach(({ matrices, material, name }) => {
-    if (matrices.length === 0) {
-      return;
+  if (isVegas) {
+    const neonCurbMaterial = new THREE.MeshStandardMaterial({
+      color: 0x32f6ff,
+      emissive: 0x32f6ff,
+      emissiveIntensity: 2.8,
+      roughness: 0.2,
+      metalness: 0.1
+    });
+    const allMatrices = redMatrices.concat(whiteMatrices);
+    if (allMatrices.length > 0) {
+      const curbs = new THREE.InstancedMesh(curbGeometry, neonCurbMaterial, allMatrices.length);
+      curbs.name = `${definition.name}:ApexCurbNeon`;
+      allMatrices.forEach((curbMatrix, i) => curbs.setMatrixAt(i, curbMatrix));
+      curbs.instanceMatrix.needsUpdate = true;
+      group.add(curbs);
     }
-
-    const curbs = new THREE.InstancedMesh(curbGeometry, material, matrices.length);
-    curbs.name = `${definition.name}:${name}`;
-    curbs.receiveShadow = true;
-    matrices.forEach((curbMatrix, curbIndex) => curbs.setMatrixAt(curbIndex, curbMatrix));
-    curbs.instanceMatrix.needsUpdate = true;
-    group.add(curbs);
-  });
+  } else {
+    [
+      { matrices: redMatrices, material: materials.curbRed, name: "ApexCurbRed" },
+      { matrices: whiteMatrices, material: materials.curbWhite, name: "ApexCurbWhite" }
+    ].forEach(({ matrices, material, name }) => {
+      if (matrices.length === 0) {
+        return;
+      }
+      const curbs = new THREE.InstancedMesh(curbGeometry, material, matrices.length);
+      curbs.name = `${definition.name}:${name}`;
+      curbs.receiveShadow = true;
+      matrices.forEach((curbMatrix, curbIndex) => curbs.setMatrixAt(curbIndex, curbMatrix));
+      curbs.instanceMatrix.needsUpdate = true;
+      group.add(curbs);
+    });
+  }
 }
 
 function createBarrierSegment(material, start, end, height, thickness) {
@@ -622,19 +644,15 @@ export function createSplineTrack(definition) {
 
   group.add(ground, road);
 
-  if (definition.id === "vegas") {
-    addSegmentedNeonRoadEdges(group, roadData.edgeSamples, definition);
-  } else {
-    const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
-    leftEdge.name = `${definition.name}:LeftRoadEdge`;
-    leftEdge.receiveShadow = true;
+  const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
+  leftEdge.name = `${definition.name}:LeftRoadEdge`;
+  leftEdge.receiveShadow = true;
 
-    const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
-    rightEdge.name = `${definition.name}:RightRoadEdge`;
-    rightEdge.receiveShadow = true;
+  const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
+  rightEdge.name = `${definition.name}:RightRoadEdge`;
+  rightEdge.receiveShadow = true;
 
-    group.add(leftEdge, rightEdge);
-  }
+  group.add(leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
   const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
