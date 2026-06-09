@@ -142,12 +142,12 @@ add track interaction system shell
 
 ## Milestone 2: Off-road
 
-- [ ] Calcolare progresso piu vicino su `centerline`.
-- [ ] Stimare distanza laterale dalla centerline.
-- [ ] Se distanza > `roadHalfWidth`, impostare `surfaceType` off-road.
-- [ ] Ridurre grip e speed limit fuori strada.
-- [ ] Esporre `surfaceType` utile per HUD futuro.
-- [ ] Verificare Vegas/Beach/Monaco.
+- [x] Calcolare progresso piu vicino su `centerline`.
+- [x] Stimare distanza laterale dalla centerline.
+- [x] Se distanza > `roadHalfWidth`, impostare `surfaceType` off-road.
+- [x] Ridurre grip e speed limit fuori strada.
+- [x] Esporre `surfaceType` utile per HUD futuro.
+- [x] Verificare Vegas/Beach/Monaco.
 
 Commit suggerito:
 

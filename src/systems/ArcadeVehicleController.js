@@ -73,7 +73,7 @@ export class ArcadeVehicleController {
     this.collided = Boolean(environmentState.collided);
 
     if (inputState.accelerate) {
-      this.speed += this.performance.acceleration * boostFactor * deltaTime;
+      this.speed += this.performance.acceleration * surfaceGrip * boostFactor * deltaTime;
     }
 
     if (inputState.brake) {

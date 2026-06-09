@@ -153,7 +153,8 @@ Regole:
 - non deve conoscere direttamente mesh, DOM, HUD o AI;
 - `update()` deve restituire uno stato adatto a `vehicle.setTransform()` e `vehicle.update()`;
 - `distanceThisFrame` serve all'animazione ruote;
-- `surfaceGrip`, `boostFactor` e collisioni reali verranno forniti da sistemi pista/collisione futuri;
+- `surfaceGrip` influenza trazione e sterzata;
+- `boostFactor` e collisioni reali vengono forniti da sistemi pista/collisione;
 - `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
 
 ## Track Factory
@@ -372,6 +373,8 @@ Regole:
 
 - legge `trackInfo.centerline`, `trackInfo.roadHalfWidth`, `trackInfo.boostPads` e `trackInfo.barrierColliders`;
 - restituisce default asfaltati quando i dati pista mancano;
+- usa distanza da `centerline` e `roadHalfWidth` per distinguere asphalt/off-road;
+- fuori strada riduce `surfaceGrip` e `speedLimitMultiplier`;
 - non deve conoscere mesh, DOM, HUD o classi veicolo;
 - non deve modificare direttamente la mesh del player;
 - la scena usa l'output per aggiornare `ArcadeVehicleController`;

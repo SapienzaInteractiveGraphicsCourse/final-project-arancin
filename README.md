@@ -252,10 +252,10 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Off-road
 
-- [ ] Rilevamento off-road tramite `centerline` e `roadHalfWidth`.
-- [ ] Ridurre `surfaceGrip` fuori strada.
-- [ ] Ridurre `speedLimitMultiplier` fuori strada.
-- [ ] Esporre `surfaceType` per HUD futuro.
+- [x] Rilevamento off-road tramite `centerline` e `roadHalfWidth`.
+- [x] Ridurre `surfaceGrip` fuori strada.
+- [x] Ridurre `speedLimitMultiplier` fuori strada.
+- [x] Esporre `surfaceType` per HUD futuro.
 
 ### Boost Pad
 
