@@ -1,3 +1,5 @@
+import { VEHICLE_PERFORMANCE } from "./vehiclePerformance.js";
+
 export const TRACK_OPTIONS = [
   {
     id: "vegas",
@@ -20,16 +22,19 @@ export const VEHICLE_OPTIONS = [
   {
     id: "kart",
     name: "Kart",
+    maxSpeedKmh: getVehicleMaxSpeedKmh("kart"),
     description: "Team-authored procedural hierarchical vehicle."
   },
   {
     id: "porsche",
     name: "Porsche",
+    maxSpeedKmh: getVehicleMaxSpeedKmh("porsche"),
     description: "Fast imported sports car, strongest on straights."
   },
   {
     id: "silvia",
     name: "Silvia",
+    maxSpeedKmh: getVehicleMaxSpeedKmh("silvia"),
     description: "Agile imported coupe, responsive through corners."
   }
 ];
@@ -99,4 +104,17 @@ export function getRaceSetupLabels(setup) {
     mode: mode?.name ?? setup.raceMode,
     color: color?.name ?? setup.bodyColor
   };
+}
+
+function getVehicleMaxSpeedKmh(vehicleId) {
+  const performance = VEHICLE_PERFORMANCE[vehicleId];
+
+  if (!performance?.rollingFriction) {
+    return 0;
+  }
+
+  const steadyStateSpeed = performance.acceleration / performance.rollingFriction;
+  const cappedSpeed = Math.min(steadyStateSpeed, performance.maxForwardSpeed);
+
+  return Math.round(cappedSpeed * 3.6);
 }

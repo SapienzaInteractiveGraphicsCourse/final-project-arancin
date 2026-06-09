@@ -5,6 +5,10 @@ import {
   VEHICLE_OPTIONS,
   getRaceSetupLabels
 } from "../config/raceOptions.js";
+import logoUrl from "../assets/ui/kart-racing-logo.png";
+import kartImageUrl from "../assets/ui/vehicles/kart.png";
+import porscheImageUrl from "../assets/ui/vehicles/porsche.png";
+import silviaImageUrl from "../assets/ui/vehicles/silvia.png";
 
 const SETUP_STEPS = [
   {
@@ -41,6 +45,12 @@ const OPTION_THEMES = {
   "time-trial": { accent: "#22d3ee", second: "#a78bfa", dark: "#071923" }
 };
 
+const VEHICLE_IMAGES = {
+  kart: kartImageUrl,
+  porsche: porscheImageUrl,
+  silvia: silviaImageUrl
+};
+
 export function createSetupMenu({ onStart }) {
   const setup = { ...DEFAULT_RACE_SETUP };
   let currentStepIndex = 0;
@@ -49,9 +59,10 @@ export function createSetupMenu({ onStart }) {
   menu.className = "setup-menu";
   menu.setAttribute("aria-label", "Race setup");
 
-  const title = document.createElement("h1");
-  title.className = "setup-title";
-  title.textContent = "Kart Racing Simulator";
+  const logo = document.createElement("img");
+  logo.className = "setup-logo";
+  logo.src = logoUrl;
+  logo.alt = "Kart Racing Simulator";
 
   const panel = document.createElement("div");
   panel.className = "setup-panel setup-panel-progressive";
@@ -83,7 +94,7 @@ export function createSetupMenu({ onStart }) {
 
   nav.append(backButton, nextButton);
   panel.append(header, progress, stage, nav);
-  menu.appendChild(title);
+  menu.appendChild(logo);
   menu.appendChild(panel);
 
   function render() {
@@ -205,11 +216,30 @@ function renderOptionCard(option, placement) {
       style="--option-accent: ${theme.accent}; --option-second: ${theme.second}; --option-dark: ${theme.dark};"
     >
       <span class="setup-option-glint"></span>
-      <span class="setup-option-icon" data-icon="${option.id}"></span>
+      ${renderOptionVisual(option)}
       <strong>${option.name}</strong>
+      ${renderMaxSpeedBadge(option)}
       <span>${option.description}</span>
     </button>
   `;
+}
+
+function renderMaxSpeedBadge(option) {
+  if (!Number.isFinite(option.maxSpeedKmh)) {
+    return "";
+  }
+
+  return `<small class="setup-option-stat">Max ${option.maxSpeedKmh} km/h</small>`;
+}
+
+function renderOptionVisual(option) {
+  const imageUrl = VEHICLE_IMAGES[option.id];
+
+  if (imageUrl) {
+    return `<img class="setup-option-image" data-vehicle-image="${option.id}" src="${imageUrl}" alt="" aria-hidden="true">`;
+  }
+
+  return `<span class="setup-option-icon" data-icon="${option.id}"></span>`;
 }
 
 function getCardPlacement(index, selectedIndex, length) {
