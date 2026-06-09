@@ -75,6 +75,24 @@ function clampPropPosition(curve, propPos, roadHalfWidth, samples = 200, clearan
   return propPos;
 }
 
+const windowMaterialCache = new Map();
+function getCachedWindowMaterial(color, lit) {
+  const key = `${color}_${lit}`;
+  if (!windowMaterialCache.has(key)) {
+    windowMaterialCache.set(key, createWindowMaterial(color, lit));
+  }
+  return windowMaterialCache.get(key);
+}
+
+const windowGeometryCache = new Map();
+function getCachedWindowGeometry(w, h, d) {
+  const key = `${w.toFixed(2)}_${h.toFixed(2)}_${d.toFixed(2)}`;
+  if (!windowGeometryCache.has(key)) {
+    windowGeometryCache.set(key, new THREE.BoxGeometry(w, h, d));
+  }
+  return windowGeometryCache.get(key);
+}
+
 function createWindowMaterial(color, lit) {
   return createFlatStandardMaterial({
     color: lit ? color : 0x050509,
@@ -99,8 +117,8 @@ function addWindowGrid(group, block, neonColors, seed, face) {
   const yStep = block.height / (rows + 1);
 
   const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
-  const darkMaterial = createWindowMaterial(0x070811, false);
-  const geometry = new THREE.BoxGeometry(windowWidth, windowHeight, windowDepth);
+  const darkMaterial = getCachedWindowMaterial(0x070811, false);
+  const geometry = getCachedWindowGeometry(windowWidth, windowHeight, windowDepth);
   
   const litMatricesByColor = colorsList.map(() => []);
   const darkMatrices = [];
@@ -141,7 +159,7 @@ function addWindowGrid(group, block, neonColors, seed, face) {
     if (matrices.length === 0) {
       return;
     }
-    const litMaterial = createWindowMaterial(color, true);
+    const litMaterial = getCachedWindowMaterial(color, true);
     const windows = new THREE.InstancedMesh(geometry, litMaterial, matrices.length);
     windows.name = `LitWindows_${colorIndex}`;
     windows.receiveShadow = true;
@@ -312,7 +330,7 @@ function addRoofBillboard(group, block, neonColors, seed) {
   const ad = vegasTitles[seed % vegasTitles.length];
 
   // 5. Canvas Text Texture with black background
-  const textTexture = createVegasCanvasTexture(512, 256, ad.title, ad.subtitle, neonColorHex, "#ffffff");
+  const textTexture = getCachedVegasCanvasTexture(512, 256, ad.title, ad.subtitle, neonColorHex, "#ffffff");
   const textMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: textTexture,
@@ -618,6 +636,18 @@ function colorToHexStr(color) {
   return "#" + color.toString(16).padStart(6, "0");
 }
 
+const vegasCanvasTextureCache = new Map();
+function getCachedVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex) {
+  const key = `${width}_${height}_${title}_${subtitle || ""}_${themeColorHex}_${textColorHex}`;
+  if (!vegasCanvasTextureCache.has(key)) {
+    vegasCanvasTextureCache.set(
+      key,
+      createVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex)
+    );
+  }
+  return vegasCanvasTextureCache.get(key);
+}
+
 function createVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -753,7 +783,7 @@ function addClassicVegasPylonSign(sign, color, contrastColor) {
   sign.add(pole);
 
   // Text Planes on front faces (z offset slightly)
-  const panelTex = createVegasCanvasTexture(256, 512, "JACKPOT", "SPIN & WIN", contrastHex, "#ffeb3b");
+  const panelTex = getCachedVegasCanvasTexture(256, 512, "JACKPOT", "SPIN & WIN", contrastHex, "#ffeb3b");
   const panelTextMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: panelTex,
@@ -768,7 +798,7 @@ function addClassicVegasPylonSign(sign, color, contrastColor) {
   panelTextPlane.position.set(0, 7.7, panelDepth * 0.5 + 0.02);
   sign.add(panelTextPlane);
 
-  const marqueeTex = createVegasCanvasTexture(256, 128, "777", "SLOTS", themeHex, "#ffffff");
+  const marqueeTex = getCachedVegasCanvasTexture(256, 128, "777", "SLOTS", themeHex, "#ffffff");
   const marqueeTextMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: marqueeTex,
@@ -783,7 +813,7 @@ function addClassicVegasPylonSign(sign, color, contrastColor) {
   marqueeTextPlane.position.set(0, 13.2, marqueeDepth * 0.5 + 0.02);
   sign.add(marqueeTextPlane);
 
-  const readerTex = createVegasCanvasTexture(256, 128, "PLAY NOW", null, "#39ff14", "#39ff14");
+  const readerTex = getCachedVegasCanvasTexture(256, 128, "PLAY NOW", null, "#39ff14", "#39ff14");
   const readerTextMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: readerTex,
@@ -859,7 +889,7 @@ function addCasinoNameBoardSign(sign, color, contrastColor) {
   });
 
   // Text Plane
-  const boardTex = createVegasCanvasTexture(512, 128, "CASINO", "ROYALE", themeHex, "#ffeb3b");
+  const boardTex = getCachedVegasCanvasTexture(512, 128, "CASINO", "ROYALE", themeHex, "#ffeb3b");
   const boardTextMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: boardTex,
@@ -983,7 +1013,7 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
     panel.position.set((index - 1) * 1.87, 4.12, 0.38);
     sign.add(panel);
 
-    const letterTex = createVegasCanvasTexture(128, 256, letters[index], null, colorToHexStr(panelColor), "#ffffff");
+    const letterTex = getCachedVegasCanvasTexture(128, 256, letters[index], null, colorToHexStr(panelColor), "#ffffff");
     const letterTextMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: letterTex,
@@ -1006,6 +1036,21 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
   }
 }
 
+function isNearGrandstand(progress, side, threshold = 0.05) {
+  const locations = [
+    { progress: 0.1, side: 1 },
+    { progress: 0.18, side: -1 },
+    { progress: 0.38, side: 1 },
+    { progress: 0.52, side: -1 },
+    { progress: 0.66, side: 1 },
+    { progress: 0.82, side: -1 },
+    { progress: 0.92, side: 1 }
+  ];
+  return locations.some((loc) => {
+    return loc.side === side && Math.abs(progress - loc.progress) < threshold;
+  });
+}
+
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
   const progressPoints = [0.05, 0.14, 0.28, 0.45, 0.58, 0.72, 0.88];
@@ -1021,9 +1066,11 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
     
-    // Use opposite side of grandstands (which use index % 2 === 0 ? 1 : -1)
-    // to prevent overlap!
-    const side = index % 2 === 0 ? -1 : 1;
+    // Choose side, and flip to opposite side if we are near a grandstand
+    let side = index % 2 === 0 ? -1 : 1;
+    if (isNearGrandstand(progress, side, 0.05)) {
+      side = -side;
+    }
     
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
@@ -1113,13 +1160,18 @@ function addNeonPalms(group, curve, definition) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
+    
+    let side = index % 2 === 0 ? 1 : -1;
+    if (isNearGrandstand(progress, side, 0.05)) {
+      side = -side;
+    }
+    
     const basePosition = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 2.9));
 
     for (let palmIndex = 0; palmIndex < 5; palmIndex += 1) {
       const offset = tangent.clone().multiplyScalar((palmIndex - 2) * 1.55);
       const position = basePosition.clone().add(offset).addScaledVector(normal, side * (palmIndex % 2) * 0.82);
-      clampPropPosition(curve, position, roadHalfWidth);
+      clampPropPosition(curve, position, roadHalfWidth, 200, 6, 7);
       const palm = createNeonPalm({
         position,
         rotationY: getHeading(tangent) + pseudoRandom(index + palmIndex) * 0.8,
@@ -1701,12 +1753,29 @@ function createGrandstand({ position, rotationY, width, rows, accentColor, index
   return stand;
 }
 
+const spectatorMaterialCache = {
+  shirts: [],
+  skins: [],
+  pants: null
+};
+
+function getSpectatorMaterials(shirtColors, skinColors) {
+  if (spectatorMaterialCache.shirts.length === 0) {
+    spectatorMaterialCache.shirts = shirtColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.skins = skinColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.pants = new THREE.MeshBasicMaterial({ color: 0x18202a });
+  }
+  return spectatorMaterialCache;
+}
+
 function addSeatedSpectators(stand, width, rows, seed) {
   const shirtColors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78, 0xf4f2e8, 0x6aa7ff, 0xff7a59];
   const skinColors = [0xf0c7a0, 0xd49a6a, 0x8b5a3c, 0xf4d2b5];
-  const shirtMaterials = shirtColors.map((color) => new THREE.MeshBasicMaterial({ color }));
-  const skinMaterials = skinColors.map((color) => new THREE.MeshBasicMaterial({ color }));
-  const pantsMaterial = new THREE.MeshBasicMaterial({ color: 0x18202a });
+  
+  const mats = getSpectatorMaterials(shirtColors, skinColors);
+  const shirtMaterials = mats.shirts;
+  const skinMaterials = mats.skins;
+  const pantsMaterial = mats.pants;
 
   const torsoGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.68, 8);
   const headGeometry = new THREE.SphereGeometry(0.22, 12, 12);
