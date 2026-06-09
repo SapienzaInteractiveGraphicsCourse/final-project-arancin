@@ -140,7 +140,15 @@ export function startScenePreview(container, setup, options = {}) {
     const currentVehicleState = controller.getState();
     const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
-    const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, { deltaTime });
+    const opponentStates = aiController ? [aiController.getState()] : [];
+    const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, {
+      deltaTime,
+      opponentStates
+    });
+    if (environmentState.impact?.type === "opponent") {
+      aiController?.registerCollision();
+    }
+
     const state = updatedRaceState.finished
       ? controller.getState()
       : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, environmentState);

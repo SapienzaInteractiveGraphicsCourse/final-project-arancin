@@ -275,9 +275,9 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Player Vs AI
 
-- [ ] Collisione player-bot.
-- [ ] Separare posizioni player/bot.
-- [ ] Penalita o feedback collisione.
+- [x] Collisione player-bot.
+- [x] Separare posizioni player/bot.
+- [x] Penalita o feedback collisione.
 
 ## 6. Gara E AI
 

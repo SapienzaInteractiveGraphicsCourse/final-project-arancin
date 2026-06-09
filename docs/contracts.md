@@ -377,6 +377,8 @@ Regole:
 - fuori strada riduce `surfaceGrip` e `speedLimitMultiplier`;
 - usa `trackInfo.boostPads` per applicare un boost temporaneo con cooldown breve;
 - usa `trackInfo.barrierColliders` per produrre `collided`, `correction` e `impact`;
+- puo ricevere `options.opponentStates` per collisione player-opponent semplificata;
+- un impatto `opponent` applica separazione minima al player e rallenta temporaneamente l'AI, ma non implica avoidance intelligente;
 - non deve conoscere mesh, DOM, HUD o classi veicolo;
 - non deve modificare direttamente la mesh del player;
 - la scena usa l'output per aggiornare `ArcadeVehicleController`;

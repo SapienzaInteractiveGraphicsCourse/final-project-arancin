@@ -187,11 +187,11 @@ resolve player barrier collisions
 
 ## Milestone 5: Player vs AI
 
-- [ ] Aggiungere collisione semplificata capsule/sfera player-AI.
-- [ ] Separare player e AI quando si sovrappongono.
-- [ ] Segnalare impatto nello stato ambiente.
-- [ ] Mantenere la classifica race invariata.
-- [ ] Non rendere l'AI instabile o bloccata dal player.
+- [x] Aggiungere collisione semplificata sfera player-AI.
+- [x] Separare player e AI quando si sovrappongono.
+- [x] Segnalare impatto nello stato ambiente.
+- [x] Mantenere la classifica race invariata.
+- [x] Non rendere l'AI instabile o bloccata dal player.
 
 Commit suggerito:
 

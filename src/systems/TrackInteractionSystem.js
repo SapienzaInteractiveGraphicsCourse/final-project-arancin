@@ -17,8 +17,11 @@ const BOOST_SPEED_LIMIT_MULTIPLIER = 1.18;
 const BOOST_DURATION_SECONDS = 0.75;
 const BOOST_COOLDOWN_SECONDS = 1.1;
 const PLAYER_COLLISION_RADIUS = 0.9;
+const OPPONENT_COLLISION_RADIUS = 0.9;
+const OPPONENT_CORRECTION_FACTOR = 0.12;
 const BARRIER_CORRECTION_PADDING = 0.04;
 const BARRIER_IMPACT_SPEED_MULTIPLIER = 0.35;
+const OPPONENT_IMPACT_SPEED_MULTIPLIER = 0.86;
 
 export class TrackInteractionSystem {
   constructor() {
@@ -37,16 +40,18 @@ export class TrackInteractionSystem {
     const deltaTime = Math.max(0, Number(options.deltaTime) || 0);
     const surfaceState = getSurfaceState(playerState, trackInfo);
     const barrierState = getBarrierState(playerState, trackInfo);
+    const opponentState = getOpponentCollisionState(playerState, options.opponentStates);
+    const collisionState = combineCollisionStates(barrierState, opponentState);
     const boostState = this.updateBoostState(deltaTime, playerState, trackInfo, {
       ...options,
-      collided: Boolean(options.collided || barrierState.collided)
+      collided: Boolean(options.collided || collisionState.collided)
     });
 
     this.lastState = normalizeEnvironmentState({
       ...DEFAULT_ENVIRONMENT_STATE,
       ...surfaceState,
       ...boostState,
-      ...barrierState,
+      ...collisionState,
       ...options.environmentState
     });
 
@@ -267,6 +272,100 @@ function getBarrierCorrection(position, collider) {
     x: (localNormalX * cos + localNormalZ * sin) * correctionDistance,
     z: (-localNormalX * sin + localNormalZ * cos) * correctionDistance
   };
+}
+
+function getOpponentCollisionState(playerState, opponentStates = []) {
+  const opponents = Array.isArray(opponentStates) ? opponentStates : [];
+
+  if (!playerState.position || opponents.length === 0) {
+    return {};
+  }
+
+  const correction = opponents.reduce((totalCorrection, opponentState) => {
+    const opponentCorrection = getOpponentCorrection(playerState.position, opponentState?.position);
+
+    if (!opponentCorrection) {
+      return totalCorrection;
+    }
+
+    totalCorrection.x += opponentCorrection.x;
+    totalCorrection.z += opponentCorrection.z;
+    return totalCorrection;
+  }, { x: 0, z: 0 });
+
+  if (Math.abs(correction.x) < 0.000001 && Math.abs(correction.z) < 0.000001) {
+    return {};
+  }
+
+  return {
+    collided: true,
+    correction,
+    impact: {
+      type: "opponent",
+      speedMultiplier: OPPONENT_IMPACT_SPEED_MULTIPLIER
+    }
+  };
+}
+
+function getOpponentCorrection(playerPosition, opponentPosition) {
+  if (!opponentPosition) {
+    return null;
+  }
+
+  const deltaX = playerPosition.x - opponentPosition.x;
+  const deltaZ = playerPosition.z - opponentPosition.z;
+  const distance = Math.hypot(deltaX, deltaZ);
+  const minimumDistance = PLAYER_COLLISION_RADIUS + OPPONENT_COLLISION_RADIUS;
+
+  if (distance >= minimumDistance) {
+    return null;
+  }
+
+  if (distance <= 0.000001) {
+    return {
+      x: minimumDistance,
+      z: 0
+    };
+  }
+
+  const correctionDistance = (minimumDistance - distance + BARRIER_CORRECTION_PADDING) * OPPONENT_CORRECTION_FACTOR;
+
+  return {
+    x: (deltaX / distance) * correctionDistance,
+    z: (deltaZ / distance) * correctionDistance
+  };
+}
+
+function combineCollisionStates(...collisionStates) {
+  const combined = {
+    collided: false,
+    correction: { x: 0, z: 0 },
+    impact: null
+  };
+
+  collisionStates.forEach((collisionState) => {
+    if (!collisionState?.collided) {
+      return;
+    }
+
+    combined.collided = true;
+    combined.correction.x += Number(collisionState.correction?.x) || 0;
+    combined.correction.z += Number(collisionState.correction?.z) || 0;
+
+    if (
+      !combined.impact ||
+      normalizePositiveNumber(collisionState.impact?.speedMultiplier, 1) <
+        normalizePositiveNumber(combined.impact.speedMultiplier, 1)
+    ) {
+      combined.impact = collisionState.impact;
+    }
+  });
+
+  if (!combined.collided) {
+    return {};
+  }
+
+  return combined;
 }
 
 function normalizePositiveNumber(value, fallback) {
