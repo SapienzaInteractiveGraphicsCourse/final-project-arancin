@@ -1,0 +1,217 @@
+# Collisions And Track Interaction Plan
+
+Branch: `feature/collisions`
+
+Obiettivo: collegare il controller arcade ai dati logici della pista, senza cambiare le factory e senza inserire logica di collisione dentro i veicoli.
+
+## Scope
+
+La sezione 5 copre:
+
+- collisione player-barriere;
+- correzione posizione fuori dalle barriere;
+- riduzione velocita dopo impatto;
+- rilevamento off-road;
+- rilevamento boost pad;
+- stato ambiente passato a `ArcadeVehicleController.update()`;
+- predisposizione collisione player-AI.
+
+Non copre ancora:
+
+- audio collisione/boost;
+- particelle;
+- minimappa;
+- fisica realistica avanzata;
+- danni persistenti;
+- AI avoidance, sorpassi e cambio traiettoria dinamico.
+
+## Confine Con Fisica E AI
+
+Il progetto usa una guida arcade. In questo branch non serve simulare una fisica realistica con massa, inerzia completa, gomme, sospensioni o risposta rigid-body. La collisione deve essere credibile e giocabile: il player non deve attraversare barriere o bot, deve essere spinto fuori dall'intersezione e deve perdere velocita quando urta.
+
+Questa sezione quindi implementa:
+
+- rilevamento intersezioni;
+- correzione posizione;
+- riduzione velocita dopo impatto;
+- stato `collided` per HUD/audio/particelle future;
+- separazione semplice tra player e AI se si sovrappongono.
+
+Non implementa:
+
+- modello fisico realistico;
+- danni;
+- rimbalzi accurati;
+- traiettorie AI intelligenti;
+- AI che frena, sterza o cambia linea per evitare fisicamente il player.
+
+L'AI avoidance appartiene a un branch futuro di comportamento/tuning AI, ad esempio `feature/ai-tuning` o `feature/ai-behavior`. In `feature/collisions` possiamo solo predisporre lo stato necessario: se player e AI si toccano, il sistema segnala collisione e separa le posizioni in modo semplice. La decisione dell'AI di evitare il player prima dell'impatto resta fuori scope.
+
+## Dati Disponibili
+
+Le piste spline espongono gia:
+
+```js
+trackInfo.roadSegments
+trackInfo.roadHalfWidth
+trackInfo.centerline
+trackInfo.boostPads
+trackInfo.barrierColliders
+```
+
+I collider barriera hanno formato:
+
+```js
+{
+  center,
+  rotationY,
+  halfLength,
+  halfThickness
+}
+```
+
+I boost pad hanno formato:
+
+```js
+{
+  position,
+  radius,
+  heading
+}
+```
+
+Il controller player accetta gia:
+
+```js
+{
+  surfaceType,
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided
+}
+```
+
+## Strategia
+
+Creare un sistema dedicato:
+
+```text
+src/systems/TrackInteractionSystem.js
+```
+
+Il sistema riceve stato player, stato AI opzionale e `trackInfo`, poi restituisce un environment state per il frame corrente.
+
+Firma prevista:
+
+```js
+trackInteraction.update(playerState, trackInfo, options) -> EnvironmentState
+trackInteraction.reset()
+```
+
+Output previsto:
+
+```js
+{
+  surfaceType,
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided,
+  correction,
+  impact
+}
+```
+
+`correction` serve alla scena/controller per correggere la posizione quando il player entra in una barriera.
+
+## Milestone 1: Sistema Base
+
+- [ ] Creare `TrackInteractionSystem`.
+- [ ] Gestire default robusti se `trackInfo` e incompleto.
+- [ ] Restituire asphalt/no collision quando mancano dati pista.
+- [ ] Collegare la scena sostituendo l'`environmentState` hardcoded.
+- [ ] Aggiornare `docs/contracts.md`.
+- [ ] Eseguire `bun run build`.
+
+Commit suggerito:
+
+```text
+add track interaction system shell
+```
+
+## Milestone 2: Off-road
+
+- [ ] Calcolare progresso piu vicino su `centerline`.
+- [ ] Stimare distanza laterale dalla centerline.
+- [ ] Se distanza > `roadHalfWidth`, impostare `surfaceType` off-road.
+- [ ] Ridurre grip e speed limit fuori strada.
+- [ ] Esporre `surfaceType` utile per HUD futuro.
+- [ ] Verificare Vegas/Beach/Monaco.
+
+Commit suggerito:
+
+```text
+detect off road surface
+```
+
+## Milestone 3: Boost Pad
+
+- [ ] Controllare distanza player-boost pad.
+- [ ] Applicare `boostFactor` solo quando il player entra nel raggio.
+- [ ] Aggiungere cooldown breve per evitare boost continuo troppo forte.
+- [ ] Annullare boost se il frame segnala impatto importante.
+- [ ] Verificare Beach e Monaco, dove i boost pad sono presenti.
+
+Commit suggerito:
+
+```text
+apply track boost pads
+```
+
+## Milestone 4: Barriere
+
+- [ ] Implementare test punto vs oriented box 2D nel piano XZ.
+- [ ] Calcolare normale di espulsione dalla barriera.
+- [ ] Applicare correzione posizione ogni frame di intersezione.
+- [ ] Segnalare `collided`.
+- [ ] Ridurre velocita quando l'impatto e frontale o laterale forte.
+- [ ] Evitare cooldown sulla risposta fisica.
+- [ ] Usare cooldown solo per eventuali feedback futuri.
+
+Commit suggerito:
+
+```text
+resolve player barrier collisions
+```
+
+## Milestone 5: Player vs AI
+
+- [ ] Aggiungere collisione semplificata capsule/sfera player-AI.
+- [ ] Separare player e AI quando si sovrappongono.
+- [ ] Segnalare impatto nello stato ambiente.
+- [ ] Mantenere la classifica race invariata.
+- [ ] Non rendere l'AI instabile o bloccata dal player.
+
+Commit suggerito:
+
+```text
+prepare player ai collision response
+```
+
+## Verifica Manuale
+
+- Vegas: urtare barriere e controllare che il player venga spinto fuori.
+- Beach: uscire strada e verificare grip ridotto.
+- Beach/Monaco: attraversare boost pad e verificare accelerazione.
+- Race: urtare AI senza rompere lap/checkpoint/position.
+- Time Trial: collisioni e boost devono funzionare anche senza AI.
+- Console: nessun errore.
+
+## Note Di Integrazione
+
+- La scena deve restare l'orchestratore: legge sistemi, aggiorna controller, renderizza.
+- `ArcadeVehicleController` non deve conoscere direttamente `trackInfo`.
+- I veicoli non devono conoscere collisioni.
+- Le piste devono continuare a esporre dati logici, non sistemi runtime.
+- Se serve una correzione posizione, meglio introdurre un metodo piccolo nel controller invece di manipolare mesh e stato fisico in punti diversi.

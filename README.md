@@ -241,17 +241,43 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 5. Collisioni
 
+- [x] Documentare `docs/collisions.md`.
+
+### Track Interaction System
+
+- [ ] Creare `TrackInteractionSystem`.
+- [ ] Sostituire `environmentState` hardcoded nella scena.
+- [ ] Gestire default robusti se la pista non espone dati completi.
+- [ ] Aggiornare `docs/contracts.md`.
+
+### Off-road
+
+- [ ] Rilevamento off-road tramite `centerline` e `roadHalfWidth`.
+- [ ] Ridurre `surfaceGrip` fuori strada.
+- [ ] Ridurre `speedLimitMultiplier` fuori strada.
+- [ ] Esporre `surfaceType` per HUD futuro.
+
+### Boost Pad
+
+- [ ] Rilevamento boost pad.
+- [ ] Applicare `boostFactor`.
+- [ ] Cooldown breve boost.
+- [ ] Annullare boost su impatto importante.
+
+### Barriere
+
 - [ ] Collisione player-barriere.
+- [ ] Test punto/veicolo contro collider oriented box 2D.
 - [ ] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
 - [ ] Spingere fuori dalla barriera lungo la normale.
 - [ ] Ridurre/invertire velocita su impatto frontale.
-- [ ] Annullare boost su impatto importante.
+
+### Player Vs AI
+
 - [ ] Collisione player-bot.
 - [ ] Separare posizioni player/bot.
 - [ ] Penalita o feedback collisione.
-- [ ] Rilevamento off-road.
-- [ ] Rilevamento boost pad.
 
 ## 6. Gara E AI
 

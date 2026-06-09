@@ -337,6 +337,47 @@ Regole:
 - i checkpoint validi devono avere `position.x`, `position.z` e `order`/`id` numerici;
 - `radius` e opzionale se e presente `size`.
 
+## Track Interaction System
+
+File previsto: `src/systems/TrackInteractionSystem.js`
+
+Firma prevista:
+
+```js
+const trackInteraction = new TrackInteractionSystem();
+```
+
+Contratto previsto:
+
+```js
+trackInteraction.update(playerState, trackInfo, options) -> EnvironmentState
+trackInteraction.reset()
+```
+
+`EnvironmentState` prodotto:
+
+```js
+{
+  surfaceType,
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided,
+  correction,
+  impact
+}
+```
+
+Regole:
+
+- legge `trackInfo.centerline`, `trackInfo.roadHalfWidth`, `trackInfo.boostPads` e `trackInfo.barrierColliders`;
+- restituisce default asfaltati quando i dati pista mancano;
+- non deve conoscere mesh, DOM, HUD o classi veicolo;
+- non deve modificare direttamente la mesh del player;
+- la scena usa l'output per aggiornare `ArcadeVehicleController`;
+- la risposta fisica a una barriera deve essere continua ogni frame di intersezione;
+- eventuali cooldown servono solo per feedback futuri, non per bloccare la correzione fisica.
+
 ## Race Records
 
 File: `src/systems/raceRecords.js`
