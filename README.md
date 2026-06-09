@@ -259,9 +259,9 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Boost Pad
 
-- [ ] Rilevamento boost pad.
-- [ ] Applicare `boostFactor`.
-- [ ] Cooldown breve boost.
+- [x] Rilevamento boost pad.
+- [x] Applicare `boostFactor`.
+- [x] Cooldown breve boost.
 - [ ] Annullare boost su impatto importante.
 
 ### Barriere

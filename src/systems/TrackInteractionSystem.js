@@ -12,26 +12,60 @@ const DEFAULT_ENVIRONMENT_STATE = {
 const OFF_ROAD_GRIP = 0.45;
 const OFF_ROAD_SPEED_LIMIT_MULTIPLIER = 0.45;
 const ROAD_EDGE_TOLERANCE_METERS = 0.35;
+const BOOST_FACTOR = 1.75;
+const BOOST_SPEED_LIMIT_MULTIPLIER = 1.18;
+const BOOST_DURATION_SECONDS = 0.75;
+const BOOST_COOLDOWN_SECONDS = 1.1;
 
 export class TrackInteractionSystem {
   constructor() {
     this.lastState = { ...DEFAULT_ENVIRONMENT_STATE };
+    this.boostTimer = 0;
+    this.boostCooldownTimer = 0;
   }
 
   reset() {
     this.lastState = { ...DEFAULT_ENVIRONMENT_STATE };
+    this.boostTimer = 0;
+    this.boostCooldownTimer = 0;
   }
 
   update(playerState = {}, trackInfo = {}, options = {}) {
+    const deltaTime = Math.max(0, Number(options.deltaTime) || 0);
     const surfaceState = getSurfaceState(playerState, trackInfo);
+    const boostState = this.updateBoostState(deltaTime, playerState, trackInfo, options);
 
     this.lastState = normalizeEnvironmentState({
       ...DEFAULT_ENVIRONMENT_STATE,
       ...surfaceState,
+      ...boostState,
       ...options.environmentState
     });
 
     return this.getState();
+  }
+
+  updateBoostState(deltaTime, playerState, trackInfo, options) {
+    this.boostTimer = Math.max(0, this.boostTimer - deltaTime);
+    this.boostCooldownTimer = Math.max(0, this.boostCooldownTimer - deltaTime);
+
+    if (options.environmentState?.collided || options.collided) {
+      this.boostTimer = 0;
+    }
+
+    if (this.boostTimer === 0 && this.boostCooldownTimer === 0 && isInsideBoostPad(playerState, trackInfo)) {
+      this.boostTimer = BOOST_DURATION_SECONDS;
+      this.boostCooldownTimer = BOOST_COOLDOWN_SECONDS;
+    }
+
+    if (this.boostTimer === 0) {
+      return {};
+    }
+
+    return {
+      boostFactor: BOOST_FACTOR,
+      speedLimitMultiplier: BOOST_SPEED_LIMIT_MULTIPLIER
+    };
   }
 
   getState() {
@@ -133,6 +167,33 @@ function getOffRoadSurfaceType(trackInfo) {
   }
 
   return "grass";
+}
+
+function isInsideBoostPad(playerState, trackInfo) {
+  const boostPads = Array.isArray(trackInfo.boostPads) ? trackInfo.boostPads : [];
+
+  if (!playerState.position || boostPads.length === 0) {
+    return false;
+  }
+
+  return boostPads.some((boostPad) => {
+    if (!boostPad?.position) {
+      return false;
+    }
+
+    const radius = normalizePositiveNumber(boostPad.radius, 0);
+
+    if (radius <= 0) {
+      return false;
+    }
+
+    const distance = Math.hypot(
+      playerState.position.x - boostPad.position.x,
+      playerState.position.z - boostPad.position.z
+    );
+
+    return distance <= radius;
+  });
 }
 
 function normalizePositiveNumber(value, fallback) {

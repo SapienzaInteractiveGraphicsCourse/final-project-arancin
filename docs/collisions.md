@@ -157,11 +157,11 @@ detect off road surface
 
 ## Milestone 3: Boost Pad
 
-- [ ] Controllare distanza player-boost pad.
-- [ ] Applicare `boostFactor` solo quando il player entra nel raggio.
-- [ ] Aggiungere cooldown breve per evitare boost continuo troppo forte.
+- [x] Controllare distanza player-boost pad.
+- [x] Applicare `boostFactor` solo quando il player entra nel raggio.
+- [x] Aggiungere cooldown breve per evitare boost continuo troppo forte.
 - [ ] Annullare boost se il frame segnala impatto importante.
-- [ ] Verificare Beach e Monaco, dove i boost pad sono presenti.
+- [x] Verificare Beach e Monaco, dove i boost pad sono presenti.
 
 Commit suggerito:
 

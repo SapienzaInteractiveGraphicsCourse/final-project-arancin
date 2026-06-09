@@ -375,6 +375,7 @@ Regole:
 - restituisce default asfaltati quando i dati pista mancano;
 - usa distanza da `centerline` e `roadHalfWidth` per distinguere asphalt/off-road;
 - fuori strada riduce `surfaceGrip` e `speedLimitMultiplier`;
+- usa `trackInfo.boostPads` per applicare un boost temporaneo con cooldown breve;
 - non deve conoscere mesh, DOM, HUD o classi veicolo;
 - non deve modificare direttamente la mesh del player;
 - la scena usa l'output per aggiornare `ArcadeVehicleController`;
