@@ -64,11 +64,29 @@ export function startScenePreview(container, setup, options = {}) {
   let animationFrameId = 0;
   let paused = false;
   let renderedFinishSignature = "";
+  let totalElapsedTime = 0;
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
   timer.connect(document);
   scene.add(track.group, vehicle.group);
+  if (lights.sun && lights.sun.target) {
+    scene.add(lights.sun.target);
+  }
+
+  // Cache references to animating props and start lights to avoid costly traversals in the frame loop
+  const animatingProps = [];
+  const gantryStartLights = [];
+
+  track.group.traverse((child) => {
+    if (child.userData.spin || child.userData.float) {
+      animatingProps.push(child);
+    }
+    if (child.name === "GantryStartLights" && child.userData.lamps) {
+      gantryStartLights.push(...child.userData.lamps);
+    }
+  });
+
   container.appendChild(raceOverlay);
   container.appendChild(raceHud);
   container.appendChild(wrongWayOverlay);
@@ -102,6 +120,7 @@ export function startScenePreview(container, setup, options = {}) {
     raceManager.startCountdown();
     renderedFinishSignature = "";
     finishScreen.setVisible(false);
+    totalElapsedTime = 0;
   }
 
   function update(deltaTime) {
@@ -123,6 +142,8 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.toggleHeadlights();
     }
 
+    totalElapsedTime += deltaTime;
+
     const currentVehicleState = controller.getState();
     const raceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = raceState.phase === RACE_PHASES.RUNNING;
@@ -139,6 +160,78 @@ export function startScenePreview(container, setup, options = {}) {
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
     updateCameraFollow(state);
+
+    // Auto-enable headlights for night circuits (Vegas)
+    if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
+      vehicle.setHeadlights(true);
+    }
+
+    // 1. Center the moon/sun directional light & shadow camera on the car
+    if (lights.sun) {
+      lights.sun.position.set(
+        state.position.x - 42,
+        state.position.y + 46,
+        state.position.z + 30
+      );
+      lights.sun.target.position.copy(state.position);
+    }
+
+    // 2. Keep the gradient sky sphere centered on the camera
+    if (scene.userData.trackSky) {
+      scene.userData.trackSky.position.copy(camera.position);
+    }
+
+    // 3. Update the start gantry F1 countdown lights
+    if (gantryStartLights.length > 0) {
+      const countdown = raceState.countdown;
+      const phase = raceState.phase;
+
+      if (phase === RACE_PHASES.COUNTDOWN) {
+        // Lamp 0 (left): red when countdown <= 3.0
+        // Lamp 1 (middle): red when countdown <= 2.0
+        // Lamp 2 (right): red when countdown <= 1.0
+        gantryStartLights[0].color.setHex(countdown <= 3.0 ? 0xff0000 : 0x1f1f24);
+        gantryStartLights[0].emissive.setHex(countdown <= 3.0 ? 0xff0000 : 0x000000);
+        gantryStartLights[0].emissiveIntensity = countdown <= 3.0 ? 2.5 : 0;
+
+        gantryStartLights[1].color.setHex(countdown <= 2.0 ? 0xff0000 : 0x1f1f24);
+        gantryStartLights[1].emissive.setHex(countdown <= 2.0 ? 0xff0000 : 0x000000);
+        gantryStartLights[1].emissiveIntensity = countdown <= 2.0 ? 2.5 : 0;
+
+        gantryStartLights[2].color.setHex(countdown <= 1.0 ? 0xff0000 : 0x1f1f24);
+        gantryStartLights[2].emissive.setHex(countdown <= 1.0 ? 0xff0000 : 0x000000);
+        gantryStartLights[2].emissiveIntensity = countdown <= 1.0 ? 2.5 : 0;
+      } else if (phase === RACE_PHASES.RUNNING) {
+        // All lamps turn Green!
+        gantryStartLights.forEach((lampMat) => {
+          lampMat.color.setHex(0x00ff00);
+          lampMat.emissive.setHex(0x00ff00);
+          lampMat.emissiveIntensity = 2.5;
+        });
+      } else {
+        // Off
+        gantryStartLights.forEach((lampMat) => {
+          lampMat.color.setHex(0x1f1f24);
+          lampMat.emissive.setHex(0x000000);
+          lampMat.emissiveIntensity = 0;
+        });
+      }
+    }
+
+    // 4. Rotate and float props (MSG Sphere, Casino Hologram Dice)
+    for (let i = 0; i < animatingProps.length; i++) {
+      const child = animatingProps[i];
+      if (child.userData.spin) {
+        child.rotation.x += child.userData.spin.x * deltaTime;
+        child.rotation.y += child.userData.spin.y * deltaTime;
+        child.rotation.z += child.userData.spin.z * deltaTime;
+      }
+      if (child.userData.float) {
+        const f = child.userData.float;
+        child.position.y = f.baseY + Math.sin(totalElapsedTime * f.speed + f.phase) * f.amplitude;
+      }
+    }
+
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
     checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);

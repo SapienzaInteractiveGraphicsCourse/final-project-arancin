@@ -13,7 +13,7 @@ function removePreviousSky(scene) {
   scene.userData.trackSky = null;
 }
 
-function createGradientSky(gradient) {
+function createGradientSky(gradient, theme = {}) {
   const geometry = new THREE.SphereGeometry(260, 24, 12);
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -40,10 +40,25 @@ function createGradientSky(gradient) {
       uniform vec3 midColor;
       uniform vec3 zenithColor;
 
+      float hash(vec3 p) {
+        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+      }
+
       void main() {
-        float height = normalize(vWorldPosition).y * 0.5 + 0.5;
+        vec3 dir = normalize(vWorldPosition);
+        float height = dir.y * 0.5 + 0.5;
         vec3 sunsetBand = mix(horizonColor, midColor, smoothstep(0.18, 0.52, height));
         vec3 skyColor = mix(sunsetBand, zenithColor, smoothstep(0.48, 1.0, height));
+
+        // Add starfield in the upper zenith sky (for dark/night themes)
+        if (dir.y > 0.05) {
+          float n = hash(floor(dir * 180.0));
+          if (n > 0.988) {
+            float twinkle = sin(n * 100.0) * 0.4 + 0.6;
+            skyColor += vec3(twinkle * smoothstep(0.05, 0.35, dir.y));
+          }
+        }
+
         gl_FragColor = vec4(skyColor, 1.0);
       }
     `
@@ -51,6 +66,21 @@ function createGradientSky(gradient) {
   const sky = new THREE.Mesh(geometry, material);
   sky.name = "TrackGradientSky";
   sky.renderOrder = -1000;
+
+  // Add low-poly glowing moon inside the sky sphere
+  if (theme.moonPosition) {
+    const moonGeo = new THREE.SphereGeometry(7.5, 8, 8);
+    const moonColor = theme.moonColor !== undefined ? theme.moonColor : 0xffffff;
+    const moonMat = new THREE.MeshBasicMaterial({
+      color: moonColor,
+      fog: false
+    });
+    const moon = new THREE.Mesh(moonGeo, moonMat);
+    const dir = new THREE.Vector3(...theme.moonPosition).normalize();
+    // Offset moon far away near the sky shell boundary
+    moon.position.copy(dir).multiplyScalar(240);
+    sky.add(moon);
+  }
 
   return sky;
 }
@@ -72,7 +102,7 @@ export function applyTrackSceneTheme(scene, trackInfo) {
   }
 
   if (theme.skyGradient) {
-    const sky = createGradientSky(theme.skyGradient);
+    const sky = createGradientSky(theme.skyGradient, theme);
     scene.userData.trackSky = sky;
     scene.add(sky);
   }

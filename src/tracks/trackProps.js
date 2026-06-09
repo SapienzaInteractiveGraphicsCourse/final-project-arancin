@@ -654,6 +654,7 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
     const panel = new THREE.Mesh(new THREE.BoxGeometry(3, 6, 0.3), panelMaterial);
     panel.position.set((index - 1) * 3.4, 7.5, 0.7);
     sign.add(panel);
+    
   }
 
   for (let index = 0; index < 6; index += 1) {

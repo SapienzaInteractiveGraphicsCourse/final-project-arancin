@@ -152,8 +152,8 @@ function addSegmentedNeonRoadEdges(group, edgeSamples, definition) {
   const segmentCount = Math.floor(totalDistance / NEON_EDGE_INTERVAL);
   const geometry = new THREE.BoxGeometry(NEON_EDGE_WIDTH, 0.035, NEON_EDGE_LENGTH);
   const materials = [
-    createNeonEdgeMaterial(0xff2090),
-    createNeonEdgeMaterial(0x00e5ff)
+    createNeonEdgeMaterial(0xffffff),
+    createNeonEdgeMaterial(0xff2020)
   ];
   const matrices = [[], []];
   const matrix = new THREE.Matrix4();
@@ -266,7 +266,7 @@ function getCurveSide(edgeSamples, index) {
 }
 
 function addApexCurbs(group, edgeSamples, definition, materials) {
-  if (definition.id !== "vegas") {
+  if (definition.id !== "monaco") {
     return;
   }
 
@@ -278,6 +278,11 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
   const whiteMatrices = [];
 
   for (let index = 3; index < edgeSamples.length - 3; index += CURB_SAMPLE_STEP) {
+    const progress = index / (edgeSamples.length - 1);
+    if (progress < 0.05 || progress > 0.95) {
+      continue;
+    }
+
     const curveSide = getCurveSide(edgeSamples, index);
 
     if (curveSide === 0) {
@@ -404,6 +409,43 @@ function addStartLine(group, checkpoint, materials) {
 
   group.add(startLine);
 
+  // Add starting grid slots/boxes behind the finish line
+  const tangent = checkpoint.tangent.clone().setY(0).normalize();
+  const normal = new THREE.Vector3(-tangent.z, 0, tangent.x);
+  const gridPositions = [
+    { dist: 4.8, side: 1 },
+    { dist: 8.8, side: -1 },
+    { dist: 12.8, side: 1 },
+    { dist: 16.8, side: -1 }
+  ];
+
+  gridPositions.forEach(({ dist, side }, idx) => {
+    const gridPos = checkpoint.position.clone()
+      .addScaledVector(tangent, -dist)
+      .addScaledVector(normal, side * (checkpoint.size.x * 0.22));
+    gridPos.y = ROAD_Y + 0.051;
+
+    const slotGroup = new THREE.Group();
+    slotGroup.name = `StartGridSlot:${idx}`;
+    slotGroup.position.copy(gridPos);
+    slotGroup.rotation.y = checkpoint.rotationY;
+
+    const bracketMaterial = materials.startWhite;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.08), bracketMaterial);
+    line.receiveShadow = true;
+    slotGroup.add(line);
+
+    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
+    sideLeft.position.set(-0.8, 0, 0.2);
+    sideLeft.receiveShadow = true;
+    const sideRight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
+    sideRight.position.set(0.8, 0, 0.2);
+    sideRight.receiveShadow = true;
+
+    slotGroup.add(sideLeft, sideRight);
+    group.add(slotGroup);
+  });
+
   const checkpointMarker = new THREE.Group();
   checkpointMarker.name = "StartFinishCheckpointGate";
   checkpointMarker.position.copy(checkpoint.position);
@@ -426,7 +468,7 @@ function addStartGantry(group, checkpoint, materials) {
   const postHeight = 4.2;
   const postGeometry = new THREE.CylinderGeometry(0.24, 0.32, postHeight, 8);
   const topGeometry = new THREE.BoxGeometry(span, 0.58, 0.48);
-  const signGeometry = new THREE.BoxGeometry(4.7, 1.28, 0.16);
+  const signGeometry = new THREE.BoxGeometry(4.7, 1.28, 0.08);
   const leftPost = new THREE.Mesh(postGeometry, materials.startGantry);
   const rightPost = new THREE.Mesh(postGeometry, materials.startGantry);
   const top = new THREE.Mesh(topGeometry, materials.startGantry);
@@ -435,7 +477,9 @@ function addStartGantry(group, checkpoint, materials) {
   leftPost.position.set(-span * 0.5, postHeight * 0.5, 0);
   rightPost.position.set(span * 0.5, postHeight * 0.5, 0);
   top.position.set(0, postHeight, 0);
-  sign.position.set(0, postHeight - 0.02, 0.32);
+  
+  // Shift sign to the grid-facing side (z = -0.28) and rotate by PI so it faces the player
+  sign.position.set(0, postHeight - 0.02, -0.28);
   sign.rotation.y = Math.PI;
 
   [leftPost, rightPost, top, sign].forEach((mesh) => {
@@ -444,6 +488,38 @@ function addStartGantry(group, checkpoint, materials) {
   });
 
   gantry.add(leftPost, rightPost, top, sign);
+
+  // Add dynamic F1 starting light lamps under the gantry crossbar facing the starting grid
+  const lightsGroup = new THREE.Group();
+  lightsGroup.name = "GantryStartLights";
+  lightsGroup.position.set(0, postHeight - 0.44, -0.25);
+
+  const lampGeom = new THREE.SphereGeometry(0.16, 12, 12);
+  const backboard = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.48, 0.08), materials.startGantry);
+  backboard.castShadow = true;
+  backboard.receiveShadow = true;
+  lightsGroup.add(backboard);
+
+  const lamps = [];
+  for (let i = 0; i < 3; i++) {
+    const lampMat = new THREE.MeshStandardMaterial({
+      color: 0x1f1f24,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
+      roughness: 0.22,
+      metalness: 0.1,
+      flatShading: true
+    });
+    const lamp = new THREE.Mesh(lampGeom, lampMat);
+    lamp.position.set((i - 1) * 0.46, 0, 0.05);
+    lamp.castShadow = true;
+    lamp.receiveShadow = true;
+    lightsGroup.add(lamp);
+    lamps.push(lampMat);
+  }
+  lightsGroup.userData.lamps = lamps;
+  gantry.add(lightsGroup);
+
   group.add(gantry);
 }
 
