@@ -22,7 +22,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
-- [ ] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen; AI e contromano da completare.
+- [x] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen, AI base e contromano.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
@@ -71,7 +71,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
 - [x] Verificare `bun run build`.
-O
+
 ## 2. Veicoli
 
 ### Interfaccia Comune
@@ -258,8 +258,8 @@ O
 ### Modalita
 
 - [x] Documentare `docs/race-systems.md`.
-- [ ] Supportare modalita `race`:
-  - [ ] gara contro AI;
+- [x] Supportare modalita `race`:
+  - [x] gara contro AI;
   - [x] giri multipli;
   - [x] checkpoint in ordine;
   - [x] classifica semplice player predisposta.
@@ -320,7 +320,7 @@ O
 - [x] AI frena prima delle curve.
 - [x] AI accelera in uscita.
 - [x] AI segue traiettoria con offset laterale.
-- [ ] AI competitiva ma battibile.
+- [ ] AI competitiva ma battibile in tuning finale dedicato.
 
 ### Contromano
 
@@ -349,17 +349,17 @@ O
 
 ## 8. HUD, UI E Minimap
 
-- [ ] Menu selezione pista.
-- [ ] Menu selezione veicolo.
-- [ ] Selezione colore veicolo.
-- [ ] Pulsante start.
+- [x] Menu selezione pista (attualmente minimale, da migliorare).
+- [x] Menu selezione veicolo (attualmente minimale, da migliorare).
+- [ ] Selezione colore veicolo (attualmente minimale, da migliorare, da capire se esiste la fuznione).
+- [x] Pulsante start (attualmente minimale, da migliorare).
 - [ ] HUD speed.
-- [ ] HUD lap.
-- [ ] HUD time.
-- [ ] HUD checkpoint.
+- [x] HUD lap (attualmente minimale, da migliorare).
+- [x] HUD time (attualmente minimale, da migliorare).
+- [x] HUD checkpoint (attualmente minimale, da migliorare).
 - [ ] HUD surface.
-- [ ] HUD status/wrong way.
-- [ ] HUD posizione/gap.
+- [x] HUD status/wrong way (attualmente minimale, da migliorare).
+- [x] HUD posizione/gap (attualmente minimale, da migliorare).
 - [ ] Minimap canvas.
 - [ ] Disegnare centerline su minimap.
 - [ ] Marker player.

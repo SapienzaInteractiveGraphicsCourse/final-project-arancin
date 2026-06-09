@@ -28,8 +28,8 @@ Dipendenze:
 
 - [x] `trackInfo.checkpoints`;
 - [x] `trackInfo.centerline`;
-- [ ] veicolo AI creato con lo stesso `vehicleId` del player;
-- [ ] performance AI coerenti con il veicolo scelto.
+- [x] veicolo AI creato con lo stesso `vehicleId` del player;
+- [x] performance AI coerenti con il veicolo scelto.
 
 ### Time Trial
 
@@ -56,7 +56,7 @@ Dipendenze:
 
 ## Fuori Scope Iniziale
 
-- AI completa;
+- tuning avanzato AI;
 - collisione player-bot;
 - record persistenti complessi;
 - ghost lap;
