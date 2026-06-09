@@ -562,6 +562,42 @@ const vehicle = createVehicleById(setup.vehicleId);
 
 Non creare direttamente piste o veicoli dentro la preview, salvo placeholder temporanei dentro le factory.
 
+## Camera Controller
+
+File previsto: `src/systems/CameraController.js`
+
+Firma prevista:
+
+```js
+const cameraController = new CameraController(camera, options)
+```
+
+Contratto previsto:
+
+```js
+cameraController.update(deltaTime, vehicleState, trackInfo, context)
+cameraController.nextMode()
+cameraController.setMode(mode)
+cameraController.applyShake(intensity)
+cameraController.resize(width, height)
+cameraController.getState()
+cameraController.dispose()
+```
+
+Modalita previste:
+
+```js
+"follow" | "top" | "hood" | "orbit"
+```
+
+Regole:
+
+- gestisce posizione e lookAt della camera;
+- non deve conoscere DOM, HUD, RaceManager o classi veicolo;
+- usa `vehicleState.position` e `vehicleState.heading` come input principale;
+- la scena resta responsabile di chiamare `update()`, `nextMode()` e `resize()`;
+- camera shake e solo feedback visivo e non deve influenzare fisica/input.
+
 ## Branch Responsibilities
 
 - `feature/procedural-kart`: evolve `src/vehicles/vehicleFactory.js` e aggiunge classi veicolo.
