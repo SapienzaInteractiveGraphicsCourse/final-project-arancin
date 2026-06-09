@@ -16,6 +16,9 @@ const BOOST_FACTOR = 1.75;
 const BOOST_SPEED_LIMIT_MULTIPLIER = 1.18;
 const BOOST_DURATION_SECONDS = 0.75;
 const BOOST_COOLDOWN_SECONDS = 1.1;
+const PLAYER_COLLISION_RADIUS = 0.9;
+const BARRIER_CORRECTION_PADDING = 0.04;
+const BARRIER_IMPACT_SPEED_MULTIPLIER = 0.35;
 
 export class TrackInteractionSystem {
   constructor() {
@@ -33,12 +36,17 @@ export class TrackInteractionSystem {
   update(playerState = {}, trackInfo = {}, options = {}) {
     const deltaTime = Math.max(0, Number(options.deltaTime) || 0);
     const surfaceState = getSurfaceState(playerState, trackInfo);
-    const boostState = this.updateBoostState(deltaTime, playerState, trackInfo, options);
+    const barrierState = getBarrierState(playerState, trackInfo);
+    const boostState = this.updateBoostState(deltaTime, playerState, trackInfo, {
+      ...options,
+      collided: Boolean(options.collided || barrierState.collided)
+    });
 
     this.lastState = normalizeEnvironmentState({
       ...DEFAULT_ENVIRONMENT_STATE,
       ...surfaceState,
       ...boostState,
+      ...barrierState,
       ...options.environmentState
     });
 
@@ -194,6 +202,71 @@ function isInsideBoostPad(playerState, trackInfo) {
 
     return distance <= radius;
   });
+}
+
+function getBarrierState(playerState, trackInfo) {
+  const barrierColliders = Array.isArray(trackInfo.barrierColliders) ? trackInfo.barrierColliders : [];
+
+  if (!playerState.position || barrierColliders.length === 0) {
+    return {};
+  }
+
+  const correction = barrierColliders.reduce((totalCorrection, collider) => {
+    const colliderCorrection = getBarrierCorrection(playerState.position, collider);
+
+    if (!colliderCorrection) {
+      return totalCorrection;
+    }
+
+    totalCorrection.x += colliderCorrection.x;
+    totalCorrection.z += colliderCorrection.z;
+    return totalCorrection;
+  }, { x: 0, z: 0 });
+
+  if (Math.abs(correction.x) < 0.000001 && Math.abs(correction.z) < 0.000001) {
+    return {};
+  }
+
+  return {
+    collided: true,
+    correction,
+    impact: {
+      type: "barrier",
+      speedMultiplier: BARRIER_IMPACT_SPEED_MULTIPLIER
+    }
+  };
+}
+
+function getBarrierCorrection(position, collider) {
+  if (!collider?.center) {
+    return null;
+  }
+
+  const rotationY = Number(collider.rotationY) || 0;
+  const cos = Math.cos(rotationY);
+  const sin = Math.sin(rotationY);
+  const deltaX = position.x - collider.center.x;
+  const deltaZ = position.z - collider.center.z;
+  const localX = deltaX * cos - deltaZ * sin;
+  const localZ = deltaX * sin + deltaZ * cos;
+  const expandedHalfLength = normalizePositiveNumber(collider.halfLength, 0) + PLAYER_COLLISION_RADIUS;
+  const expandedHalfThickness = normalizePositiveNumber(collider.halfThickness, 0) + PLAYER_COLLISION_RADIUS;
+  const penetrationX = expandedHalfLength - Math.abs(localX);
+  const penetrationZ = expandedHalfThickness - Math.abs(localZ);
+
+  if (penetrationX <= 0 || penetrationZ <= 0) {
+    return null;
+  }
+
+  const useLengthAxis = penetrationX < penetrationZ;
+  const localNormalX = useLengthAxis ? Math.sign(localX || 1) : 0;
+  const localNormalZ = useLengthAxis ? 0 : Math.sign(localZ || 1);
+  const correctionDistance = (useLengthAxis ? penetrationX : penetrationZ) + BARRIER_CORRECTION_PADDING;
+
+  return {
+    x: (localNormalX * cos + localNormalZ * sin) * correctionDistance,
+    z: (-localNormalX * sin + localNormalZ * cos) * correctionDistance
+  };
 }
 
 function normalizePositiveNumber(value, fallback) {

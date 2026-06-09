@@ -262,16 +262,16 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Rilevamento boost pad.
 - [x] Applicare `boostFactor`.
 - [x] Cooldown breve boost.
-- [ ] Annullare boost su impatto importante.
+- [x] Annullare boost su impatto importante.
 
 ### Barriere
 
-- [ ] Collisione player-barriere.
-- [ ] Test punto/veicolo contro collider oriented box 2D.
-- [ ] Applicare correzione fisica ogni frame di intersezione.
+- [x] Collisione player-barriere.
+- [x] Test punto/veicolo contro collider oriented box 2D.
+- [x] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
-- [ ] Spingere fuori dalla barriera lungo la normale.
-- [ ] Ridurre/invertire velocita su impatto frontale.
+- [x] Spingere fuori dalla barriera lungo la normale.
+- [x] Ridurre/invertire velocita su impatto frontale.
 
 ### Player Vs AI
 

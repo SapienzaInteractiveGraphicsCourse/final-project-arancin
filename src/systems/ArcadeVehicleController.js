@@ -95,6 +95,11 @@ export class ArcadeVehicleController {
       : baseFriction;
     this.speed *= Math.exp(-friction * deltaTime);
     this.speed = clamp(this.speed, -maxReverseSpeed, maxForwardSpeed);
+
+    if (environmentState.impact?.speedMultiplier) {
+      this.speed *= clamp(environmentState.impact.speedMultiplier, 0, 1);
+    }
+
     this.speedRatio = getSpeedRatio(this.speed, this.performance.maxForwardSpeed);
 
     const reverseFactor = this.speed < 0 ? -1 : 1;
@@ -110,6 +115,12 @@ export class ArcadeVehicleController {
     const distance = this.speed * deltaTime;
     this.position.x += Math.sin(this.heading) * distance;
     this.position.z += Math.cos(this.heading) * distance;
+
+    if (environmentState.correction) {
+      this.position.x += Number(environmentState.correction.x) || 0;
+      this.position.z += Number(environmentState.correction.z) || 0;
+    }
+
     this.distanceThisFrame = Math.abs(distance);
 
     return this.getState();

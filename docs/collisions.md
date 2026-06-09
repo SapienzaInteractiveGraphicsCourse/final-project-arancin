@@ -160,7 +160,7 @@ detect off road surface
 - [x] Controllare distanza player-boost pad.
 - [x] Applicare `boostFactor` solo quando il player entra nel raggio.
 - [x] Aggiungere cooldown breve per evitare boost continuo troppo forte.
-- [ ] Annullare boost se il frame segnala impatto importante.
+- [x] Annullare boost se il frame segnala impatto importante.
 - [x] Verificare Beach e Monaco, dove i boost pad sono presenti.
 
 Commit suggerito:
@@ -171,12 +171,12 @@ apply track boost pads
 
 ## Milestone 4: Barriere
 
-- [ ] Implementare test punto vs oriented box 2D nel piano XZ.
-- [ ] Calcolare normale di espulsione dalla barriera.
-- [ ] Applicare correzione posizione ogni frame di intersezione.
-- [ ] Segnalare `collided`.
-- [ ] Ridurre velocita quando l'impatto e frontale o laterale forte.
-- [ ] Evitare cooldown sulla risposta fisica.
+- [x] Implementare test punto vs oriented box 2D nel piano XZ.
+- [x] Calcolare normale di espulsione dalla barriera.
+- [x] Applicare correzione posizione ogni frame di intersezione.
+- [x] Segnalare `collided`.
+- [x] Ridurre velocita quando l'impatto e frontale o laterale forte.
+- [x] Evitare cooldown sulla risposta fisica.
 - [ ] Usare cooldown solo per eventuali feedback futuri.
 
 Commit suggerito:
