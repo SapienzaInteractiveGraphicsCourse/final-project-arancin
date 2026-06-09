@@ -720,6 +720,193 @@ function createVegasCanvasTexture(width, height, title, subtitle, themeColorHex,
   return texture;
 }
 
+let cachedWelcomeTexture = null;
+function getCachedWelcomeToVegasTexture() {
+  if (!cachedWelcomeTexture) {
+    cachedWelcomeTexture = createWelcomeToVegasTexture();
+  }
+  return cachedWelcomeTexture;
+}
+
+function createWelcomeToVegasTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  // Clear transparent
+  ctx.clearRect(0, 0, 512, 512);
+
+  // 1. Draw the blue posts (two vertical thick lines)
+  ctx.fillStyle = "#1e73be";
+  ctx.fillRect(180, 200, 30, 312);
+  ctx.fillRect(302, 200, 30, 312);
+
+  // 2. Draw the blue horizontal cross bar
+  ctx.fillRect(160, 150, 192, 25);
+
+  // 3. Draw the red 8-pointed star at the top (center 256, y 95)
+  const starX = 256;
+  const starY = 95;
+  ctx.save();
+  ctx.translate(starX, starY);
+
+  // Gold spikes (8 points)
+  ctx.fillStyle = "#f5d45a";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    ctx.lineTo(Math.cos(angle) * 35, Math.sin(angle) * 35);
+    ctx.lineTo(Math.cos(angle + Math.PI / 8) * 12, Math.sin(angle + Math.PI / 8) * 12);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Red inner star
+  ctx.fillStyle = "#d12a2a";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    ctx.lineTo(Math.cos(angle) * 28, Math.sin(angle) * 28);
+    ctx.lineTo(Math.cos(angle + Math.PI / 8) * 8, Math.sin(angle + Math.PI / 8) * 8);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // 4. Draw the main Diamond body
+  // Center of diamond is (256, 270), width is 380, height is 230
+  const dX = 256;
+  const dY = 270;
+  const dW = 190;
+  const dH = 115;
+
+  // Outer gold neon border
+  ctx.shadowColor = "#f5d45a";
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = "#f5d45a";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH - 12);
+  ctx.lineTo(dX + dW + 12, dY);
+  ctx.lineTo(dX, dY + dH + 12);
+  ctx.lineTo(dX - dW - 12, dY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Red neon frame inside
+  ctx.fillStyle = "#d12a2a";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH - 4);
+  ctx.lineTo(dX + dW + 4, dY);
+  ctx.lineTo(dX, dY + dH + 4);
+  ctx.lineTo(dX - dW - 4, dY);
+  ctx.closePath();
+  ctx.fill();
+
+  // White/cream center
+  ctx.fillStyle = "#fcfaf0";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH);
+  ctx.lineTo(dX + dW, dY);
+  ctx.lineTo(dX, dY + dH);
+  ctx.lineTo(dX - dW, dY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Little yellow bulb dots around the border
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#f5d45a";
+  ctx.lineWidth = 1.5;
+  const borderPoints = 28;
+  for (let i = 0; i < borderPoints; i++) {
+    const alpha = i / borderPoints;
+    let x, y;
+    if (alpha < 0.25) {
+      const t = alpha / 0.25;
+      x = dX + t * dW;
+      y = (dY - dH) + t * dH;
+    } else if (alpha < 0.5) {
+      const t = (alpha - 0.25) / 0.25;
+      x = (dX + dW) - t * dW;
+      y = dY + t * dH;
+    } else if (alpha < 0.75) {
+      const t = (alpha - 0.5) / 0.25;
+      x = dX - t * dW;
+      y = (dY + dH) - t * dH;
+    } else {
+      const t = (alpha - 0.75) / 0.25;
+      x = (dX - dW) + t * dW;
+      y = dY - t * dH;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 5. Draw "WELCOME" circles & letters
+  const welcomeY = dY - 60;
+  const welcomeXStart = dX - 110;
+  const welcomeXStep = 36;
+  const letters = ["W", "E", "L", "C", "O", "M", "E"];
+
+  letters.forEach((char, i) => {
+    const cx = welcomeXStart + i * welcomeXStep;
+    const cy = welcomeY;
+
+    // Circle border
+    ctx.strokeStyle = "#f5d45a";
+    ctx.lineWidth = 2.5;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Circle inner border
+    ctx.strokeStyle = "#3a4a9f";
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Letter
+    ctx.fillStyle = "#d12a2a";
+    ctx.font = "bold 19px 'Arial Black', Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(char, cx, cy + 1);
+  });
+
+  // 6. Draw "TO Fabulous" text
+  ctx.fillStyle = "#1e73be";
+  ctx.font = "italic bold 17px 'Georgia', serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TO Fabulous", dX, dY - 15);
+
+  // 7. Draw "LAS VEGAS" text
+  ctx.fillStyle = "#d12a2a";
+  ctx.font = "bold 38px 'Arial Black', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.shadowColor = "#f5d45a";
+  ctx.shadowBlur = 6;
+  ctx.fillText("LAS VEGAS", dX, dY + 32);
+  ctx.shadowBlur = 0;
+
+  // 8. Draw "NEVADA" text
+  ctx.fillStyle = "#1e73be";
+  ctx.font = "bold 16px 'Arial Black', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("NEVADA", dX, dY + 70);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function createVegasVerticalCanvasTexture(width, height, text, themeColorHex) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -1079,7 +1266,7 @@ function isNearGrandstand(progress, side, threshold = 0.05) {
 
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.01, 0.28, 0.45, 0.59, 0.74, 0.87];
+  const progressPoints = [0.08, 0.28, 0.45, 0.59, 0.74, 0.87];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -2452,50 +2639,291 @@ function buildBellagio(group, curve, roadHalfWidth) {
 function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
-  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 40, roadHalfWidth, 25);
+  
+  // Place it a bit further down the road (progress = 0.045) so it is clearly visible from the starting grid
+  // Angled 35 degrees towards the starting grid so the player sees it oncoming at spawn/start
+  const transform = getRoadsideTransform(curve, 0.045, -1, roadHalfWidth + 10.5, roadHalfWidth, 8);
   signGroup.position.copy(transform.position);
-  signGroup.rotation.y = transform.rotationY;
+  signGroup.rotation.y = transform.rotationY + Math.PI * 0.18; 
 
-  const goldMaterial = createVegasMaterial({
-    color: 0xd4af37,
-    emissive: 0xffd700,
-    emissiveIntensity: 0.8,
-    roughness: 0.3,
-    metalness: 0.12
-  });
-  const frameMaterial = createVegasMaterial({
-    color: 0xff2090,
-    emissive: 0xff2090,
-    emissiveIntensity: 1,
-    roughness: 0.18
-  });
-  const poleMaterial = createVegasMaterial({ color: 0xa9a9b4, roughness: 0.42, metalness: 0.28 });
-
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), goldMaterial);
-  panel.position.set(0, 12, 0.04);
-  panel.rotation.z = Math.PI / 4;
-  signGroup.add(panel);
-
-  const frameParts = [
-    [0, 16.95, 10, Math.PI / 4],
-    [0, 7.05, 10, Math.PI / 4],
-    [-4.95, 12, 10, -Math.PI / 4],
-    [4.95, 12, 10, -Math.PI / 4]
-  ];
-  frameParts.forEach(([x, y, length, rotationZ]) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(length, 0.28, 0.28), frameMaterial);
-    frame.position.set(x, y, 0.1);
-    frame.rotation.z = rotationZ;
-    signGroup.add(frame);
+  const welcomeTex = getCachedWelcomeToVegasTexture();
+  const welcomeMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: welcomeTex,
+    emissive: 0xffffff,
+    emissiveMap: welcomeTex,
+    emissiveIntensity: 1.5,
+    transparent: true,
+    alphaTest: 0.15,
+    side: THREE.DoubleSide,
+    roughness: 0.25,
+    metalness: 0.08
   });
 
-  [-3.2, 3.2].forEach((x) => {
-    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 5), poleMaterial));
-    pole.position.set(x, 3, -0.05);
-    signGroup.add(pole);
-  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), welcomeMat);
+  plane.position.y = 8; // rests perfectly on the ground
+  signGroup.add(plane);
+
+  // Spotlight to illuminate the sign at night
+  const light = new THREE.PointLight(0xffffff, 8, 15, 1.5);
+  light.position.set(0, 8, 3.5);
+  signGroup.add(light);
 
   group.add(signGroup);
+}
+
+function buildEiffelTower(group, curve, roadHalfWidth) {
+  const tower = new THREE.Group();
+  tower.name = "VegasSkyline:EiffelTower";
+
+  // Position it at progress 0.11, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.11, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  tower.position.copy(transform.position);
+  tower.rotation.y = transform.rotationY;
+
+  const metalMaterial = createVegasMaterial({
+    color: 0x1f1d24,
+    roughness: 0.6,
+    metalness: 0.4
+  });
+
+  const goldNeonMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffb800,
+    emissive: 0xffb800,
+    emissiveIntensity: 1.5,
+    roughness: 0.2
+  });
+
+  // Base legs
+  const legGeo = new THREE.CylinderGeometry(0.8, 1.6, 20, 5);
+  const angles = [Math.PI/4, 3*Math.PI/4, -Math.PI/4, -3*Math.PI/4];
+  const legSpacing = 12;
+
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(legGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * legSpacing, 10, Math.sin(angle) * legSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.25;
+    leg.rotation.x = Math.sin(angle) * 0.25;
+    tower.add(leg);
+
+    // Glowing neon strips along the legs
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 20.2, 0.3), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.8;
+    neonStrip.position.z += Math.sin(angle) * 0.8;
+    tower.add(neonStrip);
+  });
+
+  // Platform 1
+  const plat1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(20, 2.5, 20), metalMaterial));
+  plat1.position.y = 20;
+  tower.add(plat1);
+
+  // Platform 1 neon border
+  const plat1Neon = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.6, 20.4), goldNeonMaterial);
+  plat1Neon.position.y = 20;
+  tower.add(plat1Neon);
+
+  // Decorative arches under platform 1
+  const archMat = new THREE.MeshStandardMaterial({
+    color: 0xff4400,
+    emissive: 0xff4400,
+    emissiveIntensity: 0.8
+  });
+  for (let i = 0; i < 4; i++) {
+    const rot = (i * Math.PI) / 2;
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.4, 6, 16, Math.PI), archMat);
+    arch.position.set(0, 18.8, 0);
+    arch.rotation.y = rot;
+    arch.position.x += Math.cos(rot) * (legSpacing - 2);
+    arch.position.z += Math.sin(rot) * (legSpacing - 2);
+    arch.rotation.z = Math.PI;
+    tower.add(arch);
+  }
+
+  // Mid legs
+  const midLegGeo = new THREE.CylinderGeometry(0.5, 0.8, 18, 5);
+  const midLegSpacing = 7;
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(midLegGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * midLegSpacing, 29, Math.sin(angle) * midLegSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.16;
+    leg.rotation.x = Math.sin(angle) * 0.16;
+    tower.add(leg);
+
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 18.2, 0.2), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.5;
+    neonStrip.position.z += Math.sin(angle) * 0.5;
+    tower.add(neonStrip);
+  });
+
+  // Platform 2
+  const plat2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(11, 1.8, 11), metalMaterial));
+  plat2.position.y = 38;
+  tower.add(plat2);
+
+  const plat2Neon = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.4, 11.4), goldNeonMaterial);
+  plat2Neon.position.y = 38;
+  tower.add(plat2Neon);
+
+  // Spire / Top section
+  const spireGeo = new THREE.CylinderGeometry(0.1, 0.5, 27, 4);
+  const spire = markShadow(new THREE.Mesh(spireGeo, metalMaterial));
+  spire.position.set(0, 51.5, 0);
+  tower.add(spire);
+
+  const spireNeon = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.55, 27.2, 4), goldNeonMaterial);
+  spireNeon.position.set(0, 51.5, 0);
+  tower.add(spireNeon);
+
+  // Top Beacon Light
+  const beaconMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 3.0
+  });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), beaconMat);
+  beacon.position.set(0, 65.5, 0);
+  tower.add(beacon);
+
+  const beaconLight = new THREE.PointLight(0xffffff, 25, 45, 1.2);
+  beaconLight.position.set(0, 65.5, 0);
+  tower.add(beaconLight);
+
+  group.add(tower);
+}
+
+function buildFerrisWheel(group, curve, roadHalfWidth) {
+  const ferrisGroup = new THREE.Group();
+  ferrisGroup.name = "VegasSkyline:FerrisWheel";
+
+  // Position at progress 0.13, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.13, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  ferrisGroup.position.copy(transform.position);
+  // Orient it so the wheel is parallel to the road
+  ferrisGroup.rotation.y = transform.rotationY + Math.PI / 2;
+
+  const metalMaterial = createVegasMaterial({ color: 0x222026, roughness: 0.7, metalness: 0.3 });
+  
+  const neonCyan = new THREE.MeshStandardMaterial({
+    color: 0x00e5ff,
+    emissive: 0x00e5ff,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  const neonMagenta = new THREE.MeshStandardMaterial({
+    color: 0xff2090,
+    emissive: 0xff2090,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  // Supports (A-frame structure)
+  [-1.5, 1.5].forEach((zOffset) => {
+    const legLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legLeft.position.set(-6, 14, zOffset);
+    legLeft.rotation.z = -0.2;
+    ferrisGroup.add(legLeft);
+
+    const legRight = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legRight.position.set(6, 14, zOffset);
+    legRight.rotation.z = 0.2;
+    ferrisGroup.add(legRight);
+  });
+
+  const axle = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.2, 8), metalMaterial));
+  axle.position.set(0, 28, 0);
+  axle.rotation.x = Math.PI / 2;
+  ferrisGroup.add(axle);
+
+  // Rotating part group (this is what spins)
+  const rotatingPart = new THREE.Group();
+  rotatingPart.name = "FerrisWheelRotatingPart";
+  rotatingPart.position.set(0, 28, 0);
+  
+  // Set the rotation spin! (slowly rotates around Z-axis)
+  const spinSpeed = 0.08;
+  rotatingPart.userData.spin = { x: 0, y: 0, z: spinSpeed };
+
+  // Double outer rings
+  const ringRadius = 18;
+  [-0.9, 0.9].forEach((zOffset, ringIndex) => {
+    const ringMat = ringIndex === 0 ? neonCyan : neonMagenta;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.35, 8, 36), ringMat);
+    ring.position.set(0, 0, zOffset);
+    rotatingPart.add(ring);
+  });
+
+  // Spokes connecting hub to outer rings
+  const spokeMat = createVegasMaterial({
+    color: 0x0088ff,
+    emissive: 0x0088ff,
+    emissiveIntensity: 0.8,
+    roughness: 0.3
+  });
+  const spokeCount = 12;
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    [-0.9, 0.9].forEach((zOffset) => {
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, ringRadius, 4), spokeMat);
+      spoke.position.set(Math.cos(angle) * (ringRadius * 0.5), Math.sin(angle) * (ringRadius * 0.5), zOffset);
+      spoke.rotation.z = angle + Math.PI / 2;
+      rotatingPart.add(spoke);
+    });
+  }
+
+  // Cabins hanging off the outer edge
+  const cabinColors = [0xffe600, 0xff2090, 0x39ff14, 0x00e5ff, 0xff8800];
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    const cabinColor = cabinColors[i % cabinColors.length];
+
+    const cabinGroup = new THREE.Group();
+    cabinGroup.name = `FerrisCabin:${i}`;
+    cabinGroup.position.set(Math.cos(angle) * ringRadius, Math.sin(angle) * ringRadius, 0);
+
+    // Apply counter-spin to keep cabin upright!
+    cabinGroup.userData.spin = { x: 0, y: 0, z: -spinSpeed };
+
+    // Support hanger
+    const hanger = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 1.8, 4),
+      metalMaterial
+    );
+    hanger.position.set(0, 0.9, 0);
+    cabinGroup.add(hanger);
+
+    // Main cabin box
+    const cabinMat = new THREE.MeshStandardMaterial({
+      color: cabinColor,
+      emissive: cabinColor,
+      emissiveIntensity: 1.4,
+      roughness: 0.2
+    });
+    const cabinBox = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.4), cabinMat));
+    cabinBox.position.set(0, 0, 0);
+    cabinGroup.add(cabinBox);
+
+    // Light inside/under the cabin
+    const cabinLight = new THREE.PointLight(cabinColor, 3, 5, 2.0);
+    cabinLight.position.set(0, -0.6, 0);
+    cabinGroup.add(cabinLight);
+
+    rotatingPart.add(cabinGroup);
+  }
+
+  ferrisGroup.add(rotatingPart);
+
+  // Center hub light
+  const hubLight = new THREE.PointLight(0x00ffcc, 15, 25, 1.5);
+  hubLight.position.set(0, 28, 0);
+  ferrisGroup.add(hubLight);
+
+  group.add(ferrisGroup);
 }
 
 function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
@@ -2552,6 +2980,8 @@ function buildVegasSkyline(group, curve, roadHalfWidth) {
   buildMgmGrand(group, curve, roadHalfWidth);
   buildBellagio(group, curve, roadHalfWidth);
   buildBackgroundVegasTowers(group, curve, roadHalfWidth);
+  buildEiffelTower(group, curve, roadHalfWidth);
+  buildFerrisWheel(group, curve, roadHalfWidth);
 }
 
 function disableDecorativeCastShadows(group) {
