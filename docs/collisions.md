@@ -127,12 +127,12 @@ Output previsto:
 
 ## Milestone 1: Sistema Base
 
-- [ ] Creare `TrackInteractionSystem`.
-- [ ] Gestire default robusti se `trackInfo` e incompleto.
-- [ ] Restituire asphalt/no collision quando mancano dati pista.
-- [ ] Collegare la scena sostituendo l'`environmentState` hardcoded.
-- [ ] Aggiornare `docs/contracts.md`.
-- [ ] Eseguire `bun run build`.
+- [x] Creare `TrackInteractionSystem`.
+- [x] Gestire default robusti se `trackInfo` e incompleto.
+- [x] Restituire asphalt/no collision quando mancano dati pista.
+- [x] Collegare la scena sostituendo l'`environmentState` hardcoded.
+- [x] Aggiornare `docs/contracts.md`.
+- [x] Eseguire `bun run build`.
 
 Commit suggerito:
 

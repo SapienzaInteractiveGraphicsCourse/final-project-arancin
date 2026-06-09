@@ -339,15 +339,15 @@ Regole:
 
 ## Track Interaction System
 
-File previsto: `src/systems/TrackInteractionSystem.js`
+File: `src/systems/TrackInteractionSystem.js`
 
-Firma prevista:
+Firma:
 
 ```js
 const trackInteraction = new TrackInteractionSystem();
 ```
 
-Contratto previsto:
+Contratto:
 
 ```js
 trackInteraction.update(playerState, trackInfo, options) -> EnvironmentState

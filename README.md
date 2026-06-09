@@ -245,10 +245,10 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ### Track Interaction System
 
-- [ ] Creare `TrackInteractionSystem`.
-- [ ] Sostituire `environmentState` hardcoded nella scena.
-- [ ] Gestire default robusti se la pista non espone dati completi.
-- [ ] Aggiornare `docs/contracts.md`.
+- [x] Creare `TrackInteractionSystem`.
+- [x] Sostituire `environmentState` hardcoded nella scena.
+- [x] Gestire default robusti se la pista non espone dati completi.
+- [x] Aggiornare `docs/contracts.md`.
 
 ### Off-road
 
