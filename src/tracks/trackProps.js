@@ -3245,51 +3245,99 @@ function addBeachGround(group) {
   group.add(ground);
 }
 
-function addBeachOceanPlane(group) {
-  // Oceano principale — lato est (positivo Z / positivo X = destra del tracciato)
-  const material = createBeachMaterial({
-    color: 0x0b93cc,
-    emissive: 0x006a9a,
-    emissiveIntensity: 0.22,
-    roughness: 0.38
-  });
-  const ocean = new THREE.Mesh(new THREE.PlaneGeometry(600, 1100), material);
-  ocean.name = "TropicalBeachPropsOcean";
-  ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(250, -0.08, 0);
-  ocean.receiveShadow = true;
-  group.add(ocean);
+function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth, segmentsAlong = 40, subdivisionsAcross = 10) {
+  const vertices = [];
+  const indices = [];
 
-  // Acque basse (color turchese chiaro)
-  const shallowMaterial = createBeachMaterial({
-    color: 0x30cfe0,
-    emissive: 0x10a8c0,
-    emissiveIntensity: 0.14,
-    roughness: 0.44
-  });
-  const shallow = new THREE.Mesh(new THREE.PlaneGeometry(70, 1100), shallowMaterial);
-  shallow.name = "TropicalBeachShallowWater";
-  shallow.rotation.x = -Math.PI / 2;
-  shallow.position.set(126, -0.075, 0);
-  group.add(shallow);
+  for (let i = 0; i <= segmentsAlong; i++) {
+    const t = t1 + (t2 - t1) * (i / segmentsAlong);
+    const frame = getRoadFrame(curve, t % 1);
+    
+    for (let j = 0; j <= subdivisionsAcross; j++) {
+      const u = j / subdivisionsAcross;
+      const dist = (roadHalfWidth + 18) + u * oceanWidth;
+      const point = frame.point.clone().addScaledVector(frame.right, side * dist);
+      point.y = -0.2;
+      vertices.push(point.x, point.y, point.z);
+    }
+  }
 
-  // Banda di schiuma/riva
-  const surfMaterial = createBeachMaterial({
-    color: 0xf0f5e8,
-    roughness: 0.50
-  });
-  const surf = new THREE.Mesh(new THREE.PlaneGeometry(22, 1100), surfMaterial);
-  surf.name = "TropicalBeachSurfBand";
-  surf.rotation.x = -Math.PI / 2;
-  surf.position.set(86, -0.073, 0);
-  group.add(surf);
+  for (let i = 0; i < segmentsAlong; i++) {
+    for (let j = 0; j < subdivisionsAcross; j++) {
+      const p0 = i * (subdivisionsAcross + 1) + j;
+      const p1 = p0 + 1;
+      const p2 = (i + 1) * (subdivisionsAcross + 1) + j;
+      const p3 = p2 + 1;
 
-  // Secondo specchio d'acqua dal lato opposto (sinistra / tornante)
-  const ocean2 = new THREE.Mesh(new THREE.PlaneGeometry(500, 800), material);
-  ocean2.name = "TropicalBeachPropsOcean2";
-  ocean2.rotation.x = -Math.PI / 2;
-  ocean2.position.set(-250, -0.08, 0);
-  group.add(ocean2);
+      indices.push(p0, p2, p1);
+      indices.push(p1, p2, p3);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addLowPolySeaSegment(group, curve, t1, t2, side, roadHalfWidth, oceanWidth) {
+  const geometry = createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth);
+  
+  const initialY = [];
+  const positions = geometry.attributes.position.array;
+  for (let i = 0; i < positions.length; i += 3) {
+    initialY.push(positions[i + 1]);
+  }
+  geometry.userData = { initialY };
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x0088cc,
+    emissive: 0x003355,
+    emissiveIntensity: 0.5,
+    roughness: 0.15,
+    metalness: 0.1,
+    flatShading: true,
+    side: THREE.DoubleSide
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = `LowPolySeaSegment_${t1.toFixed(2)}_${t2.toFixed(2)}`;
+  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+
+  mesh.onBeforeRender = function(renderer, scene, camera, geom, mat, grp) {
+    const time = performance.now() * 0.001;
+    const posAttr = geom.attributes.position;
+    const posArray = posAttr.array;
+    const initY = geom.userData.initialY;
+
+    for (let i = 0; i < posArray.length; i += 3) {
+      const x = posArray[i];
+      const z = posArray[i + 2];
+      
+      const wave = Math.sin(x * 0.08 + time * 1.3) * Math.cos(z * 0.08 + time * 1.3) * 0.5
+                 + Math.sin(x * 0.03 - time * 0.8) * 0.25;
+      
+      posArray[i + 1] = initY[i / 3] + wave;
+    }
+    
+    posAttr.needsUpdate = true;
+    geom.computeVertexNormals();
+  };
+
+  group.add(mesh);
+}
+
+function addBeachOceanPlane(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth * 0.5;
+  const oceanWidth = 250;
+
+  // Segment 1: t = 0.10 to 0.30
+  addLowPolySeaSegment(group, curve, 0.10, 0.30, -1, roadHalfWidth, oceanWidth);
+
+  // Segment 2: t = 0.55 to 0.75
+  addLowPolySeaSegment(group, curve, 0.55, 0.75, -1, roadHalfWidth, oceanWidth);
 }
 
 function addBeachEdgeStrips(group, curve, trackDef) {
@@ -3485,7 +3533,12 @@ function addBeachTropicalPlants(group, curve, trackDef) {
   for (let index = 0; index < 20; index += 1) {
     const side = index % 2 === 0 ? 1 : -1;
     const progress = (index + 0.3) / 20;
-    const offset = side * (roadHalfWidth + 14 + (index % 4) * 5.5);
+    
+    let offsetVal = roadHalfWidth + 14 + (index % 4) * 5.5;
+    if (side === -1 && ((progress >= 0.10 && progress <= 0.30) || (progress >= 0.55 && progress <= 0.75))) {
+      offsetVal = roadHalfWidth + 10 + (index % 3) * 3; // Stay on the dry sand shore (max offset 16)
+    }
+    const offset = side * offsetVal;
     const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 12);
     const useBush = index % 5 === 0;
     const plant = useBush ? createTropicalBush(index) : createTropicalPalm(index);
@@ -3552,7 +3605,7 @@ function addBeachHutsStrict(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
   [0.20, 0.55, 0.80].forEach((progress, index) => {
-    const side = index % 2 === 0 ? 1 : -1;
+    const side = 1; // Always place huts on the right (land) side to keep ocean side clean
     const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 18), roadHalfWidth, 12);
     const hut = createBeachHutStrict();
     hut.position.copy(position);
@@ -3603,6 +3656,11 @@ function addBeachLampPostsStrict(group, curve, trackDef) {
   for (let index = 0; index < 16; index += 1) {
     const side = index % 2 === 0 ? 1 : -1;
     const progress = (index + 0.25) / 16;
+    
+    if (side === -1 && ((progress >= 0.10 && progress <= 0.30) || (progress >= 0.55 && progress <= 0.75))) {
+      continue; // Skip lamp posts on the left (ocean) side during coastal sections
+    }
+    
     const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 12);
     const lamp = new THREE.Group();
     lamp.name = "TropicalBeachLampPostStrict";
@@ -3677,7 +3735,7 @@ export function buildBeachProps(group, curve, trackDef) {
   propsGroup.name = "TropicalBeachProps";
 
   addBeachGround(propsGroup);
-  addBeachOceanPlane(propsGroup);
+  addBeachOceanPlane(propsGroup, curve, trackDef);
   addBeachClouds(propsGroup);
   // addBeachCenterDashes(propsGroup, curve, trackDef);
   addBeachTropicalPlants(propsGroup, curve, trackDef);
