@@ -3245,9 +3245,16 @@ function addBeachGround(group) {
   group.add(ground);
 }
 
-function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth, segmentsAlong = 40, subdivisionsAcross = 10) {
+function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth, segmentsAlong = 15, subdivisionsAcross = 10) {
   const vertices = [];
   const indices = [];
+
+  // Pre-generate centerline points for distance check
+  const centerlinePoints = [];
+  const numSamples = 160;
+  for (let k = 0; k <= numSamples; k++) {
+    centerlinePoints.push(curve.getPointAt(k / numSamples));
+  }
 
   for (let i = 0; i <= segmentsAlong; i++) {
     const t = t1 + (t2 - t1) * (i / segmentsAlong);
@@ -3255,9 +3262,37 @@ function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth
     
     for (let j = 0; j <= subdivisionsAcross; j++) {
       const u = j / subdivisionsAcross;
-      const dist = (roadHalfWidth + 18) + u * oceanWidth;
-      const point = frame.point.clone().addScaledVector(frame.right, side * dist);
+      let dist = (roadHalfWidth + 20) + u * oceanWidth;
+      let point = frame.point.clone().addScaledVector(frame.right, side * dist);
       point.y = -0.2;
+
+      // Verify distance to nearest centerline point
+      let isTooClose = true;
+      let attempts = 0;
+      while (isTooClose && attempts < 50) {
+        let minDistance = Infinity;
+        for (let k = 0; k < centerlinePoints.length; k++) {
+          const d = point.distanceTo(centerlinePoints[k]);
+          if (d < minDistance) {
+            minDistance = d;
+          }
+        }
+        
+        if (minDistance < roadHalfWidth + 15) {
+          // Shift further out
+          dist += 5.0;
+          point = frame.point.clone().addScaledVector(frame.right, side * dist);
+          attempts++;
+        } else {
+          isTooClose = false;
+        }
+      }
+
+      // Deform Y coordinate using two sine functions based on X and Z
+      // Max variation: ±1.2 units (0.7 + 0.5 = 1.2)
+      const wave = Math.sin(point.x * 0.1) * 0.7 + Math.sin(point.z * 0.08) * 0.5;
+      point.y = -0.2 + wave;
+
       vertices.push(point.x, point.y, point.z);
     }
   }
@@ -3283,19 +3318,12 @@ function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth
 
 function addLowPolySeaSegment(group, curve, t1, t2, side, roadHalfWidth, oceanWidth) {
   const geometry = createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth);
-  
-  const initialY = [];
-  const positions = geometry.attributes.position.array;
-  for (let i = 0; i < positions.length; i += 3) {
-    initialY.push(positions[i + 1]);
-  }
-  geometry.userData = { initialY };
 
   const material = new THREE.MeshStandardMaterial({
-    color: 0x0088cc,
+    color: 0x0099cc,
     emissive: 0x003355,
     emissiveIntensity: 0.5,
-    roughness: 0.15,
+    roughness: 0.25,
     metalness: 0.1,
     flatShading: true,
     side: THREE.DoubleSide
@@ -3306,38 +3334,19 @@ function addLowPolySeaSegment(group, curve, t1, t2, side, roadHalfWidth, oceanWi
   mesh.receiveShadow = true;
   mesh.castShadow = false;
 
-  mesh.onBeforeRender = function(renderer, scene, camera, geom, mat, grp) {
-    const time = performance.now() * 0.001;
-    const posAttr = geom.attributes.position;
-    const posArray = posAttr.array;
-    const initY = geom.userData.initialY;
-
-    for (let i = 0; i < posArray.length; i += 3) {
-      const x = posArray[i];
-      const z = posArray[i + 2];
-      
-      const wave = Math.sin(x * 0.08 + time * 1.3) * Math.cos(z * 0.08 + time * 1.3) * 0.5
-                 + Math.sin(x * 0.03 - time * 0.8) * 0.25;
-      
-      posArray[i + 1] = initY[i / 3] + wave;
-    }
-    
-    posAttr.needsUpdate = true;
-    geom.computeVertexNormals();
-  };
-
   group.add(mesh);
 }
 
 function addBeachOceanPlane(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth * 0.5;
-  const oceanWidth = 250;
+  const oceanWidth = 220;
 
-  // Segment 1: t = 0.10 to 0.30
-  addLowPolySeaSegment(group, curve, 0.10, 0.30, -1, roadHalfWidth, oceanWidth);
+  // Create exactly 2 ocean patches on the left side (side = -1)
+  // Segment 1: t = 0.15 to 0.30
+  addLowPolySeaSegment(group, curve, 0.15, 0.30, -1, roadHalfWidth, oceanWidth);
 
-  // Segment 2: t = 0.55 to 0.75
-  addLowPolySeaSegment(group, curve, 0.55, 0.75, -1, roadHalfWidth, oceanWidth);
+  // Segment 2: t = 0.60 to 0.75
+  addLowPolySeaSegment(group, curve, 0.60, 0.75, -1, roadHalfWidth, oceanWidth);
 }
 
 function addBeachEdgeStrips(group, curve, trackDef) {
