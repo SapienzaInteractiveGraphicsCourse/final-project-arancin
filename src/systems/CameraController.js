@@ -2,13 +2,19 @@ import * as THREE from "three";
 
 const CAMERA_MODES = {
   FOLLOW: "follow",
-  TOP: "top"
+  TOP: "top",
+  HOOD: "hood",
+  ORBIT: "orbit"
 };
 const CAMERA_MODE_ORDER = [
   CAMERA_MODES.FOLLOW,
-  CAMERA_MODES.TOP
+  CAMERA_MODES.TOP,
+  CAMERA_MODES.HOOD,
+  CAMERA_MODES.ORBIT
 ];
 const CAMERA_TRANSITION_SECONDS = 0.42;
+const SHAKE_DURATION_SECONDS = 0.28;
+const SHAKE_FREQUENCY = 42;
 
 export class CameraController {
   constructor(camera, { initialMode = CAMERA_MODES.FOLLOW } = {}) {
@@ -23,11 +29,16 @@ export class CameraController {
     this.transitionDuration = CAMERA_TRANSITION_SECONDS;
     this.isTransitioning = false;
     this.deltaTime = 0;
+    this.orbitAngle = 0;
+    this.shakeTimer = 0;
+    this.shakeIntensity = 0;
+    this.shakeOffset = new THREE.Vector3();
     this.needsSnap = true;
   }
 
   update(deltaTime = 0, vehicleState = {}, trackInfo = {}) {
     this.deltaTime = Math.max(0, deltaTime);
+    this.updateShake();
 
     if (this.mode === CAMERA_MODES.FOLLOW) {
       this.updateFollowCamera(vehicleState, trackInfo);
@@ -36,6 +47,16 @@ export class CameraController {
 
     if (this.mode === CAMERA_MODES.TOP) {
       this.updateTopCamera(vehicleState);
+      return;
+    }
+
+    if (this.mode === CAMERA_MODES.HOOD) {
+      this.updateHoodCamera(vehicleState, trackInfo);
+      return;
+    }
+
+    if (this.mode === CAMERA_MODES.ORBIT) {
+      this.updateOrbitCamera(vehicleState);
     }
   }
 
@@ -56,7 +77,7 @@ export class CameraController {
 
     this.lookTarget.set(vehicleState.position.x, targetY + 0.75, vehicleState.position.z);
     this.applyCameraTarget(0.08, 0.16);
-    this.camera.lookAt(this.cameraLookAt);
+    this.lookAtTarget();
   }
 
   updateTopCamera(vehicleState) {
@@ -68,6 +89,51 @@ export class CameraController {
     this.lookTarget.set(vehicleState.position.x, vehicleState.position.y, vehicleState.position.z);
     this.applyCameraTarget(0.16, 1);
     this.camera.lookAt(this.cameraLookAt);
+  }
+
+  updateHoodCamera(vehicleState, trackInfo) {
+    if (!vehicleState.position || !Number.isFinite(vehicleState.heading)) {
+      return;
+    }
+
+    const targetY = trackInfo.spawn?.position?.y ?? vehicleState.position.y ?? 0;
+    const forwardX = Math.sin(vehicleState.heading);
+    const forwardZ = Math.cos(vehicleState.heading);
+    const cameraHeight = 1.45;
+    const cameraForwardOffset = 1.55;
+    const lookAhead = 9.5;
+
+    this.cameraTarget.set(
+      vehicleState.position.x + forwardX * cameraForwardOffset,
+      targetY + cameraHeight,
+      vehicleState.position.z + forwardZ * cameraForwardOffset
+    );
+    this.lookTarget.set(
+      vehicleState.position.x + forwardX * lookAhead,
+      targetY + 1.2,
+      vehicleState.position.z + forwardZ * lookAhead
+    );
+    this.applyCameraTarget(0.28, 0.32);
+    this.lookAtTarget();
+  }
+
+  updateOrbitCamera(vehicleState) {
+    if (!vehicleState.position) {
+      return;
+    }
+
+    this.orbitAngle += this.deltaTime * 0.38;
+    const radius = 15.5;
+    const height = 8.2;
+
+    this.cameraTarget.set(
+      vehicleState.position.x + Math.sin(this.orbitAngle) * radius,
+      vehicleState.position.y + height,
+      vehicleState.position.z + Math.cos(this.orbitAngle) * radius
+    );
+    this.lookTarget.set(vehicleState.position.x, vehicleState.position.y + 1.25, vehicleState.position.z);
+    this.applyCameraTarget(0.12, 0.18);
+    this.lookAtTarget();
   }
 
   applyCameraTarget(positionLerp, lookLerp) {
@@ -95,6 +161,14 @@ export class CameraController {
     this.cameraLookAt.lerp(this.lookTarget, lookLerp);
   }
 
+  lookAtTarget() {
+    if (this.mode !== CAMERA_MODES.TOP && this.shakeTimer > 0) {
+      this.camera.position.add(this.shakeOffset);
+    }
+
+    this.camera.lookAt(this.cameraLookAt);
+  }
+
   nextMode() {
     const currentIndex = CAMERA_MODE_ORDER.indexOf(this.mode);
     const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % CAMERA_MODE_ORDER.length;
@@ -106,6 +180,9 @@ export class CameraController {
     if (CAMERA_MODE_ORDER.includes(mode) && mode !== this.mode) {
       this.startTransition();
       this.mode = mode;
+      if (mode === CAMERA_MODES.ORBIT) {
+        this.orbitAngle = Math.atan2(this.camera.position.x - this.cameraLookAt.x, this.camera.position.z - this.cameraLookAt.z);
+      }
     }
   }
 
@@ -116,7 +193,37 @@ export class CameraController {
     this.isTransitioning = !this.needsSnap;
   }
 
-  applyShake() {}
+  applyShake(intensity = 1) {
+    if (this.mode === CAMERA_MODES.TOP) {
+      return;
+    }
+
+    if (this.shakeTimer > 0) {
+      return;
+    }
+
+    this.shakeTimer = SHAKE_DURATION_SECONDS;
+    this.shakeIntensity = Math.max(this.shakeIntensity, Math.max(0, intensity));
+  }
+
+  updateShake() {
+    if (this.shakeTimer <= 0) {
+      this.shakeOffset.set(0, 0, 0);
+      this.shakeIntensity = 0;
+      return;
+    }
+
+    this.shakeTimer = Math.max(0, this.shakeTimer - this.deltaTime);
+    const fade = this.shakeTimer / SHAKE_DURATION_SECONDS;
+    const strength = this.shakeIntensity * 0.12 * fade;
+    const time = performance.now() * 0.001 * SHAKE_FREQUENCY;
+
+    this.shakeOffset.set(
+      Math.sin(time * 1.17) * strength,
+      Math.cos(time * 0.93) * strength * 0.45,
+      Math.sin(time * 0.71) * strength
+    );
+  }
 
   resize(width, height) {
     this.camera.aspect = width / height;

@@ -213,6 +213,10 @@ export function startScenePreview(container, setup, options = {}) {
     updatePlayerRacePosition(raceManager, state, aiState, track.trackInfo);
     const raceState = raceManager.getState();
 
+    if (environmentState.impact) {
+      cameraController.applyShake(environmentState.impact.type === "opponent" ? 0.45 : 1);
+    }
+
     cameraController.update(deltaTime, state, track.trackInfo);
     const wrongWayState = wrongWayDetector.update(deltaTime, state, track.trackInfo);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayState);

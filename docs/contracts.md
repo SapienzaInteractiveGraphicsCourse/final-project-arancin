@@ -643,13 +643,7 @@ cameraController.dispose()
 Modalita supportate ora:
 
 ```js
-"follow" | "top"
-```
-
-Modalita previste per estensioni successive:
-
-```js
-"hood" | "orbit"
+"follow" | "top" | "hood" | "orbit"
 ```
 
 Regole:
@@ -659,6 +653,7 @@ Regole:
 - usa `vehicleState.position` e `vehicleState.heading` come input principale;
 - la scena resta responsabile di chiamare `update()`, `nextMode()` e `resize()`;
 - camera shake e solo feedback visivo e non deve influenzare fisica/input.
+- la modalita `top` non applica camera shake per restare leggibile in debug.
 
 ## Branch Responsibilities
 
