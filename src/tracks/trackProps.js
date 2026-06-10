@@ -3234,10 +3234,10 @@ function createMergedGeometry(parts) {
 
 function addBeachGround(group) {
   const material = createBeachMaterial({
-    color: 0xe8c87a,
+    color: 0xe4c06c,
     roughness: 0.95
   });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), material);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100), material);
   ground.name = "TropicalBeachPropsGround";
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
@@ -3246,40 +3246,50 @@ function addBeachGround(group) {
 }
 
 function addBeachOceanPlane(group) {
+  // Oceano principale — lato est (positivo Z / positivo X = destra del tracciato)
   const material = createBeachMaterial({
-    color: 0x0b83bd,
-    emissive: 0x00507a,
-    emissiveIntensity: 0.18,
-    roughness: 0.42
+    color: 0x0b93cc,
+    emissive: 0x006a9a,
+    emissiveIntensity: 0.22,
+    roughness: 0.38
   });
-  const ocean = new THREE.Mesh(new THREE.PlaneGeometry(520, 900), material);
+  const ocean = new THREE.Mesh(new THREE.PlaneGeometry(600, 1100), material);
   ocean.name = "TropicalBeachPropsOcean";
   ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(250, -0.08, 0);
+  ocean.position.set(380, -0.08, 20);
   ocean.receiveShadow = true;
   group.add(ocean);
 
+  // Acque basse (color turchese chiaro)
   const shallowMaterial = createBeachMaterial({
-    color: 0x36c7d3,
-    emissive: 0x168ea4,
-    emissiveIntensity: 0.12,
-    roughness: 0.48
+    color: 0x30cfe0,
+    emissive: 0x10a8c0,
+    emissiveIntensity: 0.14,
+    roughness: 0.44
   });
-  const shallow = new THREE.Mesh(new THREE.PlaneGeometry(70, 900), shallowMaterial);
+  const shallow = new THREE.Mesh(new THREE.PlaneGeometry(70, 1100), shallowMaterial);
   shallow.name = "TropicalBeachShallowWater";
   shallow.rotation.x = -Math.PI / 2;
-  shallow.position.set(126, -0.074, 0);
+  shallow.position.set(148, -0.075, 20);
   group.add(shallow);
 
+  // Banda di schiuma/riva
   const surfMaterial = createBeachMaterial({
-    color: 0xf4f7ed,
-    roughness: 0.42
+    color: 0xf0f5e8,
+    roughness: 0.50
   });
-  const surf = new THREE.Mesh(new THREE.PlaneGeometry(18, 900), surfMaterial);
+  const surf = new THREE.Mesh(new THREE.PlaneGeometry(22, 1100), surfMaterial);
   surf.name = "TropicalBeachSurfBand";
   surf.rotation.x = -Math.PI / 2;
-  surf.position.set(86, -0.072, 0);
+  surf.position.set(105, -0.073, 20);
   group.add(surf);
+
+  // Secondo specchio d'acqua dal lato opposto (sinistra / tornante)
+  const ocean2 = new THREE.Mesh(new THREE.PlaneGeometry(500, 800), material);
+  ocean2.name = "TropicalBeachPropsOcean2";
+  ocean2.rotation.x = -Math.PI / 2;
+  ocean2.position.set(-340, -0.08, 100);
+  group.add(ocean2);
 }
 
 function addBeachEdgeStrips(group, curve, trackDef) {
@@ -3471,16 +3481,33 @@ function createTropicalBush(seed = 0) {
 function addBeachTropicalPlants(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
-  for (let index = 0; index < 12; index += 1) {
+  // 20 palme distribuite attorno al tracciato con proporzioni più grandi
+  for (let index = 0; index < 20; index += 1) {
     const side = index % 2 === 0 ? 1 : -1;
-    const progress = (index + 0.35) / 12;
-    const offset = side * (roadHalfWidth + 12 + (index % 3) * 3.5);
+    const progress = (index + 0.3) / 20;
+    const offset = side * (roadHalfWidth + 14 + (index % 4) * 5.5);
     const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 12);
-    const plant = index % 4 === 0 ? createTropicalBush(index) : createTropicalPalm(index);
+    const useBush = index % 5 === 0;
+    const plant = useBush ? createTropicalBush(index) : createTropicalPalm(index);
     plant.position.copy(position);
-    plant.rotation.y = rotationY + (index % 5) * 0.16;
-    plant.scale.setScalar(0.82 + pseudoRandom(index + 4.1) * 0.28);
+    plant.rotation.y = rotationY + (index % 5) * 0.22;
+    // Scale larger: palme 1.1–1.6x, cespugli 1.2–1.8x
+    const baseScale = useBush ? 1.4 : 1.1;
+    plant.scale.setScalar(baseScale + pseudoRandom(index + 4.1) * 0.5);
     group.add(plant);
+  }
+
+  // Cluster di palme sulla riva verso l'oceano (lato +X)
+  for (let index = 0; index < 8; index += 1) {
+    const progress = (index + 0.1) / 8;
+    const { position, rotationY } = safePlace(curve, progress, 1, roadHalfWidth + 28 + index * 8, roadHalfWidth, 18);
+    // Posiziona vicino alla riva (x positivo)
+    position.x = Math.max(position.x, 85 + index * 4);
+    const palm = createTropicalPalm(index + 100);
+    palm.position.copy(position);
+    palm.rotation.y = rotationY;
+    palm.scale.setScalar(1.2 + pseudoRandom(index + 9.3) * 0.4);
+    group.add(palm);
   }
 }
 
@@ -3652,6 +3679,7 @@ export function buildBeachProps(group, curve, trackDef) {
   addBeachGround(propsGroup);
   addBeachOceanPlane(propsGroup);
   addBeachClouds(propsGroup);
+  addBeachCenterDashes(propsGroup, curve, trackDef);
   addBeachTropicalPlants(propsGroup, curve, trackDef);
   addBeachHutsStrict(propsGroup, curve, trackDef);
   addBeachUmbrellasStrict(propsGroup, curve, trackDef);

@@ -88,6 +88,24 @@ function createGradientSky(gradient, theme = {}) {
 export function applyTrackSceneTheme(scene, trackInfo) {
   const theme = trackInfo.scene;
 
+  // Day mode with sky gradient (e.g. beach) — use gradient sky but no stars
+  if (trackInfo.lightingMode === "day" && theme?.skyGradient) {
+    removePreviousSky(scene);
+    scene.background = new THREE.Color(theme.background ?? 0x87ceeb);
+
+    if (theme.fogType === "linear") {
+      scene.fog = new THREE.Fog(theme.fog ?? 0xc8eaff, theme.fogNear ?? 150, theme.fogFar ?? 400);
+    } else {
+      scene.fog = new THREE.FogExp2(theme.fog ?? 0xc8eaff, theme.fogDensity ?? 0.003);
+    }
+
+    const sky = createGradientSky(theme.skyGradient, {}); // pass empty theme = no stars/moon
+    scene.userData.trackSky = sky;
+    scene.add(sky);
+    return;
+  }
+
+  // Plain day mode fallback (no gradient defined)
   if (trackInfo.lightingMode === "day") {
     removePreviousSky(scene);
     scene.background = new THREE.Color(0x87ceeb);

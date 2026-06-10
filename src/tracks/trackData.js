@@ -72,67 +72,72 @@ export const TRACK_DEFINITIONS = {
     name: "Tropical Beach",
     themeId: "beach",
     curveType: "catmullrom",
-    tension: 0.44,
+    tension: 0.46,
     roadWidth: 10.5,
-    segments: 160,
-    groundSize: 520,
+    segments: 220,
+    groundSize: 700,
     barrierOffset: 0.42,
-    barrierHeight: 0.48,
+    barrierHeight: 0.52,
     barrierThickness: 0.42,
-    checkpointTs: [0, 0.20, 0.42, 0.63, 0.82],
-    boostTs: [0.10, 0.48, 0.75],
+    checkpointTs: [0, 0.18, 0.38, 0.58, 0.78],
+    boostTs: [0.09, 0.44, 0.72],
     spawnOffsetMeters: -4.2,
     lightingMode: "day",
     skyboxTheme: "beach",
     particleProfile: "sand",
     scene: {
-      background: 0x8fd8ff,
-      fog: 0xbfefff,
+      background: 0x7ecef5,
+      fog: 0xc8eaff,
       fogType: "linear",
-      fogNear: 120,
-      fogFar: 340,
+      fogNear: 160,
+      fogFar: 420,
       ambientColor: 0xfff3c8,
-      ambientIntensity: 0.78,
-      moonColor: 0xfff0bb,
-      moonIntensity: 2.65,
-      moonPosition: [-36, 58, 42],
-      shadowBounds: 130,
-      shadowFar: 260,
+      ambientIntensity: 0.85,
+      moonColor: 0xfff8e0,
+      moonIntensity: 2.8,
+      moonPosition: [-60, 80, 60],
+      shadowBounds: 180,
+      shadowFar: 320,
       skyGradient: {
-        horizon: 0xffe4a5,
-        mid: 0x8fd8ff,
-        zenith: 0x3c91e6
+        horizon: 0xfde9b0,
+        mid: 0x7ecef5,
+        zenith: 0x2a7ec8
       }
     },
     palette: {
-      road: 0x30323a,
-      ground: 0xe8c87a,
-      barrier: 0xf3e2a5,
-      boost: 0xffff00,
+      road: 0x2e3038,
+      ground: 0xe4c06c,
+      barrier: 0xf5e8b0,
+      boost: 0xffee00,
       water: 0x0088cc,
-      sand: 0xe8c87a,
-      roadEdge: 0xf3e2a5,
+      sand: 0xe4c06c,
+      roadEdge: 0xf0d870,
       centerLine: 0xffffff,
-      checkpoint: 0x21d6c6,
+      checkpoint: 0x1cd4c0,
       foliage: 0x20955a
     },
+    // Layout: rettilineo di partenza → curva larga destra → S veloce → chicane sinistra-destra
+    // → tornante a U (curva lenta) → rettilineo costiero → curva destra → rientro
     controlPoints: [
-      [0, 0, -120],
-      [0, 0, -76],
-      [18, 0, -34],
-      [58, 0, -16],
-      [92, 0, 16],
-      [76, 0, 58],
-      [28, 0, 72],
-      [-20, 0, 48],
-      [-58, 0, 62],
-      [-92, 0, 98],
-      [-130, 0, 82],
-      [-146, 0, 34],
-      [-118, 0, -10],
-      [-64, 0, -28],
-      [-42, 0, -72],
-      [-24, 0, -118]
+      [  0,  0, -150],  // start/finish (rettilineo)
+      [  0,  0,  -90],  // rettilineo
+      [ 22,  0,  -40],  // curva larga a destra
+      [ 80,  0,   -8],  // entrata S
+      [110,  0,   30],  // S – parte alta
+      [ 90,  0,   70],  // S – parte bassa (sinistra)
+      [ 48,  0,   90],  // uscita S
+      [ 18,  0,  108],  // chicane: stretto sinistra
+      [ 50,  0,  120],  // chicane: stretto destra
+      [ 30,  0,  150],  // entrata tornante
+      [-24,  0,  168],  // tornante U – apice
+      [-80,  0,  148],  // tornante U – uscita
+      [-95,  0,  105],  // rettilineo costiero inizia
+      [-130, 0,   60],  // rettilineo costiero
+      [-155, 0,   10],  // curva destra lenta
+      [-140, 0,  -48],  // curva destra
+      [-100, 0,  -90],  // rientro
+      [ -52, 0, -120],  // rientro
+      [ -20, 0, -148]   // back to start
     ]
   },
   [TRACK_IDS.MONACO]: {

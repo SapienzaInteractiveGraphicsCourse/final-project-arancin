@@ -165,9 +165,9 @@ export function createTrackMaterials(definition) {
       roughness: 0.72
     }),
     startGantry: createFlatStandardMaterial({
-      color: definition.id === "vegas" ? 0x181b24 : 0x2b3036,
-      roughness: 0.48,
-      metalness: definition.id === "vegas" ? 0.36 : 0.12
+      color: definition.id === "vegas" ? 0x181b24 : (definition.id === "beach" ? 0xd8cba8 : 0x2b3036),
+      roughness: definition.id === "vegas" ? 0.48 : 0.58,
+      metalness: definition.id === "vegas" ? 0.36 : 0.08
     }),
     startSign: new THREE.MeshStandardMaterial({
       color: 0xffffff,
