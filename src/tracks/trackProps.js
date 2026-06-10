@@ -3,6 +3,7 @@ import { createFlatStandardMaterial } from "./trackMaterials.js";
 import crowdTextureUrl from "../assets/textures/grandstand_crowd.png";
 
 const ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS = false;
+const UP = new THREE.Vector3(0, 1, 0);
 
 function addDecorativePointLight(parent, color, intensity, distance, decay, position) {
   if (!ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS) {
@@ -2022,13 +2023,15 @@ function createGrandstand({ position, rotationY, width, rows, accentColor, index
 const spectatorMaterialCache = {
   shirts: [],
   skins: [],
+  hairs: [],
   pants: null
 };
 
-function getSpectatorMaterials(shirtColors, skinColors) {
+function getSpectatorMaterials(shirtColors, skinColors, hairColors) {
   if (spectatorMaterialCache.shirts.length === 0) {
     spectatorMaterialCache.shirts = shirtColors.map((color) => new THREE.MeshBasicMaterial({ color }));
     spectatorMaterialCache.skins = skinColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.hairs = hairColors.map((color) => new THREE.MeshBasicMaterial({ color }));
     spectatorMaterialCache.pants = new THREE.MeshBasicMaterial({ color: 0x18202a });
   }
   return spectatorMaterialCache;
@@ -2037,20 +2040,24 @@ function getSpectatorMaterials(shirtColors, skinColors) {
 function addSeatedSpectators(stand, width, rows, seed) {
   const shirtColors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78, 0xf4f2e8, 0x6aa7ff, 0xff7a59];
   const skinColors = [0xf0c7a0, 0xd49a6a, 0x8b5a3c, 0xf4d2b5];
+  const hairColors = [0x15100c, 0x4a2b18, 0x8a5a2b, 0xd8b15f, 0x5f6470];
   
-  const mats = getSpectatorMaterials(shirtColors, skinColors);
+  const mats = getSpectatorMaterials(shirtColors, skinColors, hairColors);
   const shirtMaterials = mats.shirts;
   const skinMaterials = mats.skins;
+  const hairMaterials = mats.hairs;
   const pantsMaterial = mats.pants;
 
-  const torsoGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.68, 8);
-  const headGeometry = new THREE.SphereGeometry(0.22, 12, 12);
-  const legGeometry = new THREE.CylinderGeometry(0.1, 0.08, 0.62, 8);
-  const armGeometry = new THREE.CylinderGeometry(0.08, 0.06, 0.46, 8);
+  const torsoGeometry = new THREE.CylinderGeometry(0.3, 0.24, 0.82, 8);
+  const headGeometry = new THREE.SphereGeometry(0.26, 12, 12);
+  const hairGeometry = new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
+  const legGeometry = new THREE.CylinderGeometry(0.12, 0.1, 0.72, 8);
+  const armGeometry = new THREE.CylinderGeometry(0.095, 0.07, 0.55, 8);
 
-  const seatsPerRow = Math.max(7, Math.floor(width / 1.45));
+  const seatsPerRow = Math.max(7, Math.floor(width / 1.62));
   const torsoMatrices = shirtMaterials.map(() => []);
   const headMatrices = skinMaterials.map(() => []);
+  const hairMatrices = hairMaterials.map(() => []);
   const leftArmMatrices = skinMaterials.map(() => []);
   const rightArmMatrices = skinMaterials.map(() => []);
   const leftLegMatrices = [];
@@ -2076,26 +2083,30 @@ function addSeatedSpectators(stand, width, rows, seed) {
       const z = 0.02 - row * 1.15;
       const shirtIndex = (seat + row + seed) % shirtMaterials.length;
       const skinIndex = (seat * 2 + row + seed) % skinMaterials.length;
-      const scaleNoise = 1.04 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.18;
+      const hairIndex = (seat * 3 + row + seed) % hairMaterials.length;
+      const scaleNoise = 1.08 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.2;
 
       variedScale.set(scaleNoise, scaleNoise, scaleNoise);
       
       matrix.compose(new THREE.Vector3(x, y + 0.04, z), torsoQuaternion, variedScale);
       torsoMatrices[shirtIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x, y + 0.58, z + 0.03), headQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x, y + 0.68, z + 0.03), headQuaternion, variedScale);
       headMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x - 0.29, y + 0.04, z + 0.03), leftArmQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x, y + 0.69, z + 0.03), headQuaternion, variedScale);
+      hairMatrices[hairIndex].push(matrix.clone());
+
+      matrix.compose(new THREE.Vector3(x - 0.35, y + 0.04, z + 0.03), leftArmQuaternion, variedScale);
       leftArmMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x + 0.29, y + 0.04, z + 0.03), rightArmQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x + 0.35, y + 0.04, z + 0.03), rightArmQuaternion, variedScale);
       rightArmMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x - 0.13, y - 0.28, z + 0.38), legQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x - 0.16, y - 0.33, z + 0.44), legQuaternion, variedScale);
       leftLegMatrices.push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x + 0.13, y - 0.28, z + 0.38), legQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x + 0.16, y - 0.33, z + 0.44), legQuaternion, variedScale);
       rightLegMatrices.push(matrix.clone());
     }
   }
@@ -2107,6 +2118,9 @@ function addSeatedSpectators(stand, width, rows, seed) {
     addInstancedSpectatorPart(stand, headGeometry, skinMaterials[materialIndex], matrices, `Head:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], leftArmMatrices[materialIndex], `LeftArm:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], rightArmMatrices[materialIndex], `RightArm:${materialIndex}`);
+  });
+  hairMatrices.forEach((matrices, materialIndex) => {
+    addInstancedSpectatorPart(stand, hairGeometry, hairMaterials[materialIndex], matrices, `Hair:${materialIndex}`);
   });
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, leftLegMatrices, "LeftLeg");
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, rightLegMatrices, "RightLeg");
@@ -3129,6 +3143,532 @@ function addVegasProps(group, curve, definition) {
 
   disableDecorativeCastShadows(propsGroup);
   group.add(propsGroup);
+}
+
+function createBeachMaterial({
+  color,
+  emissive,
+  emissiveIntensity = 0,
+  roughness = 0.85,
+  metalness = 0.02
+}) {
+  const parameters = {
+    color,
+    roughness,
+    metalness,
+    flatShading: true
+  };
+
+  if (emissive !== undefined) {
+    parameters.emissive = emissive;
+    parameters.emissiveIntensity = emissiveIntensity;
+  }
+
+  return new THREE.MeshStandardMaterial(parameters);
+}
+
+function getRoadFrame(curve, progress) {
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const right = getRightVector(tangent);
+
+  return {
+    point,
+    tangent,
+    right,
+    heading: getHeading(tangent)
+  };
+}
+
+function safePlace(curve, progress, side, offset, roadHalfWidth, minClearance = 12) {
+  const frame = getRoadFrame(curve, progress);
+  const safeOffset = Math.max(Math.abs(offset), roadHalfWidth + minClearance);
+  const position = frame.point.clone().addScaledVector(frame.right, side * safeOffset);
+  clampPropPosition(curve, position, roadHalfWidth, 220, minClearance, minClearance);
+  return {
+    position,
+    rotationY: frame.heading + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+    frame
+  };
+}
+
+function makeBasisMatrix(position, tangent, right, scale = new THREE.Vector3(1, 1, 1)) {
+  const matrix = new THREE.Matrix4();
+  matrix.makeBasis(right.clone().normalize(), UP, tangent.clone().setY(0).normalize().negate());
+  matrix.scale(scale);
+  matrix.setPosition(position);
+  return matrix;
+}
+
+function addTransformedBox(target, geometry, matrix) {
+  const sourcePosition = geometry.getAttribute("position");
+  const sourceIndex = geometry.getIndex();
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+  const vertex = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const baseIndex = target.positions.length / 3;
+
+  for (let index = 0; index < sourcePosition.count; index += 1) {
+    vertex.fromBufferAttribute(sourcePosition, index).applyMatrix4(matrix);
+    target.positions.push(vertex.x, vertex.y, vertex.z);
+  }
+
+  const sourceNormal = geometry.getAttribute("normal");
+  for (let index = 0; index < sourceNormal.count; index += 1) {
+    normal.fromBufferAttribute(sourceNormal, index).applyMatrix3(normalMatrix).normalize();
+    target.normals.push(normal.x, normal.y, normal.z);
+  }
+
+  for (let index = 0; index < sourceIndex.count; index += 1) {
+    target.indices.push(baseIndex + sourceIndex.getX(index));
+  }
+}
+
+function createMergedGeometry(parts) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(parts.positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(parts.normals, 3));
+  geometry.setIndex(parts.indices);
+  return geometry;
+}
+
+function addBeachGround(group) {
+  const material = createBeachMaterial({
+    color: 0xe8c87a,
+    roughness: 0.95
+  });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), material);
+  ground.name = "TropicalBeachPropsGround";
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.05;
+  ground.receiveShadow = true;
+  group.add(ground);
+}
+
+function addBeachOceanPlane(group) {
+  const material = createBeachMaterial({
+    color: 0x0b83bd,
+    emissive: 0x00507a,
+    emissiveIntensity: 0.18,
+    roughness: 0.42
+  });
+  const ocean = new THREE.Mesh(new THREE.PlaneGeometry(520, 900), material);
+  ocean.name = "TropicalBeachPropsOcean";
+  ocean.rotation.x = -Math.PI / 2;
+  ocean.position.set(250, -0.08, 0);
+  ocean.receiveShadow = true;
+  group.add(ocean);
+
+  const shallowMaterial = createBeachMaterial({
+    color: 0x36c7d3,
+    emissive: 0x168ea4,
+    emissiveIntensity: 0.12,
+    roughness: 0.48
+  });
+  const shallow = new THREE.Mesh(new THREE.PlaneGeometry(70, 900), shallowMaterial);
+  shallow.name = "TropicalBeachShallowWater";
+  shallow.rotation.x = -Math.PI / 2;
+  shallow.position.set(126, -0.074, 0);
+  group.add(shallow);
+
+  const surfMaterial = createBeachMaterial({
+    color: 0xf4f7ed,
+    roughness: 0.42
+  });
+  const surf = new THREE.Mesh(new THREE.PlaneGeometry(18, 900), surfMaterial);
+  surf.name = "TropicalBeachSurfBand";
+  surf.rotation.x = -Math.PI / 2;
+  surf.position.set(86, -0.072, 0);
+  group.add(surf);
+}
+
+function addBeachEdgeStrips(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+  const material = createBeachMaterial({
+    color: 0xff6600,
+    emissive: 0xff6600,
+    emissiveIntensity: 1,
+    roughness: 0.55
+  });
+  const segmentCount = trackDef.segments;
+  const source = new THREE.BoxGeometry(0.12, 0.08, 1);
+  const parts = [0, 1, 2, 3].map(() => ({ positions: [], normals: [], indices: [] }));
+  const stripOffsets = [
+    { side: -1, offset: roadHalfWidth + 0.05 },
+    { side: -1, offset: roadHalfWidth - 0.45 },
+    { side: 1, offset: roadHalfWidth - 0.45 },
+    { side: 1, offset: roadHalfWidth + 0.05 }
+  ];
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const a = index / segmentCount;
+    const b = (index + 1) / segmentCount;
+    const start = getRoadFrame(curve, a);
+    const end = getRoadFrame(curve, b);
+    const segLen = start.point.distanceTo(end.point);
+    const midProgress = (a + b) * 0.5;
+    const frame = getRoadFrame(curve, midProgress >= 1 ? midProgress - 1 : midProgress);
+
+    stripOffsets.forEach(({ side, offset }, partIndex) => {
+      const position = frame.point.clone().addScaledVector(frame.right, side * offset);
+      position.y = 0.08;
+      const matrix = makeBasisMatrix(position, frame.tangent, frame.right, new THREE.Vector3(1, 1, segLen));
+      addTransformedBox(parts[partIndex], source, matrix);
+    });
+  }
+
+  parts.forEach((part, index) => {
+    const mesh = new THREE.Mesh(createMergedGeometry(part), material);
+    mesh.name = `TropicalBeachEdgeStrip:${index}`;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
+
+  source.dispose();
+}
+
+function addBeachCenterDashes(group, curve, trackDef) {
+  const material = createBeachMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.6,
+    roughness: 0.48
+  });
+  const totalLength = curve.getLength();
+  const dashCount = Math.floor(totalLength / 10);
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.06, 3), material, dashCount);
+  const matrix = new THREE.Matrix4();
+
+  for (let index = 0; index < dashCount; index += 1) {
+    const progress = ((index * 10) + 1.5) / totalLength;
+    const frame = getRoadFrame(curve, progress % 1);
+    const position = frame.point.clone();
+    position.y = 0.07;
+    matrix.copy(makeBasisMatrix(position, frame.tangent, frame.right));
+    dashes.setMatrixAt(index, matrix);
+  }
+
+  dashes.name = "TropicalBeachCenterDashes";
+  dashes.instanceMatrix.needsUpdate = true;
+  dashes.receiveShadow = true;
+  group.add(dashes);
+}
+
+function createTropicalPalm(seed = 0) {
+  const palm = new THREE.Group();
+  palm.name = "TropicalBeachPalm";
+
+  const trunkMaterial = createBeachMaterial({ color: 0x6f4726, roughness: 0.9 });
+  const trunkBandMaterial = createBeachMaterial({ color: 0xa87a44, roughness: 0.88 });
+  const ribMaterial = createBeachMaterial({ color: 0x174d25, roughness: 0.82 });
+  const leafMaterials = [
+    createBeachMaterial({ color: 0x2d8f34, roughness: 0.78, metalness: 0 }),
+    createBeachMaterial({ color: 0x3eaa43, roughness: 0.78, metalness: 0 }),
+    createBeachMaterial({ color: 0x1f6f2b, roughness: 0.82, metalness: 0 })
+  ];
+  leafMaterials.forEach((material) => {
+    material.side = THREE.DoubleSide;
+  });
+  ribMaterial.side = THREE.DoubleSide;
+
+  const trunkHeight = 8.8 + (seed % 3) * 0.7;
+  const segmentCount = 9;
+  const lean = seed % 2 === 0 ? 0.075 : -0.075;
+  const segmentHeight = trunkHeight / segmentCount;
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const taper = 1 - index / segmentCount;
+    const segment = markShadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17 + taper * 0.07, 0.27 + taper * 0.1, segmentHeight * 1.04, 8),
+      trunkMaterial
+    ));
+    segment.position.set(lean * index * 0.34, segmentHeight * (index + 0.5), 0);
+    segment.rotation.z = lean;
+    palm.add(segment);
+
+    if (index % 2 === 0) {
+      const band = markShadow(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.19 + taper * 0.07, 0.2 + taper * 0.08, 0.12, 8),
+        trunkBandMaterial
+      ));
+      band.position.copy(segment.position);
+      band.rotation.z = lean;
+      palm.add(band);
+    }
+  }
+
+  const crown = new THREE.Group();
+  crown.position.set(lean * segmentCount * 0.34, trunkHeight + 0.15, 0);
+
+  const createFrond = (length, material, droop, leafletCount = 8) => {
+    const frond = new THREE.Group();
+    const rib = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, length), ribMaterial));
+    rib.position.z = -length * 0.5;
+    frond.add(rib);
+
+    const leafletGeometry = new THREE.PlaneGeometry(0.22, length * 0.3);
+    for (let index = 0; index < leafletCount; index += 1) {
+      const progress = (index + 1) / (leafletCount + 1);
+      const z = -progress * length;
+      const span = Math.sin(progress * Math.PI);
+
+      [-1, 1].forEach((side) => {
+        const leaflet = markShadow(new THREE.Mesh(leafletGeometry, material));
+        leaflet.position.set(side * (0.28 + span * 0.75), -progress * droop, z);
+        leaflet.rotation.y = side * (Math.PI / 2.8);
+        leaflet.rotation.z = side * (0.5 + progress * 0.28);
+        leaflet.scale.set(0.8 + span * 0.65, 1, 1);
+        frond.add(leaflet);
+      });
+    }
+
+    return frond;
+  };
+
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    const length = 5.8 + pseudoRandom(seed + index * 0.7) * 1.2;
+    const frond = createFrond(length, leafMaterials[index % leafMaterials.length], 1.1 + (index % 3) * 0.28, 7);
+    frond.rotation.y = angle;
+    frond.rotation.x = Math.PI / 3.6 + (index % 4) * 0.07;
+    frond.rotation.z = (index % 2 === 0 ? 1 : -1) * 0.12;
+    frond.position.set(Math.cos(angle) * 0.34, 0.12, Math.sin(angle) * 0.34);
+    crown.add(frond);
+  }
+
+  [0, 1, 2].forEach((index) => {
+    const angle = (index / 4) * Math.PI * 2 + 0.35;
+    const uprightFrond = createFrond(4.2, leafMaterials[(index + 1) % leafMaterials.length], 0.35, 6);
+    uprightFrond.rotation.y = angle;
+    uprightFrond.rotation.x = Math.PI / 5.4;
+    uprightFrond.position.y = 0.45;
+    crown.add(uprightFrond);
+  });
+
+  palm.add(crown);
+  return palm;
+}
+
+function createTropicalBush(seed = 0) {
+  const bush = new THREE.Group();
+  bush.name = "TropicalBeachBush";
+
+  const material = createBeachMaterial({
+    color: seed % 2 === 0 ? 0x2f9b4b : 0x1f7a3a,
+    roughness: 0.82
+  });
+
+  for (let index = 0; index < 4; index += 1) {
+    const leaf = markShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 + index * 0.08, 0), material));
+    leaf.position.set((index - 1.5) * 0.45, 0.55 + index * 0.1, (pseudoRandom(seed + index) - 0.5) * 0.8);
+    leaf.scale.set(1.25, 0.72, 0.9);
+    bush.add(leaf);
+  }
+
+  return bush;
+}
+
+function addBeachTropicalPlants(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  for (let index = 0; index < 12; index += 1) {
+    const side = index % 2 === 0 ? 1 : -1;
+    const progress = (index + 0.35) / 12;
+    const offset = side * (roadHalfWidth + 12 + (index % 3) * 3.5);
+    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 12);
+    const plant = index % 4 === 0 ? createTropicalBush(index) : createTropicalPalm(index);
+    plant.position.copy(position);
+    plant.rotation.y = rotationY + (index % 5) * 0.16;
+    plant.scale.setScalar(0.82 + pseudoRandom(index + 4.1) * 0.28);
+    group.add(plant);
+  }
+}
+
+function createBeachHutStrict() {
+  const hut = new THREE.Group();
+  hut.name = "TropicalBeachHutStrict";
+  const baseMaterial = createBeachMaterial({ color: 0xd4a055, roughness: 0.82 });
+  const wallMaterial = createBeachMaterial({ color: 0xc8955a, roughness: 0.82 });
+  const roofMaterial = createBeachMaterial({ color: 0x8b4513, roughness: 0.78 });
+  const awningMaterial = createBeachMaterial({
+    color: 0xff6600,
+    emissive: 0xff6600,
+    emissiveIntensity: 0.2,
+    roughness: 0.62
+  });
+
+  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 3, 10), baseMaterial));
+  const frontWall = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.4), wallMaterial));
+  const backWall = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.4), wallMaterial));
+  const roof = markShadow(new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 12), roofMaterial));
+  const awning = markShadow(new THREE.Mesh(new THREE.BoxGeometry(13, 0.3, 4), awningMaterial));
+  const poleMaterial = createBeachMaterial({ color: 0xd4c8a0, roughness: 0.7 });
+  const poleGeometry = new THREE.CylinderGeometry(0.25, 0.25, 6, 5);
+
+  base.position.y = 1.5;
+  frontWall.position.set(0, 5, -5.2);
+  backWall.position.set(0, 5, 5.2);
+  roof.position.y = 7.5;
+  awning.position.set(0, 6, -7);
+  hut.add(base, frontWall, backWall, roof, awning);
+
+  [-4, 4].forEach((x) => {
+    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
+    pole.position.set(x, 3, -7);
+    hut.add(pole);
+  });
+
+  return hut;
+}
+
+function addBeachHutsStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  [0.20, 0.55, 0.80].forEach((progress, index) => {
+    const side = index % 2 === 0 ? 1 : -1;
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 18), roadHalfWidth, 12);
+    const hut = createBeachHutStrict();
+    hut.position.copy(position);
+    hut.rotation.y = rotationY;
+    group.add(hut);
+  });
+}
+
+function addBeachUmbrellasStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+  const colors = [0xff4444, 0xffffff, 0xffaa00, 0x4488ff];
+  const poleMaterial = createBeachMaterial({ color: 0xc8c8b0, roughness: 0.68 });
+  const poleGeometry = new THREE.CylinderGeometry(0.12, 0.12, 4, 5);
+
+  for (let index = 0; index < 10; index += 1) {
+    const progress = (index + 0.5) * 0.1;
+    const offset = roadHalfWidth + 15 + (index % 4) * 3.2;
+    const { position, rotationY } = safePlace(curve, progress, 1, offset, roadHalfWidth, 12);
+    const umbrella = new THREE.Group();
+    umbrella.name = "TropicalBeachUmbrellaStrict";
+    umbrella.position.copy(position);
+    umbrella.rotation.y = rotationY;
+
+    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
+    pole.position.y = 2;
+    const canopy = markShadow(new THREE.Mesh(
+      new THREE.ConeGeometry(3.5, 1.5, 7),
+      createBeachMaterial({ color: colors[index % colors.length], roughness: 0.7 })
+    ));
+    canopy.position.y = 4.5;
+    umbrella.add(pole, canopy);
+    group.add(umbrella);
+  }
+}
+
+function addBeachLampPostsStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+  const poleMaterial = createBeachMaterial({ color: 0xd4c8a0, roughness: 0.62 });
+  const topMaterial = createBeachMaterial({
+    color: 0xffd080,
+    emissive: 0xffd080,
+    emissiveIntensity: 0.7,
+    roughness: 0.36
+  });
+  const poleGeometry = new THREE.CylinderGeometry(0.2, 0.25, 7, 6);
+  const topGeometry = new THREE.SphereGeometry(0.5, 5, 4);
+
+  for (let index = 0; index < 16; index += 1) {
+    const side = index % 2 === 0 ? 1 : -1;
+    const progress = (index + 0.25) / 16;
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 12);
+    const lamp = new THREE.Group();
+    lamp.name = "TropicalBeachLampPostStrict";
+    lamp.position.copy(position);
+    lamp.rotation.y = rotationY;
+
+    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
+    const top = markShadow(new THREE.Mesh(topGeometry, topMaterial));
+    pole.position.y = 3.5;
+    top.position.y = 7.3;
+    const light = new THREE.PointLight(0xffd080, 20, 18, 2);
+    light.position.y = 7.5;
+
+    lamp.add(pole, top, light);
+    group.add(lamp);
+  }
+}
+
+function createBeachCloud(seed = 0) {
+  const cloud = new THREE.Group();
+  cloud.name = "TropicalBeachCloud";
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xf7fbff,
+    roughness: 0.9,
+    metalness: 0,
+    flatShading: true,
+    fog: false
+  });
+  const geometry = new THREE.SphereGeometry(1, 8, 6);
+  const puffCount = 4 + (seed % 3);
+
+  for (let index = 0; index < puffCount; index += 1) {
+    const puff = new THREE.Mesh(geometry, material);
+    const side = index - (puffCount - 1) * 0.5;
+    puff.position.set(side * 4.2, (index % 2) * 0.7, pseudoRandom(seed + index) * 1.4);
+    puff.scale.set(
+      3.6 + pseudoRandom(seed + index * 1.7) * 1.7,
+      1.0 + pseudoRandom(seed + index * 2.3) * 0.45,
+      1.3 + pseudoRandom(seed + index * 3.1) * 0.6
+    );
+    puff.castShadow = false;
+    puff.receiveShadow = false;
+    cloud.add(puff);
+  }
+
+  return cloud;
+}
+
+function addBeachClouds(group) {
+  const cloudPositions = [
+    [-180, 48, -155, 0.25, 1.25],
+    [-70, 58, -235, -0.12, 1.55],
+    [92, 52, -190, 0.18, 1.35],
+    [190, 46, -70, -0.28, 1.45],
+    [-210, 54, 80, 0.08, 1.65],
+    [42, 62, 142, -0.2, 1.35],
+    [230, 56, 190, 0.14, 1.5]
+  ];
+
+  cloudPositions.forEach(([x, y, z, rotationY, scale], index) => {
+    const cloud = createBeachCloud(index);
+    cloud.position.set(x, y, z);
+    cloud.rotation.y = rotationY;
+    cloud.scale.setScalar(scale);
+    group.add(cloud);
+  });
+}
+
+export function buildBeachProps(group, curve, trackDef) {
+  const propsGroup = new THREE.Group();
+  propsGroup.name = "TropicalBeachProps";
+
+  addBeachGround(propsGroup);
+  addBeachOceanPlane(propsGroup);
+  addBeachClouds(propsGroup);
+  addBeachTropicalPlants(propsGroup, curve, trackDef);
+  addBeachHutsStrict(propsGroup, curve, trackDef);
+  addBeachUmbrellasStrict(propsGroup, curve, trackDef);
+  addBeachLampPostsStrict(propsGroup, curve, trackDef);
+
+  group.add(propsGroup);
+  group.userData.disposeProps = () => {
+    propsGroup.traverse((child) => {
+      child.geometry?.dispose();
+
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material?.dispose();
+      }
+    });
+  };
 }
 
 export function addTrackProps(group, curve, definition) {

@@ -88,6 +88,13 @@ function createGradientSky(gradient, theme = {}) {
 export function applyTrackSceneTheme(scene, trackInfo) {
   const theme = trackInfo.scene;
 
+  if (trackInfo.lightingMode === "day") {
+    removePreviousSky(scene);
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0xe8d5a0, 0.003);
+    return;
+  }
+
   if (!theme) {
     return;
   }
@@ -110,6 +117,18 @@ export function applyTrackSceneTheme(scene, trackInfo) {
 
 export function applyTrackLightingTheme(lights, trackInfo) {
   const theme = trackInfo.scene;
+
+  if (trackInfo.lightingMode === "day") {
+    lights.ambient.color.setHex(0xfff5e0);
+    lights.ambient.intensity = 1.2;
+    lights.sun.color.setHex(0xfffbe0);
+    lights.sun.intensity = 1.5;
+    lights.sun.position.set(100, 200, 100);
+    lights.sun.castShadow = true;
+    lights.sun.shadow.camera.far = 300;
+    lights.sun.shadow.camera.updateProjectionMatrix();
+    return;
+  }
 
   if (!theme) {
     return;

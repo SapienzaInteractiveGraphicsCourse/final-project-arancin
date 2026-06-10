@@ -359,6 +359,77 @@ function createBarrierCollider(start, end, height, thickness) {
   };
 }
 
+function createBarrierRibbonGeometry(edgeSamples, side, offset, height, thickness) {
+  const vertices = [];
+  const indices = [];
+  const sampleCount = edgeSamples.length;
+
+  edgeSamples.forEach((sample) => {
+    const base = (side < 0 ? sample.left : sample.right)
+      .clone()
+      .addScaledVector(sample.normal, side * offset);
+    const outer = base.clone().addScaledVector(sample.normal, side * thickness);
+    base.y = ROAD_Y;
+    outer.y = ROAD_Y;
+
+    vertices.push(
+      base.x, ROAD_Y, base.z,
+      outer.x, ROAD_Y, outer.z,
+      base.x, ROAD_Y + height, base.z,
+      outer.x, ROAD_Y + height, outer.z
+    );
+  });
+
+  for (let index = 0; index < sampleCount - 1; index += 1) {
+    const current = index * 4;
+    const next = (index + 1) * 4;
+
+    indices.push(
+      current, next, current + 2,
+      current + 2, next, next + 2,
+      current + 1, current + 3, next + 1,
+      current + 3, next + 3, next + 1,
+      current + 2, next + 2, current + 3,
+      current + 3, next + 2, next + 3
+    );
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createBeachShoulderGeometry(edgeSamples, side, width) {
+  const vertices = [];
+  const indices = [];
+
+  edgeSamples.forEach((sample) => {
+    const roadEdge = side < 0 ? sample.left.clone() : sample.right.clone();
+    const shoulderEdge = roadEdge.clone().addScaledVector(sample.normal, side * width);
+    roadEdge.y = ROAD_Y + 0.012;
+    shoulderEdge.y = ROAD_Y + 0.012;
+
+    vertices.push(
+      roadEdge.x, roadEdge.y, roadEdge.z,
+      shoulderEdge.x, shoulderEdge.y, shoulderEdge.z
+    );
+  });
+
+  for (let index = 0; index < edgeSamples.length - 1; index += 1) {
+    const current = index * 2;
+    const next = (index + 1) * 2;
+    indices.push(current, next, current + 1, current + 1, next, next + 1);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function addBarriers(group, edgeSamples, definition, material) {
   const colliders = [];
   const matrices = [];
@@ -387,6 +458,36 @@ function addBarriers(group, edgeSamples, definition, material) {
       matrices.push(matrix.clone());
       colliders.push(collider);
     });
+  }
+
+  if (definition.id === "beach") {
+    const shoulderMaterial = material.clone();
+    shoulderMaterial.color.setHex(0xe0c66f);
+    shoulderMaterial.side = THREE.DoubleSide;
+    const barrierMaterial = material.clone();
+    barrierMaterial.side = THREE.DoubleSide;
+    const shoulderWidth = offset;
+
+    [-1, 1].forEach((side) => {
+      if (shoulderWidth > 0) {
+        const shoulder = new THREE.Mesh(
+          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth),
+          shoulderMaterial
+        );
+        shoulder.name = `${definition.name}:BarrierShoulder:${side}`;
+        shoulder.receiveShadow = true;
+        group.add(shoulder);
+      }
+
+      const barrier = new THREE.Mesh(
+        createBarrierRibbonGeometry(edgeSamples, side, offset, height, thickness),
+        barrierMaterial
+      );
+      barrier.name = `${definition.name}:BarrierRibbon:${side}`;
+      barrier.receiveShadow = true;
+      group.add(barrier);
+    });
+    return colliders;
   }
 
   const barriers = new THREE.InstancedMesh(geometry, material, matrices.length);
@@ -638,7 +739,7 @@ function disposeObjectTree(group) {
   });
 }
 
-export function createSplineTrack(definition) {
+export function createSplineTrack(definition, propsBuilder = addTrackProps) {
   const group = new THREE.Group();
   group.name = `${definition.name} Track`;
 
@@ -673,7 +774,7 @@ export function createSplineTrack(definition) {
   addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
-  addTrackProps(group, curve, definition);
+  propsBuilder(group, curve, definition);
 
   group.userData.trackInfo = {
     id: definition.id,
