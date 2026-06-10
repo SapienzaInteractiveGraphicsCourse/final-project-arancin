@@ -3481,6 +3481,20 @@ function createTropicalPalm(seed = 0) {
     crown.add(uprightFrond);
   });
 
+  // Cluster of 3 brown coconuts nestled right under the fronds
+  const coconutMaterial = createBeachMaterial({ color: 0x4d321d, roughness: 0.82 });
+  const coconutGeo = new THREE.SphereGeometry(0.18, 6, 6);
+  for (let c = 0; c < 3; c++) {
+    const coconut = markShadow(new THREE.Mesh(coconutGeo, coconutMaterial));
+    // Position coconuts around the center of the crown
+    const angle = (c / 3) * Math.PI * 2 + (seed % 5) * 0.4;
+    const r = 0.22;
+    coconut.position.set(Math.cos(angle) * r, -0.1 - (c % 2) * 0.04, Math.sin(angle) * r);
+    // Give them a slightly organic, non-perfectly-spherical shape
+    coconut.scale.set(1.0, 1.15, 0.95);
+    crown.add(coconut);
+  }
+
   palm.add(crown);
   return palm;
 }
@@ -3566,9 +3580,9 @@ function createBeachChair(seed = 0) {
   return chair;
 }
 
-function createBeachPersonWithStrawHat(seed = 0) {
+function createBeachPersonSittingWithStrawHat(seed = 0) {
   const person = new THREE.Group();
-  person.name = "TropicalBeachPerson";
+  person.name = "TropicalBeachPersonSitting";
 
   // Skin material
   const skinMaterial = createBeachMaterial({ color: 0xdcb38c, roughness: 0.6 });
@@ -3581,82 +3595,118 @@ function createBeachPersonWithStrawHat(seed = 0) {
   // Straw hat material (straw yellow)
   const strawMaterial = createBeachMaterial({ color: 0xd4b26f, roughness: 0.8 });
 
-  // 1. Torso (Busto con camicia bianca)
-  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.4), shirtMaterial));
-  torso.position.y = 0.9;
+  // 1. Torso (Busto camicia bianca, reclinato)
+  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.35), shirtMaterial));
+  torso.position.set(0, 0.4, 0.05);
+  torso.rotation.x = 0.12; // Reclined slightly back
   person.add(torso);
 
-  // 2. Legs (Gambe con pantaloncini)
-  const legLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.6, 6), pantsMaterial));
-  legLeft.position.set(-0.2, 0.3, 0);
-  const legRight = legLeft.clone();
-  legRight.position.x = 0.2;
-  person.add(legLeft, legRight);
-
-  // Lower legs (Stinchi color pelle)
-  const shinLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.6, 6), skinMaterial));
-  shinLeft.position.set(-0.2, -0.3, 0);
-  const shinRight = shinLeft.clone();
-  shinRight.position.x = 0.2;
-  person.add(shinLeft, shinRight);
-
-  // 3. Head (Testa color pelle)
-  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), skinMaterial));
-  head.position.y = 1.6;
+  // 2. Head (Testa color pelle, sopra il busto reclinato)
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), skinMaterial));
+  head.position.set(0, 0.92, 0.12);
   person.add(head);
 
   // Hair (Capelli ricci neri)
-  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.31, 8, 8), blackMaterial));
-  hair.position.set(0, 1.65, 0.02);
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), blackMaterial));
+  hair.position.set(0, 0.96, 0.14);
   hair.scale.set(1.02, 0.9, 1.02);
   person.add(hair);
 
   // Beard (Barba corta nera)
-  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.15), blackMaterial));
-  beard.position.set(0, 1.48, -0.2);
+  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.12), blackMaterial));
+  beard.position.set(0, 0.82, 0.02);
   person.add(beard);
 
-  // 4. Arms (Braccia con camicia)
-  const armLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.7, 6), shirtMaterial));
-  armLeft.position.set(-0.45, 0.9, 0);
-  armLeft.rotation.z = 0.15;
-  const armRight = armLeft.clone();
-  armRight.position.x = 0.45;
-  armRight.rotation.z = -0.15;
-  person.add(armLeft, armRight);
+  // 3. Legs (Thighs extending horizontally forward)
+  // Pantaloncini (shorts) part of thighs
+  const thighLeftPants = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.35, 6), pantsMaterial));
+  thighLeftPants.position.set(-0.18, 0.06, -0.175);
+  thighLeftPants.rotation.x = Math.PI / 2;
+  
+  const thighRightPants = thighLeftPants.clone();
+  thighRightPants.position.x = 0.18;
+  person.add(thighLeftPants, thighRightPants);
 
-  // Lower arms (Avambracci piegati color pelle)
-  const forearmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.6, 6), skinMaterial));
-  forearmLeft.position.set(-0.5, 0.45, -0.15);
-  forearmLeft.rotation.x = -0.7; // folded slightly forward
+  // Skin (knee) part of thighs
+  const thighLeftSkin = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 6), skinMaterial));
+  thighLeftSkin.position.set(-0.18, 0.06, -0.4);
+  thighLeftSkin.rotation.x = Math.PI / 2;
+  
+  const thighRightSkin = thighLeftSkin.clone();
+  thighRightSkin.position.x = 0.18;
+  person.add(thighLeftSkin, thighRightSkin);
+
+  // 4. Shins (Gambe che scendono verticalmente)
+  const shinLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), skinMaterial));
+  shinLeft.position.set(-0.18, -0.165, -0.5);
+  
+  const shinRight = shinLeft.clone();
+  shinRight.position.x = 0.18;
+  person.add(shinLeft, shinRight);
+
+  // Feet (Piedi orizzontali)
+  const footLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMaterial));
+  footLeft.position.set(-0.18, -0.38, -0.54);
+  footLeft.rotation.y = 0.1;
+  
+  const footRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMaterial));
+  footRight.position.set(0.18, -0.38, -0.54);
+  footRight.rotation.y = -0.1;
+  person.add(footLeft, footRight);
+
+  // 5. Arms (Braccia che si appoggiano sui braccioli)
+  // Upper arms (sloping down and slightly forward)
+  const upperArmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), shirtMaterial));
+  upperArmLeft.position.set(-0.34, 0.5, -0.02);
+  upperArmLeft.rotation.x = 0.35;
+  upperArmLeft.rotation.z = 0.08;
+  
+  const upperArmRight = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), shirtMaterial));
+  upperArmRight.position.set(0.34, 0.5, -0.02);
+  upperArmRight.rotation.x = 0.35;
+  upperArmRight.rotation.z = -0.08;
+  person.add(upperArmLeft, upperArmRight);
+
+  // Forearms (resting flat on armrests: x = +/-0.36, y = 0.22)
+  const forearmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.35, 6), skinMaterial));
+  forearmLeft.position.set(-0.36, 0.24, -0.28);
+  forearmLeft.rotation.x = Math.PI / 2;
+  
   const forearmRight = forearmLeft.clone();
-  forearmRight.position.x = 0.5;
+  forearmRight.position.x = 0.36;
   person.add(forearmLeft, forearmRight);
 
-  // 5. STRAW HAT (Cappellaccio di paglia gigante)
+  // Hands (on front of armrest)
+  const handLeft = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 6), skinMaterial));
+  handLeft.position.set(-0.36, 0.24, -0.47);
+  const handRight = handLeft.clone();
+  handRight.position.x = 0.36;
+  person.add(handLeft, handRight);
+
+  // 6. STRAW HAT (Cappellaccio di paglia gigante)
   const hatGroup = new THREE.Group();
-  hatGroup.position.set(0, 1.78, 0);
-  hatGroup.rotation.x = 0.1; // slight tilt forward-left like in photo
+  hatGroup.position.set(0, 1.08, 0.12);
+  hatGroup.rotation.x = 0.15;
   hatGroup.rotation.z = -0.1;
 
   // Hat Crown (Cupola centrale)
-  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.35, 8), strawMaterial));
-  crown.position.y = 0.15;
+  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.28, 0.28, 8), strawMaterial));
+  crown.position.y = 0.12;
   hatGroup.add(crown);
 
   // Hat Brim (Tesa larga e piatta)
-  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.03, 16), strawMaterial));
+  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.02, 16), strawMaterial));
   hatGroup.add(brim);
 
   // Frayed Straw Strands (Fili di paglia sporgenti dalla tesa)
-  const strandGeo = new THREE.CylinderGeometry(0.01, 0.005, 0.8, 4);
+  const strandGeo = new THREE.CylinderGeometry(0.008, 0.004, 0.6, 4);
   const strandCount = 18;
   for (let i = 0; i < strandCount; i++) {
     const angle = (i / strandCount) * Math.PI * 2;
     const strand = markShadow(new THREE.Mesh(strandGeo, strawMaterial));
     
     // Position at the edge of the brim
-    const radius = 1.15;
+    const radius = 0.86;
     strand.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
     
     // Rotate to point outwards with some random variations
@@ -3668,26 +3718,27 @@ function createBeachPersonWithStrawHat(seed = 0) {
 
   person.add(hatGroup);
 
-  // Adjust overall scale
-  person.scale.setScalar(0.75);
+  // Proportional scale to fit chair seat nicely
+  person.scale.setScalar(0.9);
 
   return person;
 }
 
 function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
-  // 1. Two chairs, scaled up to 1.35x
+  // 1. Two chairs, scaled to 2.8x (slightly smaller than 3.5x as requested)
   const chair1 = createBeachChair(index * 2);
   const chair2 = createBeachChair(index * 2 + 1);
 
-  chair1.scale.setScalar(1.35);
-  chair2.scale.setScalar(1.35);
+  chair1.scale.setScalar(2.8);
+  chair2.scale.setScalar(2.8);
 
   const angle = palmRotationY;
-  const dx1 = Math.sin(angle) * 1.8 + Math.cos(angle) * -1.0;
-  const dz1 = Math.cos(angle) * 1.8 - Math.sin(angle) * -1.0;
+  // Spacing offsets optimized for 2.8x scale
+  const dx1 = Math.sin(angle) * 3.0 + Math.cos(angle) * -2.0;
+  const dz1 = Math.cos(angle) * 3.0 - Math.sin(angle) * -2.0;
 
-  const dx2 = Math.sin(angle) * 1.8 + Math.cos(angle) * 0.8;
-  const dz2 = Math.cos(angle) * 1.8 - Math.sin(angle) * 0.8;
+  const dx2 = Math.sin(angle) * 3.0 + Math.cos(angle) * 2.0;
+  const dz2 = Math.cos(angle) * 3.0 - Math.sin(angle) * 2.0;
 
   chair1.position.set(palmPosition.x + dx1, palmPosition.y - 0.05, palmPosition.z + dz1);
   chair1.rotation.y = angle + Math.PI + 0.15;
@@ -3697,16 +3748,11 @@ function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
 
   group.add(chair1, chair2);
 
-  // 2. The person standing next to the chairs
-  const person = createBeachPersonWithStrawHat(index);
-  const dxP = Math.sin(angle) * 2.3 + Math.cos(angle) * 0.0;
-  const dzP = Math.cos(angle) * 2.3 - Math.sin(angle) * 0.0;
-  
-  // Place feet on ground (-0.05)
-  person.position.set(palmPosition.x + dxP, palmPosition.y - 0.05 + 0.6, palmPosition.z + dzP);
-  person.rotation.y = angle + Math.PI + 0.4;
-  
-  group.add(person);
+  // 2. The sitting person on chair1
+  const person = createBeachPersonSittingWithStrawHat(index);
+  // Place on seat: y = 0.43 (slightly above y=0.4 seat mesh), z = 0.05
+  person.position.set(0, 0.43, 0.05);
+  chair1.add(person);
 }
 
 function addBeachTropicalPlants(group, curve, trackDef) {
@@ -3729,8 +3775,185 @@ function addBeachTropicalPlants(group, curve, trackDef) {
 
     if (!useBush && (index === 2 || index === 8)) {
       addChairsUnderPalm(group, position, rotationY, index);
+      if (index === 2) {
+        addHouseBehindPalm(group, curve, progress, offset, roadHalfWidth, rotationY, index);
+      }
     }
   }
+}
+
+function addHouseBehindPalm(group, curve, progress, palmOffset, roadHalfWidth, palmRotationY, index) {
+  // Compute position behind the palm.
+  // The palm has a negative offset (inside loop, side = -1).
+  // So we move it further away by subtracting 25 meters to accommodate the larger 3.2x scale.
+  const houseOffset = palmOffset - 25.0;
+  
+  // Use safePlace to sample coordinates and height correctly.
+  // Using side = -1, minClearance = 12.0 for safety.
+  const { position, rotationY } = safePlace(curve, progress, -1, houseOffset, roadHalfWidth, 12.0);
+  
+  const house = createBeachHouse(index);
+  house.position.copy(position);
+  // Scale up the house to 3.2x to make it beautifully proportioned
+  house.scale.setScalar(3.2);
+  // Rotate 180 degrees (add Math.PI) so the front porch faces the track/road
+  house.rotation.y = rotationY + Math.PI;
+  
+  group.add(house);
+}
+
+function createBeachHouse(seed = 0) {
+  const house = new THREE.Group();
+  house.name = "TropicalBeachHouse";
+
+  // Materials
+  const wallMaterial = createBeachMaterial({ color: 0xfa9b93, roughness: 0.8 }); // Pink/peach plaster
+  const roofMaterial = createBeachMaterial({ color: 0xfa9b93, roughness: 0.8 }); // Pink/peach roof
+  const trimMaterial = createBeachMaterial({ color: 0xfad02c, roughness: 0.6, metalness: 0.1 }); // Bright yellow trim
+  const floorMaterial = createBeachMaterial({ color: 0xdcdcdc, roughness: 0.7 }); // Light grey concrete floor
+  const grassMaterial = createBeachMaterial({ color: 0x3d7042, roughness: 0.9 }); // Dark grass green base
+  const doorMaterial = createBeachMaterial({ color: 0x5c3b21, roughness: 0.85 }); // Dark brown door
+  const windowBackMaterial = createBeachMaterial({ color: 0x2b2b2b, roughness: 0.9 }); // Dark glass/shutter background
+  const slatMaterial = createBeachMaterial({ color: 0xf0f0f0, roughness: 0.6 }); // White horizontal slats
+  const metalMaterial = createBeachMaterial({ color: 0x333333, roughness: 0.6, metalness: 0.6 }); // Metallic staircase
+
+  // 1. Platform / Grass Base
+  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.3, 6.0), grassMaterial));
+  base.position.set(0, 0.15, 0);
+  house.add(base);
+
+  // 2. Porch Floor
+  const floor = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.15, 1.8), floorMaterial));
+  floor.position.set(0, 0.375, -1.8);
+  house.add(floor);
+
+  // 3. Main Room Box (Peach/Pink walls)
+  const room = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.6, 2.8, 3.4), wallMaterial));
+  room.position.set(0, 1.7, 0.8);
+  house.add(room);
+
+  // 4. Porch Columns (Pillars)
+  const colGeo = new THREE.BoxGeometry(0.2, 2.7, 0.2);
+  const colXPositions = [-3.5, -1.2, 1.2, 3.5];
+  colXPositions.forEach((cx) => {
+    const col = markShadow(new THREE.Mesh(colGeo, wallMaterial));
+    col.position.set(cx, 1.65, -2.6);
+    house.add(col);
+  });
+
+  // 5. Arches (Horizontal header beam + diagonal corner brackets)
+  const header = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.3, 0.2), wallMaterial));
+  header.position.set(0, 2.85, -2.6);
+  house.add(header);
+
+  const bracketGeo = new THREE.BoxGeometry(0.25, 0.25, 0.22);
+  const bracketXOffsets = [-3.25, -1.45, -0.95, 0.95, 1.45, 3.25];
+  bracketXOffsets.forEach((bx, idx) => {
+    const bracket = markShadow(new THREE.Mesh(bracketGeo, wallMaterial));
+    bracket.position.set(bx, 2.65, -2.6);
+    bracket.rotation.z = (idx % 2 === 0) ? -Math.PI / 4 : Math.PI / 4;
+    house.add(bracket);
+  });
+
+  // 6. Roof Slab
+  const roof = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.2, 5.6), roofMaterial));
+  roof.position.set(0, 3.1, -0.3);
+  house.add(roof);
+
+  // Yellow Roof Trim / Fascia
+  const frontTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.22, 0.3, 0.05), trimMaterial));
+  frontTrim.position.set(0, 3.15, -3.12);
+  const leftTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 5.62), trimMaterial));
+  leftTrim.position.set(-4.11, 3.15, -0.3);
+  const rightTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 5.62), trimMaterial));
+  rightTrim.position.set(4.11, 3.15, -0.3);
+  house.add(frontTrim, leftTrim, rightTrim);
+
+  // 7. Door (dark brown wooden door)
+  const door = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.08), doorMaterial));
+  door.position.set(0.2, 1.3, -0.9);
+  house.add(door);
+
+  // Door handle (gold sphere)
+  const handle = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), trimMaterial));
+  handle.position.set(0.55, 1.3, -0.85);
+  house.add(handle);
+
+  // 8. Front Windows (two windows, left and right of door)
+  const frameGeo = new THREE.BoxGeometry(1.6, 1.1, 0.08);
+  const glassGeo = new THREE.BoxGeometry(1.4, 0.9, 0.04);
+  const slatGeo = new THREE.BoxGeometry(1.4, 0.05, 0.02);
+
+  [-2.35, 2.35].forEach((wx) => {
+    // Window Frame (Yellow)
+    const frame = markShadow(new THREE.Mesh(frameGeo, trimMaterial));
+    frame.position.set(wx, 1.5, -0.9);
+    house.add(frame);
+
+    // Glass/Backplane (Dark)
+    const glass = markShadow(new THREE.Mesh(glassGeo, windowBackMaterial));
+    glass.position.set(wx, 1.5, -0.91);
+    house.add(glass);
+
+    // Horizontal louvers/slats
+    for (let s = 0; s < 5; s++) {
+      const slat = markShadow(new THREE.Mesh(slatGeo, slatMaterial));
+      slat.position.set(wx, 1.2 + s * 0.15, -0.89);
+      house.add(slat);
+    }
+  });
+
+  // 9. Side Window (Left side)
+  const sideFrame = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 1.6), trimMaterial));
+  sideFrame.position.set(-3.8, 1.5, 0.8);
+  house.add(sideFrame);
+  const sideGlass = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 1.4), windowBackMaterial));
+  sideGlass.position.set(-3.81, 1.5, 0.8);
+  house.add(sideGlass);
+  const sideSlatGeo = new THREE.BoxGeometry(0.02, 0.05, 1.4);
+  for (let s = 0; s < 5; s++) {
+    const slat = markShadow(new THREE.Mesh(sideSlatGeo, slatMaterial));
+    slat.position.set(-3.79, 1.2 + s * 0.15, 0.8);
+    house.add(slat);
+  }
+
+  // 10. Spiral Staircase on the Left
+  const post = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.2, 6), metalMaterial));
+  post.position.set(-4.1, 1.9, 1.2);
+  house.add(post);
+
+  const stairs = new THREE.Group();
+  const stepGeo = new THREE.BoxGeometry(0.65, 0.04, 0.22);
+  const stairCount = 15;
+  for (let i = 0; i < stairCount; i++) {
+    const theta = i * (Math.PI * 1.5 / (stairCount - 1));
+    const h = (i / (stairCount - 1)) * 2.8;
+    const step = markShadow(new THREE.Mesh(stepGeo, metalMaterial));
+    step.position.set(
+      Math.cos(theta) * 0.32,
+      h + 0.02,
+      Math.sin(theta) * 0.32
+    );
+    step.rotation.y = -theta;
+    stairs.add(step);
+  }
+  stairs.position.set(-4.1, 0.3, 1.2);
+  house.add(stairs);
+
+  // 11. Ornamental Bushes in Front
+  const bushPositions = [
+    [-3.2, 0.3, -2.8],
+    [3.2, 0.3, -2.8],
+    [-0.8, 0.3, -2.8]
+  ];
+  bushPositions.forEach(([bx, by, bz], bidx) => {
+    const bush = createTropicalBush(seed + bidx + 50);
+    bush.position.set(bx, by, bz);
+    bush.scale.setScalar(0.7);
+    house.add(bush);
+  });
+
+  return house;
 }
 
 function createBeachHutStrict() {
