@@ -157,7 +157,7 @@ export function startScenePreview(container, setup, options = {}) {
       const state = controller.getState();
       vehicle.setTransform(state.position, state.heading);
       vehicle.update(deltaTime, state);
-      updateCameraFollow(state);
+      cameraController.update(deltaTime, state, track.trackInfo);
       raceHud.update({
         raceState: raceManager.getState(),
         vehicleState: state,
@@ -222,7 +222,10 @@ export function startScenePreview(container, setup, options = {}) {
       trackId: track.trackInfo.id,
       trackName: track.trackInfo.name
     });
-    minimap.update({ playerState: state });
+    minimap.update({
+      playerState: state,
+      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
       raceState,
@@ -371,6 +374,17 @@ function applyAiVehicleTransform(vehicle, aiState) {
     new THREE.Vector3(aiState.position.x, aiState.position.y, aiState.position.z),
     aiState.heading
   );
+}
+
+function getVisibleAiMinimapState(aiState, aiVehicle) {
+  if (!aiState?.position || !aiVehicle?.group) {
+    return null;
+  }
+
+  return {
+    ...aiState,
+    hasVisibleModel: aiVehicle.group.visible !== false
+  };
 }
 
 function createCheckpointHighlighter(trackInfo) {

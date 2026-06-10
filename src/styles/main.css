@@ -91,8 +91,8 @@ canvas {
 .race-hud[data-track-theme="vegas"] {
   --hud-primary: #c084fc;
   --hud-secondary: #facc15;
-  --hud-speed-mid: #e879f9;
-  --hud-speed-end: #facc15;
+  --hud-speed-mid: #d8b4fe;
+  --hud-speed-end: #a855f7;
   --hud-track-mid: #a855f7;
   --hud-panel-rgb: 16, 8, 28;
   --hud-glow-rgb: 192, 132, 252;
@@ -261,6 +261,16 @@ canvas {
   -webkit-background-clip: text;
   -webkit-text-stroke: 0.45px rgba(8, 12, 20, 0.7);
   -webkit-text-fill-color: transparent;
+}
+
+.race-hud[data-track-theme="vegas"] .race-hud-time {
+  background: linear-gradient(180deg, #ffffff 0%, #f3e8ff 42%, #c084fc 78%, #7e22ce 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-stroke: 0.28px rgba(8, 12, 20, 0.48);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(216, 180, 254, 0.34);
 }
 
 .race-hud-place {

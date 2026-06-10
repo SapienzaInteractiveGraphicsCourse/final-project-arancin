@@ -49,7 +49,6 @@ export class MinimapSystem {
     this.drawCheckpoints(transform);
     this.drawAiMarker(transform, aiState);
     this.drawPlayerMarker();
-    this.drawLegend();
   }
 
   clear() {
@@ -222,31 +221,6 @@ export class MinimapSystem {
     this.context.arc(point.x, point.y, 5.4, 0, Math.PI * 2);
     this.context.fill();
     this.context.stroke();
-  }
-
-  drawLegend() {
-    const x = 14;
-    const y = this.cssHeight - 22;
-
-    this.context.fillStyle = "rgba(8, 12, 20, 0.62)";
-    this.context.beginPath();
-    this.context.roundRect(x - 7, y - 11, 72, 18, 6);
-    this.context.fill();
-
-    this.context.fillStyle = "#fde047";
-    this.context.beginPath();
-    this.context.arc(x, y - 1, 3.5, 0, Math.PI * 2);
-    this.context.fill();
-
-    this.context.fillStyle = "#fb923c";
-    this.context.beginPath();
-    this.context.arc(x + 25, y - 1, 3.5, 0, Math.PI * 2);
-    this.context.fill();
-
-    this.context.fillStyle = "#67e8f9";
-    this.context.beginPath();
-    this.context.arc(x + 50, y - 1, 3.5, 0, Math.PI * 2);
-    this.context.fill();
   }
 
   clipToCircle() {
