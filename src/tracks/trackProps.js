@@ -93,21 +93,21 @@ function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfW
   const point = curve.getPointAt(progress % 1.0);
   const tangent = curve.getTangentAt(progress % 1.0).setY(0).normalize();
   const normal = getRightVector(tangent);
-  
+
   // Determine absolute minimum clearance to prevent physical clipping, scaled with minClearance
   const safeClearance = Math.max(16, minClearance * 0.35);
   const absoluteMinClearance = roadHalfWidth + safeClearance;
-  
+
   let bestPos = null;
   let bestDist = -1;
-  
+
   const sidesToTry = [side, -side];
-  
+
   for (const s of sidesToTry) {
     let currentOffset = initialOffset;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const testPos = point.clone().addScaledVector(normal, s * currentOffset);
-      
+
       // Calculate minimum distance from testPos to the entire track
       let minTrackDist = Infinity;
       for (let index = 0; index <= 120; index += 1) {
@@ -117,30 +117,30 @@ function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfW
           minTrackDist = dist;
         }
       }
-      
+
       // If this position is safe from physical road clipping
       if (minTrackDist >= absoluteMinClearance) {
         // If it also satisfies the desired minClearance, return it immediately
         if (minTrackDist >= roadHalfWidth + minClearance) {
           return testPos;
         }
-        
+
         // Otherwise, keep track of the one that is furthest from the road
         if (minTrackDist > bestDist) {
           bestDist = minTrackDist;
           bestPos = testPos;
         }
       }
-      
+
       currentOffset += 20;
     }
   }
-  
+
   // If we found a position that doesn't clip, return it
   if (bestPos) {
     return bestPos;
   }
-  
+
   // Fallback to roadside position with safe clear distance
   for (const s of [side, -side]) {
     const safeNearPos = point.clone().addScaledVector(normal, s * (roadHalfWidth + safeClearance + 2));
@@ -156,7 +156,7 @@ function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfW
       return safeNearPos;
     }
   }
-  
+
   // Ultimate fallback to initial offset
   return point.clone().addScaledVector(normal, side * initialOffset);
 }
@@ -205,7 +205,7 @@ function addWindowGrid(group, block, neonColors, seed, face) {
   const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
   const darkMaterial = getCachedWindowMaterial(0x070811, false);
   const geometry = getCachedWindowGeometry(windowWidth, windowHeight, windowDepth);
-  
+
   const litMatricesByColor = colorsList.map(() => []);
   const darkMatrices = [];
   const matrix = new THREE.Matrix4();
@@ -346,7 +346,7 @@ function addRoofDetail(group, topY, width, depth, neonColor, variant) {
 function addRoofBillboard(group, block, neonColors, seed) {
   const topY = block.y + block.height * 0.5;
   const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
-  
+
   // Size scales with the top block (blocks[2] crown)
   const billboardWidth = Math.max(3.0, block.width * 1.25);
   const billboardHeight = billboardWidth * 0.5;
@@ -385,14 +385,14 @@ function addRoofBillboard(group, block, neonColors, seed) {
     emissiveIntensity: 4.8,
     roughness: 0.15
   });
-  
+
   const borderThickness = 0.08;
   const topBorder = new THREE.Mesh(
     new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
     borderMaterial
   );
   topBorder.position.set(0, poleHeight + billboardHeight + borderThickness * 0.5, 0);
-  
+
   const bottomBorder = new THREE.Mesh(
     new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
     borderMaterial
@@ -433,7 +433,7 @@ function addRoofBillboard(group, block, neonColors, seed) {
     textMaterial
   );
   textPlaneFront.position.set(0, poleHeight + billboardHeight * 0.5, billboardDepth * 0.5 + 0.01);
-  
+
   const textPlaneBack = textPlaneFront.clone();
   textPlaneBack.rotation.y = Math.PI;
   textPlaneBack.position.z = -(billboardDepth * 0.5 + 0.01);
@@ -624,26 +624,26 @@ function generateCitySkyline(curve, group, definition) {
   for (let index = 0; index < sampleCount; index += 1) {
     // Alternate left and right side of the track
     const side = index % 2 === 0 ? 1 : -1;
-    
+
     // Spaced out progress with a small jitter to keep it natural but prevent overlap
     const progressJitter = (pseudoRandom(index + 13.7) * 0.4 - 0.2) / sampleCount;
     const progress = ((index + 0.5) / sampleCount + progressJitter + 1.0) % 1.0;
-    
+
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
 
     const buildingIndex = index;
-    
+
     // Wider, taller, and more proportioned buildings
     const height = 32 + pseudoRandom(buildingIndex + 4.2) * 33;
     const width = 8 + pseudoRandom(buildingIndex + 8.6) * 4;
     const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 4;
-    
+
     // Position them further out so they are in the background and don't intersect other props
     const skylineOffset = definition.roadWidth * 0.5 + 82 + pseudoRandom(buildingIndex + 21.5) * 32;
     const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-    
+
     // Dynamically calculate a safe position that is guaranteed not to overlap ANY part of the track
     const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 62);
 
@@ -979,7 +979,7 @@ function createVegasVerticalCanvasTexture(width, height, text, themeColorHex) {
 
   const fontSize = Math.floor(height / (text.length * 1.35));
   const startY = (height - (text.length - 1) * fontSize * 1.15) * 0.5;
-  
+
   for (let i = 0; i < text.length; i++) {
     ctx.font = `bold ${fontSize}px Arial Black, Arial, sans-serif`;
     ctx.fillStyle = "#ffffff";
@@ -1332,16 +1332,16 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    
+
     // Choose side, and flip to opposite side if we are near a grandstand
     let side = index % 2 === 0 ? -1 : 1;
     if (isNearGrandstand(progress, side, 0.05)) {
       side = -side;
     }
-    
+
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
-    
+
     // Scale down distance since billboards are smaller and we want them visible
     const distance = roadHalfWidth + 9 + pseudoRandom(index * 19.3 + 2.8) * 4;
     const position = point.clone().addScaledVector(normal, side * distance);
@@ -1349,10 +1349,10 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
 
     sign.name = `VegasBillboard:${index}`;
     sign.position.copy(position);
-    
+
     // Clamp closer to road with custom clearance so it fits beautifully
     clampPropPosition(curve, sign.position, roadHalfWidth, 200, 8, 9);
-    
+
     // Stand straight/upright! Point at the track horizontally (y = sign.position.y)
     sign.lookAt(point.x, sign.position.y, point.z);
 
@@ -1427,12 +1427,12 @@ function addNeonPalms(group, curve, definition) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    
+
     let side = index % 2 === 0 ? 1 : -1;
     if (isNearGrandstand(progress, side, 0.05)) {
       side = -side;
     }
-    
+
     const basePosition = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 2.9));
 
     for (let palmIndex = 0; palmIndex < 5; palmIndex += 1) {
@@ -1813,7 +1813,7 @@ function addMsgSphere(group, curve, definition) {
   sphere.name = "VegasMSGSphere";
   sphere.position
     .copy(point)
-      .addScaledVector(normal, definition.roadWidth * 0.5 + 58);
+    .addScaledVector(normal, definition.roadWidth * 0.5 + 58);
 
   const sphereMaterial = createFlatStandardMaterial({
     color: 0x2810ff,
@@ -2041,7 +2041,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
   const shirtColors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78, 0xf4f2e8, 0x6aa7ff, 0xff7a59];
   const skinColors = [0xf0c7a0, 0xd49a6a, 0x8b5a3c, 0xf4d2b5];
   const hairColors = [0x15100c, 0x4a2b18, 0x8a5a2b, 0xd8b15f, 0x5f6470];
-  
+
   const mats = getSpectatorMaterials(shirtColors, skinColors, hairColors);
   const shirtMaterials = mats.shirts;
   const skinMaterials = mats.skins;
@@ -2062,7 +2062,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
   const rightArmMatrices = skinMaterials.map(() => []);
   const leftLegMatrices = [];
   const rightLegMatrices = [];
-  
+
   const matrix = new THREE.Matrix4();
   const torsoQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0, 0));
   const headQuaternion = new THREE.Quaternion();
@@ -2087,7 +2087,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
       const scaleNoise = 1.08 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.2;
 
       variedScale.set(scaleNoise, scaleNoise, scaleNoise);
-      
+
       matrix.compose(new THREE.Vector3(x, y + 0.04, z), torsoQuaternion, variedScale);
       torsoMatrices[shirtIndex].push(matrix.clone());
 
@@ -2705,13 +2705,13 @@ function buildBellagio(group, curve, roadHalfWidth) {
 function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
-  
+
   // progress=0.055 → midway between start (0) and first grandstand (0.1), right side of track.
   // offset roadHalfWidth+18 = 23.25u clears absoluteMinClearance from the approach track segment.
   // rotation +PI*0.5: front face points toward the road center so it's readable while driving.
   const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
   signGroup.position.copy(transform.position);
-  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5; 
+  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5;
 
   const welcomeTex = getCachedWelcomeToVegasTexture();
   const welcomeMat = new THREE.MeshStandardMaterial({
@@ -2761,7 +2761,7 @@ function buildEiffelTower(group, curve, roadHalfWidth) {
 
   // Base legs
   const legGeo = new THREE.CylinderGeometry(0.8, 1.6, 20, 5);
-  const angles = [Math.PI/4, 3*Math.PI/4, -Math.PI/4, -3*Math.PI/4];
+  const angles = [Math.PI / 4, 3 * Math.PI / 4, -Math.PI / 4, -3 * Math.PI / 4];
   const legSpacing = 12;
 
   angles.forEach((angle) => {
@@ -2870,7 +2870,7 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
   ferrisGroup.rotation.y = transform.rotationY + Math.PI / 2;
 
   const metalMaterial = createVegasMaterial({ color: 0x222026, roughness: 0.7, metalness: 0.3 });
-  
+
   const neonCyan = new THREE.MeshStandardMaterial({
     color: 0x00e5ff,
     emissive: 0x00e5ff,
@@ -2907,7 +2907,7 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
   const rotatingPart = new THREE.Group();
   rotatingPart.name = "FerrisWheelRotatingPart";
   rotatingPart.position.set(0, 28, 0);
-  
+
   // Set the rotation spin! (slowly rotates around Z-axis)
   const spinSpeed = 0.08;
   rotatingPart.userData.spin = { x: 0, y: 0, z: spinSpeed };
@@ -3049,9 +3049,9 @@ function resolvePropClipping(propsGroup, curve, roadHalfWidth) {
     // Skip objects that are meant to span the road (tunnels, gantries, start line, checkpoint gates)
     // or roadside lamps that are already carefully placed close to the road.
     if (
-      name.includes("Tunnel") || 
-      name.includes("Gantry") || 
-      name.includes("Checkpoint") || 
+      name.includes("Tunnel") ||
+      name.includes("Gantry") ||
+      name.includes("Checkpoint") ||
       name.includes("Start") ||
       name.includes("StreetLamp") ||
       name.includes("LightPost")
@@ -3081,7 +3081,7 @@ function resolvePropClipping(propsGroup, curve, roadHalfWidth) {
     }
 
     const pos = child.position;
-    
+
     // We run up to 3 relaxation iterations to resolve clipping from all parts of the track
     for (let iteration = 0; iteration < 3; iteration += 1) {
       let closestPoint = null;
@@ -3245,67 +3245,35 @@ function addBeachGround(group) {
   group.add(ground);
 }
 
-function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth, segmentsAlong = 15, subdivisionsAcross = 10) {
+function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y) {
   const vertices = [];
   const indices = [];
+  const segments = trackDef.segments || 200;
 
-  // Pre-generate centerline points for distance check
-  const centerlinePoints = [];
-  const numSamples = 160;
-  for (let k = 0; k <= numSamples; k++) {
-    centerlinePoints.push(curve.getPointAt(k / numSamples));
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).setY(0).normalize();
+    const normal = getRightVector(tan);
+
+    const nearP = p.clone().addScaledVector(normal, side * nearOffset);
+    const farP = p.clone().addScaledVector(normal, side * farOffset);
+
+    vertices.push(
+      nearP.x, y, nearP.z,
+      farP.x, y, farP.z
+    );
   }
 
-  for (let i = 0; i <= segmentsAlong; i++) {
-    const t = t1 + (t2 - t1) * (i / segmentsAlong);
-    const frame = getRoadFrame(curve, t % 1);
-    
-    for (let j = 0; j <= subdivisionsAcross; j++) {
-      const u = j / subdivisionsAcross;
-      let dist = (roadHalfWidth + 20) + u * oceanWidth;
-      let point = frame.point.clone().addScaledVector(frame.right, side * dist);
-      point.y = -0.2;
-
-      // Verify distance to nearest centerline point
-      let isTooClose = true;
-      let attempts = 0;
-      while (isTooClose && attempts < 50) {
-        let minDistance = Infinity;
-        for (let k = 0; k < centerlinePoints.length; k++) {
-          const d = point.distanceTo(centerlinePoints[k]);
-          if (d < minDistance) {
-            minDistance = d;
-          }
-        }
-        
-        if (minDistance < roadHalfWidth + 15) {
-          // Shift further out
-          dist += 5.0;
-          point = frame.point.clone().addScaledVector(frame.right, side * dist);
-          attempts++;
-        } else {
-          isTooClose = false;
-        }
-      }
-
-      // Deform Y coordinate using two sine functions based on X and Z
-      // Max variation: ±1.2 units (0.7 + 0.5 = 1.2)
-      const wave = Math.sin(point.x * 0.1) * 0.7 + Math.sin(point.z * 0.08) * 0.5;
-      point.y = -0.2 + wave;
-
-      vertices.push(point.x, point.y, point.z);
-    }
-  }
-
-  for (let i = 0; i < segmentsAlong; i++) {
-    for (let j = 0; j < subdivisionsAcross; j++) {
-      const p0 = i * (subdivisionsAcross + 1) + j;
-      const p1 = p0 + 1;
-      const p2 = (i + 1) * (subdivisionsAcross + 1) + j;
-      const p3 = p2 + 1;
-
-      indices.push(p0, p2, p1);
-      indices.push(p1, p2, p3);
+  for (let i = 0; i < segments; i++) {
+    const current = i * 2;
+    const next = (i + 1) * 2;
+    if (side < 0) {
+      indices.push(current, current + 1, next);
+      indices.push(current + 1, next + 1, next);
+    } else {
+      indices.push(current, next, current + 1);
+      indices.push(current + 1, next, next + 1);
     }
   }
 
@@ -3316,38 +3284,39 @@ function createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth
   return geometry;
 }
 
-function addLowPolySeaSegment(group, curve, t1, t2, side, roadHalfWidth, oceanWidth) {
-  const geometry = createLowPolySeaGeometry(curve, t1, t2, side, roadHalfWidth, oceanWidth);
-
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x0099cc,
-    emissive: 0x003355,
-    emissiveIntensity: 0.5,
-    roughness: 0.25,
-    metalness: 0.1,
-    flatShading: true,
-    side: THREE.DoubleSide
-  });
-
+function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, material, name, y) {
+  const geometry = createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y);
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = `LowPolySeaSegment_${t1.toFixed(2)}_${t2.toFixed(2)}`;
+  mesh.name = name;
   mesh.receiveShadow = true;
-  mesh.castShadow = false;
-
   group.add(mesh);
+  return mesh;
 }
 
 function addBeachOceanPlane(group, curve, trackDef) {
-  const roadHalfWidth = trackDef.roadWidth * 0.5;
-  const oceanWidth = 220;
+  const roadHalfWidth = trackDef.roadWidth / 2;
 
-  // Create exactly 2 ocean patches on the left side (side = -1)
-  // Segment 1: t = 0.15 to 0.30
-  addLowPolySeaSegment(group, curve, 0.15, 0.30, -1, roadHalfWidth, oceanWidth);
+  // Shore Sand (Spiaggia dorata)
+  const sandMaterial = createBeachMaterial({ color: 0xe0c66f, roughness: 0.95 });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 8.5, sandMaterial, "TropicalBeachOceanShore", -0.012);
 
-  // Segment 2: t = 0.60 to 0.75
-  addLowPolySeaSegment(group, curve, 0.60, 0.75, -1, roadHalfWidth, oceanWidth);
+  // Surf/Foam (Banda di schiuma/riva bianca)
+  const surfMaterial = createBeachMaterial({ color: 0xf0f5e8, roughness: 0.50 });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 8.5, roadHalfWidth + 12.5, surfMaterial, "TropicalBeachOceanSurf", -0.010);
+
+  // Shallow Water (Acque basse turchesi)
+  const shallowMaterial = createBeachMaterial({
+    color: 0x30cfe0, emissive: 0x10a8c0, emissiveIntensity: 0.14, roughness: 0.44
+  });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 12.5, roadHalfWidth + 150, shallowMaterial, "TropicalBeachOceanShallow", -0.014);
+
+  // Deep Ocean (Acque profonde blu)
+  const deepMaterial = createBeachMaterial({
+    color: 0x005f8a, emissive: 0x003a5c, emissiveIntensity: 0.15, roughness: 0.35
+  });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 150, roadHalfWidth + 1150, deepMaterial, "TropicalBeachOceanDeep", -0.018);
 }
+
 
 function addBeachEdgeStrips(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
@@ -3538,38 +3507,20 @@ function createTropicalBush(seed = 0) {
 function addBeachTropicalPlants(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
-  // 20 palme distribuite attorno al tracciato con proporzioni più grandi
+  // 20 palme/cespugli distribuiti attorno alla pista, tenendoli vicini sul lato interno
   for (let index = 0; index < 20; index += 1) {
-    const side = index % 2 === 0 ? 1 : -1;
+    const side = -1;
     const progress = (index + 0.3) / 20;
-    
-    let offsetVal = roadHalfWidth + 14 + (index % 4) * 5.5;
-    if (side === -1 && ((progress >= 0.10 && progress <= 0.30) || (progress >= 0.55 && progress <= 0.75))) {
-      offsetVal = roadHalfWidth + 10 + (index % 3) * 3; // Stay on the dry sand shore (max offset 16)
-    }
-    const offset = side * offsetVal;
-    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 12);
+    const offset = side * (roadHalfWidth + 4.5 + (index % 4) * 2.5); // Offset tra roadHalfWidth + 4.5 e roadHalfWidth + 12
+    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 4.5);
     const useBush = index % 5 === 0;
     const plant = useBush ? createTropicalBush(index) : createTropicalPalm(index);
     plant.position.copy(position);
     plant.rotation.y = rotationY + (index % 5) * 0.22;
-    // Scale larger: palme 1.1–1.6x, cespugli 1.2–1.8x
+    // Scale: palme 1.1–1.6x, cespugli 1.2–1.8x
     const baseScale = useBush ? 1.4 : 1.1;
     plant.scale.setScalar(baseScale + pseudoRandom(index + 4.1) * 0.5);
     group.add(plant);
-  }
-
-  // Cluster di palme sulla riva verso l'oceano (lato +X)
-  for (let index = 0; index < 8; index += 1) {
-    const progress = (index + 0.1) / 8;
-    const { position, rotationY } = safePlace(curve, progress, 1, roadHalfWidth + 28 + index * 8, roadHalfWidth, 18);
-    // Posiziona vicino alla riva (x positivo)
-    position.x = Math.max(position.x, 85 + index * 4);
-    const palm = createTropicalPalm(index + 100);
-    palm.position.copy(position);
-    palm.rotation.y = rotationY;
-    palm.scale.setScalar(1.2 + pseudoRandom(index + 9.3) * 0.4);
-    group.add(palm);
   }
 }
 
@@ -3614,8 +3565,8 @@ function addBeachHutsStrict(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
   [0.20, 0.55, 0.80].forEach((progress, index) => {
-    const side = 1; // Always place huts on the right (land) side to keep ocean side clean
-    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 18), roadHalfWidth, 12);
+    const side = -1;
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 8.5), roadHalfWidth, 6.0);
     const hut = createBeachHutStrict();
     hut.position.copy(position);
     hut.rotation.y = rotationY;
@@ -3631,8 +3582,8 @@ function addBeachUmbrellasStrict(group, curve, trackDef) {
 
   for (let index = 0; index < 10; index += 1) {
     const progress = (index + 0.5) * 0.1;
-    const offset = roadHalfWidth + 15 + (index % 4) * 3.2;
-    const { position, rotationY } = safePlace(curve, progress, 1, offset, roadHalfWidth, 12);
+    const offset = roadHalfWidth + 6 + (index % 3) * 2.0;
+    const { position, rotationY } = safePlace(curve, progress, -1, -(roadHalfWidth + 6 + (index % 3) * 2.0), roadHalfWidth, 5.0);
     const umbrella = new THREE.Group();
     umbrella.name = "TropicalBeachUmbrellaStrict";
     umbrella.position.copy(position);
@@ -3663,14 +3614,9 @@ function addBeachLampPostsStrict(group, curve, trackDef) {
   const topGeometry = new THREE.SphereGeometry(0.5, 5, 4);
 
   for (let index = 0; index < 16; index += 1) {
-    const side = index % 2 === 0 ? 1 : -1;
+    const side = -1;
     const progress = (index + 0.25) / 16;
-    
-    if (side === -1 && ((progress >= 0.10 && progress <= 0.30) || (progress >= 0.55 && progress <= 0.75))) {
-      continue; // Skip lamp posts on the left (ocean) side during coastal sections
-    }
-    
-    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 12);
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 2.0);
     const lamp = new THREE.Group();
     lamp.name = "TropicalBeachLampPostStrict";
     lamp.position.copy(position);
@@ -3750,7 +3696,7 @@ export function buildBeachProps(group, curve, trackDef) {
   addBeachTropicalPlants(propsGroup, curve, trackDef);
   addBeachHutsStrict(propsGroup, curve, trackDef);
   addBeachUmbrellasStrict(propsGroup, curve, trackDef);
-  addBeachLampPostsStrict(propsGroup, curve, trackDef);
+  // addBeachLampPostsStrict(propsGroup, curve, trackDef);
 
   group.add(propsGroup);
   group.userData.disposeProps = () => {
