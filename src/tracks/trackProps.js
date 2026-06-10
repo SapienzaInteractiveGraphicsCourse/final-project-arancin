@@ -3284,6 +3284,49 @@ function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffse
   return geometry;
 }
 
+// Like createBeachSideBandGeometry but adds a per-vertex 'aShoreT' attribute:
+// 0.0 = near shore edge, 1.0 = far ocean edge — used for gradient coloring.
+function createBeachGradientBandGeometry(curve, trackDef, side, nearOffset, farOffset, y) {
+  const vertices = [];
+  const shoreT  = [];   // gradient attribute
+  const indices = [];
+  const segments = trackDef.segments || 200;
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).setY(0).normalize();
+    const normal = getRightVector(tan);
+
+    const nearP = p.clone().addScaledVector(normal, side * nearOffset);
+    const farP  = p.clone().addScaledVector(normal, side * farOffset);
+
+    vertices.push(nearP.x, y, nearP.z);  // near vertex
+    shoreT.push(0.0);
+    vertices.push(farP.x,  y, farP.z);   // far vertex
+    shoreT.push(1.0);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const current = i * 2;
+    const next = (i + 1) * 2;
+    if (side < 0) {
+      indices.push(current, current + 1, next);
+      indices.push(current + 1, next + 1, next);
+    } else {
+      indices.push(current, next, current + 1);
+      indices.push(current + 1, next, next + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("aShoreT",  new THREE.Float32BufferAttribute(shoreT, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, material, name, y) {
   const geometry = createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y);
   const mesh = new THREE.Mesh(geometry, material);
@@ -3296,25 +3339,54 @@ function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, mater
 function addBeachOceanPlane(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
-  // Shore Sand (Spiaggia dorata)
+  // Shore Sand (widened)
   const sandMaterial = createBeachMaterial({ color: 0xe0c66f, roughness: 0.95 });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 8.5, sandMaterial, "TropicalBeachOceanShore", -0.012);
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 14.0, sandMaterial, "TropicalBeachOceanShore", -0.012);
 
-  // Surf/Foam (Banda di schiuma/riva bianca)
+  // Surf/Foam
   const surfMaterial = createBeachMaterial({ color: 0xf0f5e8, roughness: 0.50 });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 8.5, roadHalfWidth + 12.5, surfMaterial, "TropicalBeachOceanSurf", -0.010);
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 14.0, roadHalfWidth + 18.0, surfMaterial, "TropicalBeachOceanSurf", -0.010);
 
-  // Shallow Water (Acque basse turchesi)
-  const shallowMaterial = createBeachMaterial({
-    color: 0x30cfe0, emissive: 0x10a8c0, emissiveIntensity: 0.14, roughness: 0.44
+  // Gradient ocean: turquoise (riva) → mid blue → deep blue (largo)
+  // Uses a static ShaderMaterial with per-vertex aShoreT attribute (0=riva, 1=largo)
+  const gradientShader = new THREE.ShaderMaterial({
+    uniforms: {
+      uColorA: { value: new THREE.Color(0x2ddde8) }, // turchese chiaro
+      uColorB: { value: new THREE.Color(0x0772b0) }, // blu intermedio
+      uColorC: { value: new THREE.Color(0x003a6e) }, // blu profondo
+    },
+    vertexShader: /* glsl */`
+      attribute float aShoreT;
+      varying float vT;
+      void main() {
+        vT = aShoreT;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+      uniform vec3 uColorC;
+      varying float vT;
+      void main() {
+        // Two-stop blend: A -> B at t=0..0.45, B -> C at t=0.4..1.0
+        vec3 col = mix(uColorA, uColorB, smoothstep(0.0, 0.45, vT));
+        col = mix(col, uColorC, smoothstep(0.4, 1.0, vT));
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+    side: THREE.DoubleSide,
   });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 12.5, roadHalfWidth + 150, shallowMaterial, "TropicalBeachOceanShallow", -0.014);
 
-  // Deep Ocean (Acque profonde blu)
-  const deepMaterial = createBeachMaterial({
-    color: 0x005f8a, emissive: 0x003a5c, emissiveIntensity: 0.15, roughness: 0.35
-  });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 150, roadHalfWidth + 1150, deepMaterial, "TropicalBeachOceanDeep", -0.018);
+  const oceanGeo = createBeachGradientBandGeometry(
+    curve, trackDef, 1,
+    roadHalfWidth + 18.0, roadHalfWidth + 1155,
+    -0.014
+  );
+  const oceanMesh = new THREE.Mesh(oceanGeo, gradientShader);
+  oceanMesh.name = "TropicalBeachGradientOcean";
+  oceanMesh.receiveShadow = false;
+  group.add(oceanMesh);
 }
 
 
@@ -3773,11 +3845,9 @@ function addBeachTropicalPlants(group, curve, trackDef) {
     plant.scale.setScalar(baseScale + pseudoRandom(index + 4.1) * 0.5);
     group.add(plant);
 
-    if (!useBush && (index === 2 || index === 8)) {
+    if (!useBush && index === 2) {
       addChairsUnderPalm(group, position, rotationY, index);
-      if (index === 2) {
-        addHouseBehindPalm(group, curve, progress, offset, roadHalfWidth, rotationY, index);
-      }
+      addHouseBehindPalm(group, curve, progress, offset, roadHalfWidth, rotationY, index);
     }
   }
 }
@@ -4029,62 +4099,90 @@ function createBeachHutStrict(seed = 0) {
   beamFront.position.set(0, 3.14, -0.8);
   hut.add(beamLeft, beamRight, beamBack, beamFront);
 
-  // 5. Thatched Roof (tilted forward)
+  // 5. Thatched Roof — full 360° disc so orientation does not matter
   const roof = markShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(3.2, 3.6, 0.4, 16, 1, false, -Math.PI * 0.6, Math.PI * 1.2),
+    new THREE.CylinderGeometry(3.2, 3.6, 0.4, 16),
     roofMat
   ));
-  roof.position.set(0, 3.3, 0.2);
-  roof.rotation.x = 0.08;
+  roof.position.set(0, 3.3, 0.0);
   hut.add(roof);
 
-  // 6. Sign Board "BAR" in 3D letters
-  const signBoard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, 0.05), poleMat));
-  signBoard.position.set(0, 2.85, -2.4);
-  signBoard.rotation.x = 0.05;
-  hut.add(signBoard);
+  // 6. Sign Board "BAR" — placed on the back-local face (z=+2.55)
+  // The kiosk is spawned with rotation.y += Math.PI which flips the X axis.
+  // Place sign at z=-2.55 (front of counter in local) with lz=-0.06 (protrudes toward road).
+  // Pre-mirror ALL letter x coordinates so that after the kiosk PI flip they read correctly.
+  const signGroup = new THREE.Group();
+  signGroup.position.set(0, 3.08, -2.55);
+  signGroup.rotation.x = 0.04;
+  hut.add(signGroup);
 
-  const letterZ = -2.43;
+  // Board: wide warm-wood plank
+  const signBoard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.62, 0.08), trimMat));
+  signGroup.add(signBoard);
 
-  // Letter B
-  const bStem = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
-  bStem.position.set(-0.32, 2.85, letterZ);
-  const bTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
-  bTop.position.set(-0.26, 2.96, letterZ);
-  const bMid = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
-  bMid.position.set(-0.26, 2.85, letterZ);
-  const bBot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
-  bBot.position.set(-0.26, 2.74, letterZ);
-  const bLoopTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
-  bLoopTop.position.set(-0.2, 2.905, letterZ);
-  const bLoopBot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
-  bLoopBot.position.set(-0.2, 2.795, letterZ);
-  hut.add(bStem, bTop, bMid, bBot, bLoopTop, bLoopBot);
+  // Two small hanging chains/brackets at top corners
+  const chainGeo = new THREE.BoxGeometry(0.04, 0.22, 0.04);
+  [-0.88, 0.88].forEach((cx) => {
+    const chain = markShadow(new THREE.Mesh(chainGeo, poleMat));
+    chain.position.set(cx, 0.42, 0);
+    signGroup.add(chain);
+  });
 
-  // Letter A
-  const aLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
-  aLeft.position.set(-0.04, 2.85, letterZ);
-  aLeft.rotation.z = 0.18;
-  const aRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
-  aRight.position.set(0.04, 2.85, letterZ);
-  aRight.rotation.z = -0.18;
-  const aCross = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.02), letterMat));
-  aCross.position.set(0, 2.82, letterZ);
-  hut.add(aLeft, aRight, aCross);
+  // Big bold raised "BAR" letters in yellow.
+  // lz = -0.06 so letters protrude toward -Z local (= road side after kiosk +PI rotation).
+  // All x coords are NEGATED (pre-mirrored) so the kiosk +PI flip restores correct reading order.
+  const lz = -0.06;
+  const ly = 0;
+  const th = 0.05;
 
-  // Letter R
-  const rStem = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
-  rStem.position.set(0.18, 2.85, letterZ);
-  const rTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
-  rTop.position.set(0.24, 2.96, letterZ);
-  const rMid = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
-  rMid.position.set(0.24, 2.85, letterZ);
-  const rLoop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
-  rLoop.position.set(0.3, 2.905, letterZ);
-  const rLeg = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.02), letterMat));
-  rLeg.position.set(0.28, 2.78, letterZ);
-  rLeg.rotation.z = -0.42;
-  hut.add(rStem, rTop, rMid, rLoop, rLeg);
+  // === B (pre-mirrored: group at +0.52 so after flip it appears left) ===
+  const bGroup = new THREE.Group();
+  bGroup.position.set(+0.52, ly, 0);
+  const bV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
+  bV.position.set(+0.15, 0, lz);              // stem: right in local → left in world ✓
+  const bH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH1.position.set(+0.04, 0.185, lz);
+  const bH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH2.position.set(+0.04, 0, lz);
+  const bH3 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH3.position.set(+0.04, -0.185, lz);
+  const bC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
+  bC1.position.set(-0.065, 0.093, lz);        // bumps: left in local → right in world ✓
+  const bC2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
+  bC2.position.set(-0.065, -0.093, lz);
+  bGroup.add(bV, bH1, bH2, bH3, bC1, bC2);
+  signGroup.add(bGroup);
+
+  // === A (symmetric, centre stays at 0) ===
+  const aGroup = new THREE.Group();
+  aGroup.position.set(0, ly, 0);
+  const aL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
+  aL.position.set(+0.10, 0, lz);   // x negated; rotation.z negated
+  aL.rotation.z = -0.22;
+  const aR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
+  aR.position.set(-0.10, 0, lz);
+  aR.rotation.z = +0.22;
+  const aC = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  aC.position.set(0, -0.04, lz);
+  aGroup.add(aL, aR, aC);
+  signGroup.add(aGroup);
+
+  // === R (pre-mirrored: group at -0.52 so after flip it appears right) ===
+  const rGroup = new THREE.Group();
+  rGroup.position.set(-0.52, ly, 0);
+  const rV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
+  rV.position.set(+0.10, 0, lz);             // stem: right in local → left in world ✓
+  const rH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
+  rH1.position.set(+0.01, 0.185, lz);
+  const rH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
+  rH2.position.set(+0.01, 0.02, lz);
+  const rC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.165, th), letterMat));
+  rC1.position.set(-0.055, 0.103, lz);       // loop: left in local → right in world ✓
+  const rLeg2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, th), letterMat));
+  rLeg2.position.set(-0.072, -0.13, lz);     // leg: left in local → right in world ✓
+  rLeg2.rotation.z = +0.5;                   // rotation.z negated so leg tilts correctly ✓
+  rGroup.add(rV, rH1, rH2, rC1, rLeg2);
+  signGroup.add(rGroup);
 
   // 7. Decorative Kayaks next to the bar (Yellow & Orange-Red)
   const kayakGeo = new THREE.SphereGeometry(1.0, 8, 8);
@@ -4108,38 +4206,114 @@ function addBeachHutsStrict(group, curve, trackDef) {
 
   [0.20, 0.55, 0.80].forEach((progress, index) => {
     const side = -1;
-    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 8.5), roadHalfWidth, 6.0);
-    const hut = createBeachHutStrict();
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 16.0), roadHalfWidth, 6.0);
+    const hut = createBeachHutStrict(index);
     hut.position.copy(position);
-    hut.rotation.y = rotationY;
+    hut.rotation.y = rotationY + Math.PI; // +Math.PI so open counter faces the road
+    hut.scale.setScalar(2.0);
     group.add(hut);
   });
 }
 
+function createThatchedUmbrellaWithLoungers(index) {
+  const group = new THREE.Group();
+  group.name = "TropicalBeachUmbrellaStrict";
+
+  // --- Pole (bamboo-tan cylinder) ---
+  const poleMat = createBeachMaterial({ color: 0xb89050, roughness: 0.75 });
+  const pole = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.15, 4.8, 6),
+    poleMat
+  ));
+  pole.position.y = 2.4;
+  // Slight tilt for a natural beach look
+  pole.rotation.z = (index % 2 === 0 ? 0.06 : -0.06);
+  group.add(pole);
+
+  // --- Canopy: straw thatched layers (3 stacked cones, decreasing size) ---
+  const strawMat = createBeachMaterial({ color: 0xd4a843, roughness: 0.92 });
+  const strawDarkMat = createBeachMaterial({ color: 0xb8883a, roughness: 0.95 });
+
+  // Bottom layer — widest
+  const canopy1 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(3.8, 0.7, 12), strawMat));
+  canopy1.position.y = 4.8;
+  // Middle layer
+  const canopy2 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(2.8, 0.65, 12), strawDarkMat));
+  canopy2.position.y = 5.3;
+  // Top layer — smallest cap
+  const canopy3 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.5, 10), strawMat));
+  canopy3.position.y = 5.8;
+  // Tip sphere
+  const tip = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), strawDarkMat));
+  tip.position.y = 6.1;
+  group.add(canopy1, canopy2, canopy3, tip);
+
+  // --- Sun Loungers (sdraio) — two on either side of the pole ---
+  const woodMat  = createBeachMaterial({ color: 0x8b5a2b, roughness: 0.80 });
+  const fabricMat = createBeachMaterial({ color: 0x4a8fc4, roughness: 0.65 }); // beach-blue
+  const fabricMat2 = createBeachMaterial({ color: 0xd4af37, roughness: 0.65 }); // golden
+
+  function makeLounger(side, mat) {
+    const lounger = new THREE.Group();
+
+    // Main flat bed
+    const bed = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.10, 2.0), mat));
+    bed.position.y = 0.30;
+    // Raised headrest
+    const headrest = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.30, 0.60), mat));
+    headrest.position.set(0, 0.45, -0.75);
+    headrest.rotation.x = -0.4;
+
+    // Two wooden side rails
+    [-0.35, 0.35].forEach((rx) => {
+      const rail = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 2.0), woodMat));
+      rail.position.set(rx, 0.25, 0);
+      lounger.add(rail);
+    });
+    // Four legs
+    [[-0.3, -0.8], [-0.3, 0.7], [0.3, -0.8], [0.3, 0.7]].forEach(([lx, lz]) => {
+      const leg = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 4), woodMat));
+      leg.position.set(lx, 0.15, lz);
+      lounger.add(leg);
+    });
+
+    lounger.add(bed, headrest);
+    // Position to one side of the umbrella
+    lounger.position.set(side * 1.4, 0, 0.2);
+    return lounger;
+  }
+
+  const lounger1 = makeLounger(-1, index % 2 === 0 ? fabricMat : fabricMat2);
+  lounger1.scale.setScalar(2.0);
+  lounger1.rotation.y = Math.PI;
+
+  const lounger2 = makeLounger(+1, index % 2 === 0 ? fabricMat2 : fabricMat);
+  lounger2.scale.setScalar(2.0);
+  lounger2.rotation.y = Math.PI;
+
+  group.add(lounger1, lounger2);
+
+  return group;
+}
+
 function addBeachUmbrellasStrict(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
-  const colors = [0xff4444, 0xffffff, 0xffaa00, 0x4488ff];
-  const poleMaterial = createBeachMaterial({ color: 0xc8c8b0, roughness: 0.68 });
-  const poleGeometry = new THREE.CylinderGeometry(0.12, 0.12, 4, 5);
 
+  // Place 10 thatched umbrella+lounger sets on the SEA SIDE (side=+1)
+  // spread along the widened sand strip (offset 5–12 units from road edge)
   for (let index = 0; index < 10; index += 1) {
     const progress = (index + 0.5) * 0.1;
-    const offset = roadHalfWidth + 6 + (index % 3) * 2.0;
-    const { position, rotationY } = safePlace(curve, progress, -1, -(roadHalfWidth + 6 + (index % 3) * 2.0), roadHalfWidth, 5.0);
-    const umbrella = new THREE.Group();
-    umbrella.name = "TropicalBeachUmbrellaStrict";
-    umbrella.position.copy(position);
-    umbrella.rotation.y = rotationY;
-
-    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
-    pole.position.y = 2;
-    const canopy = markShadow(new THREE.Mesh(
-      new THREE.ConeGeometry(3.5, 1.5, 7),
-      createBeachMaterial({ color: colors[index % colors.length], roughness: 0.7 })
-    ));
-    canopy.position.y = 4.5;
-    umbrella.add(pole, canopy);
-    group.add(umbrella);
+    // Alternate between two depth rows on the beach
+    const depthOffset = (index % 3 === 0) ? 9.0 : (index % 3 === 1) ? 6.5 : 11.5;
+    const { position, rotationY } = safePlace(
+      curve, progress, +1,
+      +(roadHalfWidth + depthOffset),
+      roadHalfWidth, 5.0
+    );
+    const umbrellaGroup = createThatchedUmbrellaWithLoungers(index);
+    umbrellaGroup.position.copy(position);
+    umbrellaGroup.rotation.y = rotationY;
+    group.add(umbrellaGroup);
   }
 }
 
