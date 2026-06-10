@@ -362,7 +362,7 @@ O
 - [x] Minimap canvas.
 - [x] Disegnare centerline su minimap.
 - [x] Marker player.
-- [ ] Marker AI.
+- [x] Marker AI.
 - [x] Marker checkpoint/start.
 - [x] UI responsive.
 - [x] Evitare testo sovrapposto su mobile.

@@ -1088,12 +1088,12 @@ canvas {
   min-height: 20px;
   margin: -2px 0 7px;
   padding: 3px 7px;
-  border: 1px solid color-mix(in srgb, var(--option-second) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--option-stat) 62%, transparent);
   border-radius: 4px;
-  color: color-mix(in srgb, var(--option-second) 84%, white);
+  color: color-mix(in srgb, var(--option-stat) 84%, white);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
-    rgba(2, 6, 23, 0.56);
+    color-mix(in srgb, var(--option-stat) 18%, rgba(2, 6, 23, 0.64));
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
   font-size: 11px;
   font-style: normal;

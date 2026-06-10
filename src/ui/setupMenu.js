@@ -38,9 +38,9 @@ const OPTION_THEMES = {
   vegas: { accent: "#a855f7", second: "#facc15", dark: "#13071f" },
   beach: { accent: "#06b6d4", second: "#facc15", dark: "#06242c" },
   monaco: { accent: "#ef4444", second: "#f8fafc", dark: "#090b10" },
-  kart: { accent: "#facc15", second: "#22c55e", dark: "#1f1b08" },
-  porsche: { accent: "#f59e0b", second: "#f8fafc", dark: "#1c1206" },
-  silvia: { accent: "#38bdf8", second: "#e5e7eb", dark: "#061726" },
+  kart: { accent: "#ef4444", second: "#facc15", stat: "#ef4444", dark: "#1f0808" },
+  porsche: { accent: "#f8fafc", second: "#f59e0b", stat: "#e5e7eb", dark: "#16120b" },
+  silvia: { accent: "#38bdf8", second: "#60a5fa", stat: "#60a5fa", dark: "#061726" },
   race: { accent: "#ef4444", second: "#facc15", dark: "#1f0808" },
   "time-trial": { accent: "#22d3ee", second: "#a78bfa", dark: "#071923" }
 };
@@ -213,7 +213,7 @@ function renderOptionCard(option, placement) {
       type="button"
       data-option-id="${option.id}"
       data-placement="${placement}"
-      style="--option-accent: ${theme.accent}; --option-second: ${theme.second}; --option-dark: ${theme.dark};"
+      style="--option-accent: ${theme.accent}; --option-second: ${theme.second}; --option-stat: ${theme.stat ?? theme.second}; --option-dark: ${theme.dark};"
     >
       <span class="setup-option-glint"></span>
       ${renderOptionVisual(option)}
@@ -263,6 +263,7 @@ function applyOptionTheme(element, optionId) {
 
   element.style.setProperty("--setup-accent", theme.accent);
   element.style.setProperty("--setup-second", theme.second);
+  element.style.setProperty("--setup-stat", theme.stat ?? theme.second);
   element.style.setProperty("--setup-dark", theme.dark);
 }
 
