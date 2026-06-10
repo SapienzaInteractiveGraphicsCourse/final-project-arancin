@@ -359,6 +359,8 @@ function createMinimapPanel() {
 
   panel.append(canvas);
   return panel;
+}
+
 function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) {
   const centerline = Array.isArray(trackInfo.centerline) ? trackInfo.centerline : [];
   const raceState = raceManager.getState();
