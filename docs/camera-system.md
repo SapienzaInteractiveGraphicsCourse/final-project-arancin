@@ -95,10 +95,10 @@ extract follow camera controller
 
 ## Milestone 2: Cambio Camera Con C
 
-- [ ] Usare `actions.camera` da `InputManager`.
-- [ ] Aggiungere `nextMode()`.
-- [ ] Mostrare modalita corrente nel debug/HUD solo se necessario.
-- [ ] Verificare che `Esc`, `R` e `L` restino funzionanti.
+- [x] Usare `actions.camera` da `InputManager`.
+- [x] Aggiungere `nextMode()`.
+- [x] Mostrare modalita corrente nel debug/HUD solo se necessario.
+- [x] Verificare che `Esc`, `R` e `L` restino funzionanti.
 
 Commit suggerito:
 
@@ -108,10 +108,10 @@ add camera mode switching
 
 ## Milestone 3: Top Camera
 
-- [ ] Aggiungere camera dall'alto.
-- [ ] Seguire il player con altezza stabile.
-- [ ] LookAt sul player.
-- [ ] Utile per debug pista/checkpoint.
+- [x] Aggiungere camera dall'alto.
+- [x] Seguire il player con altezza stabile.
+- [x] LookAt sul player.
+- [x] Utile per debug pista/checkpoint.
 
 Commit suggerito:
 
@@ -121,10 +121,10 @@ add top debug camera
 
 ## Milestone 4: Hood Camera
 
-- [ ] Aggiungere hood/driver camera.
-- [ ] Posizione davanti/sopra al veicolo.
-- [ ] LookAt leggermente avanti rispetto al veicolo.
-- [ ] Evitare compenetrazione evidente con il modello.
+- [x] Aggiungere hood/driver camera.
+- [x] Posizione davanti/sopra al veicolo.
+- [x] LookAt leggermente avanti rispetto al veicolo.
+- [x] Evitare compenetrazione evidente con il modello.
 
 Commit suggerito:
 
@@ -134,10 +134,10 @@ add hood camera mode
 
 ## Milestone 5: Orbit/Free Camera
 
-- [ ] Aggiungere camera orbit semplificata.
-- [ ] Mantenerla intorno al player.
-- [ ] Non introdurre controlli mouse complessi se non necessari.
-- [ ] Deve essere opzionale e non bloccare il gameplay.
+- [x] Aggiungere camera orbit semplificata.
+- [x] Mantenerla intorno al player.
+- [x] Non introdurre controlli mouse complessi se non necessari.
+- [x] Deve essere opzionale e non bloccare il gameplay.
 
 Commit suggerito:
 
@@ -147,10 +147,10 @@ add orbit camera mode
 
 ## Milestone 6: Camera Shake
 
-- [ ] Usare `vehicleState.collided` o `environmentState.impact`.
-- [ ] Shake leggero, breve e non fastidioso.
-- [ ] Non usare shake in top camera se rende difficile testare.
-- [ ] Verificare collisioni con barriere e AI.
+- [x] Usare `vehicleState.collided` o `environmentState.impact`.
+- [x] Shake leggero, breve e non fastidioso.
+- [x] Non usare shake in top camera se rende difficile testare.
+- [x] Verificare collisioni con barriere e AI.
 
 Commit suggerito:
 
