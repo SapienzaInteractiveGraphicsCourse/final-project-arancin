@@ -72,15 +72,15 @@ export const TRACK_DEFINITIONS = {
     name: "Tropical Beach",
     themeId: "beach",
     curveType: "catmullrom",
-    tension: 0.46,
+    tension: 0.44,
     roadWidth: 10.5,
-    segments: 220,
-    groundSize: 700,
+    segments: 160,
+    groundSize: 520,
     barrierOffset: 0.42,
-    barrierHeight: 0.52,
+    barrierHeight: 0.48,
     barrierThickness: 0.42,
-    checkpointTs: [0, 0.18, 0.38, 0.58, 0.78],
-    boostTs: [0.09, 0.44, 0.72],
+    checkpointTs: [0, 0.20, 0.42, 0.63, 0.82],
+    boostTs: [0.10, 0.48, 0.75],
     spawnOffsetMeters: -4.2,
     lightingMode: "day",
     skyboxTheme: "beach",
@@ -116,28 +116,24 @@ export const TRACK_DEFINITIONS = {
       checkpoint: 0x1cd4c0,
       foliage: 0x20955a
     },
-    // Layout: rettilineo di partenza → curva larga destra → S veloce → chicane sinistra-destra
-    // → tornante a U (curva lenta) → rettilineo costiero → curva destra → rientro
+    // Layout: original layout from commit 3298db6
     controlPoints: [
-      [  0,  0, -150],  // start/finish (rettilineo)
-      [  0,  0,  -90],  // rettilineo
-      [ 22,  0,  -40],  // curva larga a destra
-      [ 80,  0,   -8],  // entrata S
-      [110,  0,   30],  // S – parte alta
-      [ 90,  0,   70],  // S – parte bassa (sinistra)
-      [ 48,  0,   90],  // uscita S
-      [ 18,  0,  108],  // chicane: stretto sinistra
-      [ 50,  0,  120],  // chicane: stretto destra
-      [ 30,  0,  150],  // entrata tornante
-      [-24,  0,  168],  // tornante U – apice
-      [-80,  0,  148],  // tornante U – uscita
-      [-95,  0,  105],  // rettilineo costiero inizia
-      [-130, 0,   60],  // rettilineo costiero
-      [-155, 0,   10],  // curva destra lenta
-      [-140, 0,  -48],  // curva destra
-      [-100, 0,  -90],  // rientro
-      [ -52, 0, -120],  // rientro
-      [ -20, 0, -148]   // back to start
+      [0, 0, -120],
+      [0, 0, -76],
+      [18, 0, -34],
+      [58, 0, -16],
+      [92, 0, 16],
+      [76, 0, 58],
+      [28, 0, 72],
+      [-20, 0, 48],
+      [-58, 0, 62],
+      [-92, 0, 98],
+      [-130, 0, 82],
+      [-146, 0, 34],
+      [-118, 0, -10],
+      [-64, 0, -28],
+      [-42, 0, -72],
+      [-24, 0, -118]
     ]
   },
   [TRACK_IDS.MONACO]: {
