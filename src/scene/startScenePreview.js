@@ -28,6 +28,18 @@ import {
   writeBestLapTime
 } from "../systems/raceRecords.js";
 
+const VEHICLE_LOADING_MIN_MS = {
+  kart: 420,
+  porsche: 850,
+  silvia: 850
+};
+
+const VEHICLE_DISPLAY_NAMES = {
+  kart: "Kart",
+  porsche: "Porsche",
+  silvia: "Silvia"
+};
+
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
   const scene = createScene();
@@ -63,6 +75,10 @@ export function startScenePreview(container, setup, options = {}) {
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
   const wrongWayOverlay = createWrongWayOverlay();
+  const loadingOverlay = createVehicleLoadingOverlay({
+    ...setup,
+    trackName: track.trackInfo.name
+  });
   const minimapPanel = createMinimapPanel();
   const minimapCanvas = minimapPanel.querySelector("canvas");
   const minimap = new MinimapSystem(minimapCanvas);
@@ -80,6 +96,7 @@ export function startScenePreview(container, setup, options = {}) {
       raceManager.startCountdown();
     }
   });
+  colorPicker.element.hidden = true;
   const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
@@ -92,6 +109,7 @@ export function startScenePreview(container, setup, options = {}) {
   let animationFrameId = 0;
   let paused = false;
   let raceArmed = false;
+  let disposed = false;
   let renderedFinishSignature = "";
 
   applyTrackSceneTheme(scene, track.trackInfo);
@@ -108,10 +126,19 @@ export function startScenePreview(container, setup, options = {}) {
   container.appendChild(raceHud.element);
   container.appendChild(wrongWayOverlay);
   container.appendChild(minimapPanel);
+  container.appendChild(loadingOverlay.element);
   container.appendChild(colorPicker.element);
   container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
+  waitForVehicleReadiness([vehicle, aiVehicle], setup.vehicleId).then(() => {
+    if (disposed) {
+      return;
+    }
+
+    loadingOverlay.remove();
+    colorPicker.element.hidden = false;
+  });
 
   function resize() {
     const width = window.innerWidth;
@@ -249,6 +276,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   return {
     dispose() {
+      disposed = true;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", resize);
       timer.dispose();
@@ -260,6 +288,7 @@ export function startScenePreview(container, setup, options = {}) {
       raceOverlay.remove();
       raceHud.remove();
       wrongWayOverlay.remove();
+      loadingOverlay.remove();
       minimapPanel.remove();
       colorPicker.element.remove();
       finishScreen.element.remove();
@@ -333,6 +362,49 @@ function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm }) {
       element.hidden = true;
     }
   };
+}
+
+function createVehicleLoadingOverlay(setup = {}) {
+  const element = document.createElement("section");
+  element.className = "vehicle-loading-overlay";
+  element.setAttribute("aria-label", "Loading race vehicle");
+  element.setAttribute("aria-live", "polite");
+
+  const vehicleName = VEHICLE_DISPLAY_NAMES[setup.vehicleId] ?? "Vehicle";
+  const trackName = setup.trackName ?? "";
+
+  element.innerHTML = `
+    <div class="vehicle-loading-panel">
+      <span class="vehicle-loading-eyebrow">Preparing Race</span>
+      <strong>${vehicleName}</strong>
+      <div class="vehicle-loading-bar" aria-hidden="true">
+        <span></span>
+      </div>
+      ${trackName ? `<small>${trackName}</small>` : ""}
+    </div>
+  `;
+
+  return {
+    element,
+    remove() {
+      element.remove();
+    }
+  };
+}
+
+function waitForVehicleReadiness(vehicles, vehicleId) {
+  const readyPromises = vehicles
+    .filter(Boolean)
+    .map((vehicle) => vehicle.whenReady?.() ?? Promise.resolve(vehicle));
+  const minimumDelay = wait(VEHICLE_LOADING_MIN_MS[vehicleId] ?? 650);
+
+  return Promise.all([...readyPromises, minimumDelay]);
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 }
 
 function createMinimapPanel() {

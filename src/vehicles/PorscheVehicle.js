@@ -31,15 +31,21 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.porscheHeadlightBeams = [];
     this.frontLightMaterials = [];
     this.rearLightMaterials = [];
-    this.loadPromise = null;
+    this.loadPromise = Promise.resolve(null);
 
     if (typeof window !== "undefined") {
-      window.setTimeout(() => {
+      this.loadPromise = Promise.resolve().then(() => {
         if (!this.disposed && !this.importedModel) {
-          this.loadPromise = this.loadImportedModel();
+          return this.loadImportedModel();
         }
-      }, 0);
+
+        return this.importedModel;
+      });
     }
+  }
+
+  whenReady() {
+    return this.loadPromise.then(() => this);
   }
 
   async loadImportedModel() {

@@ -27,6 +27,10 @@ export class BaseVehicle {
 
   update() {}
 
+  whenReady() {
+    return Promise.resolve(this);
+  }
+
   setBodyColor(color) {
     this.bodyColor.set(color);
     this.bodyMaterials.forEach((material) => {
