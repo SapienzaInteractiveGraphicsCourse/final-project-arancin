@@ -3956,39 +3956,149 @@ function createBeachHouse(seed = 0) {
   return house;
 }
 
-function createBeachHutStrict() {
+function createBeachHutStrict(seed = 0) {
   const hut = new THREE.Group();
-  hut.name = "TropicalBeachHutStrict";
-  const baseMaterial = createBeachMaterial({ color: 0xd4a055, roughness: 0.82 });
-  const wallMaterial = createBeachMaterial({ color: 0xc8955a, roughness: 0.82 });
-  const roofMaterial = createBeachMaterial({ color: 0x8b4513, roughness: 0.78 });
-  const awningMaterial = createBeachMaterial({
-    color: 0xff6600,
-    emissive: 0xff6600,
-    emissiveIntensity: 0.2,
-    roughness: 0.62
+  hut.name = "TropicalBeachBarKiosk";
+
+  // Materials
+  const slatMat = createBeachMaterial({ color: 0xc68a4c, roughness: 0.85 }); // Warm natural light wood slats
+  const trimMat = createBeachMaterial({ color: 0x4d301c, roughness: 0.88 }); // Darker wood countertop/trim
+  const poleMat = createBeachMaterial({ color: 0x4d301c, roughness: 0.9 }); // Dark log poles
+  const roofMat = createBeachMaterial({ color: 0x8c6239, roughness: 0.95 }); // Thatched palm roof
+  const letterMat = createBeachMaterial({ color: 0xfad02c, roughness: 0.5 }); // Yellow sign letters
+  const kayakYellowMat = createBeachMaterial({ color: 0xffd700, roughness: 0.6 }); // Yellow kayak
+  const kayakOrangeMat = createBeachMaterial({ color: 0xff4500, roughness: 0.6 }); // Orange-red kayak
+
+  // 1. Semi-circular slatted bar counter
+  const slatGeo = new THREE.BoxGeometry(0.32, 1.4, 0.1);
+  for (let i = 0; i < 24; i++) {
+    const angle = -Math.PI * 0.6 + (i / 23) * Math.PI * 1.2;
+    const x = Math.sin(angle) * 2.8;
+    const z = -Math.cos(angle) * 2.8; // Z negative is front
+    const slat = markShadow(new THREE.Mesh(slatGeo, slatMat));
+    slat.position.set(x, 0.7, z);
+    slat.rotation.y = -angle;
+    hut.add(slat);
+  }
+
+  // 2. Curved Countertop and Bottom Trim segments
+  const counterGeo = new THREE.BoxGeometry(0.95, 0.08, 0.45);
+  const baseTrimGeo = new THREE.BoxGeometry(0.95, 0.1, 0.25);
+  for (let j = 0; j < 10; j++) {
+    const angleStart = -Math.PI * 0.6 + (j / 10) * Math.PI * 1.2;
+    const angleEnd = -Math.PI * 0.6 + ((j + 1) / 10) * Math.PI * 1.2;
+    const angleMid = (angleStart + angleEnd) / 2;
+    const x = Math.sin(angleMid) * 2.8;
+    const z = -Math.cos(angleMid) * 2.8;
+
+    // Countertop
+    const counterSegment = markShadow(new THREE.Mesh(counterGeo, trimMat));
+    counterSegment.position.set(x, 1.44, z);
+    counterSegment.rotation.y = -angleMid;
+    hut.add(counterSegment);
+
+    // Bottom Base Trim
+    const baseSegment = markShadow(new THREE.Mesh(baseTrimGeo, trimMat));
+    baseSegment.position.set(x, 0.05, z);
+    baseSegment.rotation.y = -angleMid;
+    hut.add(baseSegment);
+  }
+
+  // 3. Timber poles/posts
+  const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 3.2, 6);
+  const postPositions = [
+    [-2.2, 1.6, -0.8],
+    [2.2, 1.6, -0.8],
+    [-1.8, 1.6, 1.4],
+    [1.8, 1.6, 1.4]
+  ];
+  postPositions.forEach(([px, py, pz]) => {
+    const post = markShadow(new THREE.Mesh(poleGeo, poleMat));
+    post.position.set(px, py, pz);
+    hut.add(post);
   });
 
-  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 3, 10), baseMaterial));
-  const frontWall = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.4), wallMaterial));
-  const backWall = markShadow(new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.4), wallMaterial));
-  const roof = markShadow(new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 12), roofMaterial));
-  const awning = markShadow(new THREE.Mesh(new THREE.BoxGeometry(13, 0.3, 4), awningMaterial));
-  const poleMaterial = createBeachMaterial({ color: 0xd4c8a0, roughness: 0.7 });
-  const poleGeometry = new THREE.CylinderGeometry(0.25, 0.25, 6, 5);
+  // 4. Horizontal timber beams at top
+  const beamLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.3), poleMat));
+  beamLeft.position.set(-2.0, 3.14, 0.3);
+  const beamRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.3), poleMat));
+  beamRight.position.set(2.0, 3.14, 0.3);
+  const beamBack = markShadow(new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.12, 0.12), poleMat));
+  beamBack.position.set(0, 3.14, 1.4);
+  const beamFront = markShadow(new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 0.12), poleMat));
+  beamFront.position.set(0, 3.14, -0.8);
+  hut.add(beamLeft, beamRight, beamBack, beamFront);
 
-  base.position.y = 1.5;
-  frontWall.position.set(0, 5, -5.2);
-  backWall.position.set(0, 5, 5.2);
-  roof.position.y = 7.5;
-  awning.position.set(0, 6, -7);
-  hut.add(base, frontWall, backWall, roof, awning);
+  // 5. Thatched Roof (tilted forward)
+  const roof = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(3.2, 3.6, 0.4, 16, 1, false, -Math.PI * 0.6, Math.PI * 1.2),
+    roofMat
+  ));
+  roof.position.set(0, 3.3, 0.2);
+  roof.rotation.x = 0.08;
+  hut.add(roof);
 
-  [-4, 4].forEach((x) => {
-    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
-    pole.position.set(x, 3, -7);
-    hut.add(pole);
-  });
+  // 6. Sign Board "BAR" in 3D letters
+  const signBoard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, 0.05), poleMat));
+  signBoard.position.set(0, 2.85, -2.4);
+  signBoard.rotation.x = 0.05;
+  hut.add(signBoard);
+
+  const letterZ = -2.43;
+
+  // Letter B
+  const bStem = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
+  bStem.position.set(-0.32, 2.85, letterZ);
+  const bTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
+  bTop.position.set(-0.26, 2.96, letterZ);
+  const bMid = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
+  bMid.position.set(-0.26, 2.85, letterZ);
+  const bBot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
+  bBot.position.set(-0.26, 2.74, letterZ);
+  const bLoopTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
+  bLoopTop.position.set(-0.2, 2.905, letterZ);
+  const bLoopBot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
+  bLoopBot.position.set(-0.2, 2.795, letterZ);
+  hut.add(bStem, bTop, bMid, bBot, bLoopTop, bLoopBot);
+
+  // Letter A
+  const aLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
+  aLeft.position.set(-0.04, 2.85, letterZ);
+  aLeft.rotation.z = 0.18;
+  const aRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
+  aRight.position.set(0.04, 2.85, letterZ);
+  aRight.rotation.z = -0.18;
+  const aCross = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.02), letterMat));
+  aCross.position.set(0, 2.82, letterZ);
+  hut.add(aLeft, aRight, aCross);
+
+  // Letter R
+  const rStem = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.02), letterMat));
+  rStem.position.set(0.18, 2.85, letterZ);
+  const rTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
+  rTop.position.set(0.24, 2.96, letterZ);
+  const rMid = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.02), letterMat));
+  rMid.position.set(0.24, 2.85, letterZ);
+  const rLoop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.02), letterMat));
+  rLoop.position.set(0.3, 2.905, letterZ);
+  const rLeg = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.02), letterMat));
+  rLeg.position.set(0.28, 2.78, letterZ);
+  rLeg.rotation.z = -0.42;
+  hut.add(rStem, rTop, rMid, rLoop, rLeg);
+
+  // 7. Decorative Kayaks next to the bar (Yellow & Orange-Red)
+  const kayakGeo = new THREE.SphereGeometry(1.0, 8, 8);
+  const kayak1 = markShadow(new THREE.Mesh(kayakGeo, kayakYellowMat));
+  kayak1.scale.set(0.35, 0.18, 2.4);
+  kayak1.position.set(3.4, 0.1, -0.2);
+  kayak1.rotation.set(0.05, 0.35, 0.0);
+  
+  const kayak2 = markShadow(new THREE.Mesh(kayakGeo, kayakOrangeMat));
+  kayak2.scale.set(0.35, 0.18, 2.4);
+  kayak2.position.set(4.0, 0.1, -0.6);
+  kayak2.rotation.set(-0.05, 0.25, 0.0);
+
+  hut.add(kayak1, kayak2);
 
   return hut;
 }
