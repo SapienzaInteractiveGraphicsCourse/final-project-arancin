@@ -3504,6 +3504,211 @@ function createTropicalBush(seed = 0) {
   return bush;
 }
 
+function createBeachChair(seed = 0) {
+  const chair = new THREE.Group();
+  chair.name = "BeachPlasticChair";
+
+  const material = createBeachMaterial({
+    color: 0xf5f5f5, // White plastic
+    roughness: 0.45,
+    metalness: 0.05
+  });
+
+  // Seat
+  const seat = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.8), material));
+  seat.position.y = 0.4;
+  chair.add(seat);
+
+  // Legs
+  const legGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.4, 5);
+  const legOffsets = [
+    [-0.32, 0.2, -0.32],
+    [0.32, 0.2, -0.32],
+    [-0.32, 0.2, 0.32],
+    [0.32, 0.2, 0.32]
+  ];
+  legOffsets.forEach(([lx, ly, lz]) => {
+    const leg = markShadow(new THREE.Mesh(legGeo, material));
+    leg.position.set(lx, ly, lz);
+    leg.rotation.z = lx * -0.12;
+    leg.rotation.x = lz * 0.12;
+    chair.add(leg);
+  });
+
+  // Backrest frame
+  const backFrameLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.06), material));
+  backFrameLeft.position.set(-0.34, 0.75, 0.34);
+  const backFrameRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.06), material));
+  backFrameRight.position.set(0.34, 0.75, 0.34);
+  const backTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.1, 0.06), material));
+  backTop.position.set(0, 1.1, 0.34);
+  chair.add(backFrameLeft, backFrameRight, backTop);
+
+  // Vertical slats
+  const slatGeo = new THREE.BoxGeometry(0.05, 0.6, 0.03);
+  [-0.2, 0, 0.2].forEach((sx) => {
+    const slat = markShadow(new THREE.Mesh(slatGeo, material));
+    slat.position.set(sx, 0.75, 0.34);
+    chair.add(slat);
+  });
+
+  // Armrests
+  const armGeo = new THREE.BoxGeometry(0.05, 0.04, 0.6);
+  const armSupportGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.25, 5);
+  [-0.36, 0.36].forEach((ax) => {
+    const arm = markShadow(new THREE.Mesh(armGeo, material));
+    arm.position.set(ax, 0.62, 0.06);
+    const support = markShadow(new THREE.Mesh(armSupportGeo, material));
+    support.position.set(ax, 0.525, -0.2);
+    chair.add(arm, support);
+  });
+
+  return chair;
+}
+
+function createBeachPersonWithStrawHat(seed = 0) {
+  const person = new THREE.Group();
+  person.name = "TropicalBeachPerson";
+
+  // Skin material
+  const skinMaterial = createBeachMaterial({ color: 0xdcb38c, roughness: 0.6 });
+  // Shirt material (white/cream)
+  const shirtMaterial = createBeachMaterial({ color: 0xfefefa, roughness: 0.5 });
+  // Pants/shorts material (beige/tan)
+  const pantsMaterial = createBeachMaterial({ color: 0xcca070, roughness: 0.7 });
+  // Hair/beard material (black)
+  const blackMaterial = createBeachMaterial({ color: 0x111111, roughness: 0.8 });
+  // Straw hat material (straw yellow)
+  const strawMaterial = createBeachMaterial({ color: 0xd4b26f, roughness: 0.8 });
+
+  // 1. Torso (Busto con camicia bianca)
+  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.4), shirtMaterial));
+  torso.position.y = 0.9;
+  person.add(torso);
+
+  // 2. Legs (Gambe con pantaloncini)
+  const legLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.6, 6), pantsMaterial));
+  legLeft.position.set(-0.2, 0.3, 0);
+  const legRight = legLeft.clone();
+  legRight.position.x = 0.2;
+  person.add(legLeft, legRight);
+
+  // Lower legs (Stinchi color pelle)
+  const shinLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.6, 6), skinMaterial));
+  shinLeft.position.set(-0.2, -0.3, 0);
+  const shinRight = shinLeft.clone();
+  shinRight.position.x = 0.2;
+  person.add(shinLeft, shinRight);
+
+  // 3. Head (Testa color pelle)
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), skinMaterial));
+  head.position.y = 1.6;
+  person.add(head);
+
+  // Hair (Capelli ricci neri)
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.31, 8, 8), blackMaterial));
+  hair.position.set(0, 1.65, 0.02);
+  hair.scale.set(1.02, 0.9, 1.02);
+  person.add(hair);
+
+  // Beard (Barba corta nera)
+  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.15), blackMaterial));
+  beard.position.set(0, 1.48, -0.2);
+  person.add(beard);
+
+  // 4. Arms (Braccia con camicia)
+  const armLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.7, 6), shirtMaterial));
+  armLeft.position.set(-0.45, 0.9, 0);
+  armLeft.rotation.z = 0.15;
+  const armRight = armLeft.clone();
+  armRight.position.x = 0.45;
+  armRight.rotation.z = -0.15;
+  person.add(armLeft, armRight);
+
+  // Lower arms (Avambracci piegati color pelle)
+  const forearmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.6, 6), skinMaterial));
+  forearmLeft.position.set(-0.5, 0.45, -0.15);
+  forearmLeft.rotation.x = -0.7; // folded slightly forward
+  const forearmRight = forearmLeft.clone();
+  forearmRight.position.x = 0.5;
+  person.add(forearmLeft, forearmRight);
+
+  // 5. STRAW HAT (Cappellaccio di paglia gigante)
+  const hatGroup = new THREE.Group();
+  hatGroup.position.set(0, 1.78, 0);
+  hatGroup.rotation.x = 0.1; // slight tilt forward-left like in photo
+  hatGroup.rotation.z = -0.1;
+
+  // Hat Crown (Cupola centrale)
+  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.35, 8), strawMaterial));
+  crown.position.y = 0.15;
+  hatGroup.add(crown);
+
+  // Hat Brim (Tesa larga e piatta)
+  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.03, 16), strawMaterial));
+  hatGroup.add(brim);
+
+  // Frayed Straw Strands (Fili di paglia sporgenti dalla tesa)
+  const strandGeo = new THREE.CylinderGeometry(0.01, 0.005, 0.8, 4);
+  const strandCount = 18;
+  for (let i = 0; i < strandCount; i++) {
+    const angle = (i / strandCount) * Math.PI * 2;
+    const strand = markShadow(new THREE.Mesh(strandGeo, strawMaterial));
+    
+    // Position at the edge of the brim
+    const radius = 1.15;
+    strand.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
+    
+    // Rotate to point outwards with some random variations
+    strand.rotation.z = angle + Math.PI / 2 + (pseudoRandom(seed + i) * 0.3 - 0.15);
+    strand.rotation.y = pseudoRandom(seed + i * 2) * 0.4 - 0.2;
+    
+    hatGroup.add(strand);
+  }
+
+  person.add(hatGroup);
+
+  // Adjust overall scale
+  person.scale.setScalar(0.75);
+
+  return person;
+}
+
+function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
+  // 1. Two chairs, scaled up to 1.35x
+  const chair1 = createBeachChair(index * 2);
+  const chair2 = createBeachChair(index * 2 + 1);
+
+  chair1.scale.setScalar(1.35);
+  chair2.scale.setScalar(1.35);
+
+  const angle = palmRotationY;
+  const dx1 = Math.sin(angle) * 1.8 + Math.cos(angle) * -1.0;
+  const dz1 = Math.cos(angle) * 1.8 - Math.sin(angle) * -1.0;
+
+  const dx2 = Math.sin(angle) * 1.8 + Math.cos(angle) * 0.8;
+  const dz2 = Math.cos(angle) * 1.8 - Math.sin(angle) * 0.8;
+
+  chair1.position.set(palmPosition.x + dx1, palmPosition.y - 0.05, palmPosition.z + dz1);
+  chair1.rotation.y = angle + Math.PI + 0.15;
+
+  chair2.position.set(palmPosition.x + dx2, palmPosition.y - 0.05, palmPosition.z + dz2);
+  chair2.rotation.y = angle + Math.PI - 0.15;
+
+  group.add(chair1, chair2);
+
+  // 2. The person standing next to the chairs
+  const person = createBeachPersonWithStrawHat(index);
+  const dxP = Math.sin(angle) * 2.3 + Math.cos(angle) * 0.0;
+  const dzP = Math.cos(angle) * 2.3 - Math.sin(angle) * 0.0;
+  
+  // Place feet on ground (-0.05)
+  person.position.set(palmPosition.x + dxP, palmPosition.y - 0.05 + 0.6, palmPosition.z + dzP);
+  person.rotation.y = angle + Math.PI + 0.4;
+  
+  group.add(person);
+}
+
 function addBeachTropicalPlants(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
@@ -3521,6 +3726,10 @@ function addBeachTropicalPlants(group, curve, trackDef) {
     const baseScale = useBush ? 1.4 : 1.1;
     plant.scale.setScalar(baseScale + pseudoRandom(index + 4.1) * 0.5);
     group.add(plant);
+
+    if (!useBush && (index === 2 || index === 8)) {
+      addChairsUnderPalm(group, position, rotationY, index);
+    }
   }
 }
 
