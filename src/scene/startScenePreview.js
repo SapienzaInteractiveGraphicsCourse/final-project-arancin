@@ -9,6 +9,7 @@ import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { CameraController } from "../systems/CameraController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
@@ -28,9 +29,7 @@ export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
   const scene = createScene();
   const camera = createMainCamera();
-  const cameraTarget = new THREE.Vector3();
-  const cameraLookAt = new THREE.Vector3();
-  const lookTarget = new THREE.Vector3();
+  const cameraController = new CameraController(camera);
   const timer = new THREE.Timer();
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
@@ -93,8 +92,7 @@ export function startScenePreview(container, setup, options = {}) {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    cameraController.resize(width, height);
     renderer.setSize(width, height);
   }
 
@@ -169,7 +167,7 @@ export function startScenePreview(container, setup, options = {}) {
     updatePlayerRacePosition(raceManager, state, aiState, track.trackInfo);
     const raceState = raceManager.getState();
 
-    updateCameraFollow(state);
+    cameraController.update(deltaTime, state, track.trackInfo);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
     checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);
@@ -180,22 +178,6 @@ export function startScenePreview(container, setup, options = {}) {
       savedLapRecords,
       renderedFinishSignature
     );
-  }
-
-  function updateCameraFollow(state) {
-    const targetY = track.spawn.position.y;
-    const cameraDistance = 9.5;
-    const cameraHeight = 6.2;
-    cameraTarget.set(
-      state.position.x + Math.sin(state.heading + Math.PI) * cameraDistance,
-      targetY + cameraHeight,
-      state.position.z + Math.cos(state.heading + Math.PI) * cameraDistance
-    );
-
-    camera.position.lerp(cameraTarget, 0.08);
-    lookTarget.set(state.position.x, targetY + 0.75, state.position.z);
-    cameraLookAt.lerp(lookTarget, 0.16);
-    camera.lookAt(cameraLookAt);
   }
 
   function animate(timestamp) {
@@ -218,6 +200,7 @@ export function startScenePreview(container, setup, options = {}) {
       timer.dispose();
       inputManager.dispose();
       controller.dispose();
+      cameraController.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       raceOverlay.remove();

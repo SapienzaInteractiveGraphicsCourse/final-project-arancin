@@ -79,13 +79,13 @@ Modalita previste:
 
 ## Milestone 1: Estrarre Follow Camera
 
-- [ ] Creare `CameraController`.
-- [ ] Spostare la logica follow da `startScenePreview.js`.
-- [ ] Mantenere comportamento visivo uguale.
-- [ ] Spostare resize camera nel controller.
-- [ ] Aggiornare `docs/contracts.md`.
-- [ ] Eseguire `bun run build`.
-- [ ] Eseguire `bun run verify:scene`.
+- [x] Creare `CameraController`.
+- [x] Spostare la logica follow da `startScenePreview.js`.
+- [x] Mantenere comportamento visivo uguale.
+- [x] Spostare resize camera nel controller.
+- [x] Aggiornare `docs/contracts.md`.
+- [x] Eseguire `bun run build`.
+- [x] Eseguire `bun run verify:scene`.
 
 Commit suggerito:
 

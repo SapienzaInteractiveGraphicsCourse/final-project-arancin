@@ -564,15 +564,15 @@ Non creare direttamente piste o veicoli dentro la preview, salvo placeholder tem
 
 ## Camera Controller
 
-File previsto: `src/systems/CameraController.js`
+File: `src/systems/CameraController.js`
 
-Firma prevista:
+Firma:
 
 ```js
 const cameraController = new CameraController(camera, options)
 ```
 
-Contratto previsto:
+Contratto:
 
 ```js
 cameraController.update(deltaTime, vehicleState, trackInfo, context)
