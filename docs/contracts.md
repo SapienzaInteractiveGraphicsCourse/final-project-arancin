@@ -640,10 +640,16 @@ cameraController.getState()
 cameraController.dispose()
 ```
 
-Modalita previste:
+Modalita supportate ora:
 
 ```js
-"follow" | "top" | "hood" | "orbit"
+"follow" | "top"
+```
+
+Modalita previste per estensioni successive:
+
+```js
+"hood" | "orbit"
 ```
 
 Regole:

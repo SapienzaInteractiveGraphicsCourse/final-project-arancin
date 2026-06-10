@@ -149,6 +149,10 @@ export function startScenePreview(container, setup, options = {}) {
       setPaused(!paused);
     }
 
+    if (actions.camera) {
+      cameraController.nextMode();
+    }
+
     if (paused) {
       return;
     }
@@ -157,7 +161,7 @@ export function startScenePreview(container, setup, options = {}) {
       const state = controller.getState();
       vehicle.setTransform(state.position, state.heading);
       vehicle.update(deltaTime, state);
-      updateCameraFollow(state);
+      cameraController.update(deltaTime, state, track.trackInfo);
       raceHud.update({
         raceState: raceManager.getState(),
         vehicleState: state,

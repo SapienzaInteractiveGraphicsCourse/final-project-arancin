@@ -378,10 +378,10 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 ### Modalita Camera
 
 - [x] Follow camera dietro il veicolo.
-- [ ] Top/debug camera.
+- [x] Top/debug camera.
 - [ ] Driver/hood camera opzionale.
 - [ ] Free/orbit camera opzionale.
-- [ ] Cambio camera con `C`.
+- [x] Cambio camera con `C`.
 
 ### Feedback
 

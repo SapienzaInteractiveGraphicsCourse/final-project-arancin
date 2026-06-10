@@ -95,10 +95,10 @@ extract follow camera controller
 
 ## Milestone 2: Cambio Camera Con C
 
-- [ ] Usare `actions.camera` da `InputManager`.
-- [ ] Aggiungere `nextMode()`.
-- [ ] Mostrare modalita corrente nel debug/HUD solo se necessario.
-- [ ] Verificare che `Esc`, `R` e `L` restino funzionanti.
+- [x] Usare `actions.camera` da `InputManager`.
+- [x] Aggiungere `nextMode()`.
+- [x] Mostrare modalita corrente nel debug/HUD solo se necessario.
+- [x] Verificare che `Esc`, `R` e `L` restino funzionanti.
 
 Commit suggerito:
 
@@ -108,10 +108,10 @@ add camera mode switching
 
 ## Milestone 3: Top Camera
 
-- [ ] Aggiungere camera dall'alto.
-- [ ] Seguire il player con altezza stabile.
-- [ ] LookAt sul player.
-- [ ] Utile per debug pista/checkpoint.
+- [x] Aggiungere camera dall'alto.
+- [x] Seguire il player con altezza stabile.
+- [x] LookAt sul player.
+- [x] Utile per debug pista/checkpoint.
 
 Commit suggerito:
 
