@@ -375,24 +375,24 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 8. HUD, UI E Minimap
 
-- [x] Menu selezione pista (attualmente minimale, da migliorare).
-- [x] Menu selezione veicolo (attualmente minimale, da migliorare).
-- [ ] Selezione colore veicolo (attualmente minimale, da migliorare, da capire se esiste la fuznione).
-- [x] Pulsante start (attualmente minimale, da migliorare).
-- [ ] HUD speed.
-- [x] HUD lap (attualmente minimale, da migliorare).
-- [x] HUD time (attualmente minimale, da migliorare).
-- [x] HUD checkpoint (attualmente minimale, da migliorare).
-- [ ] HUD surface.
-- [x] HUD status/wrong way (attualmente minimale, da migliorare).
-- [x] HUD posizione/gap (attualmente minimale, da migliorare).
-- [ ] Minimap canvas.
-- [ ] Disegnare centerline su minimap.
-- [ ] Marker player.
-- [ ] Marker AI.
-- [ ] Marker checkpoint/start.
-- [ ] UI responsive.
-- [ ] Evitare testo sovrapposto su mobile.
+- [x] Menu selezione pista.
+- [x] Menu selezione veicolo.
+- [x] Selezione colore veicolo.
+- [x] Pulsante start.
+- [x] HUD speed.
+- [x] HUD lap.
+- [x] HUD time.
+- [x] HUD checkpoint.
+- [x] HUD surface.
+- [x] HUD countdown/wrong way overlay.
+- [x] HUD posizione/gap.
+- [x] Minimap canvas.
+- [x] Disegnare centerline su minimap.
+- [x] Marker player.
+- [x] Marker AI.
+- [x] Marker checkpoint/start.
+- [x] UI responsive.
+- [x] Evitare testo sovrapposto su mobile.
 
 ## 9. Audio
 
