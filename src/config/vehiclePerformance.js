@@ -1,8 +1,8 @@
 export const VEHICLE_PERFORMANCE = {
   porsche: {
-    maxForwardSpeed: 44,
+    maxForwardSpeed: 80,
     maxReverseSpeed: 9,
-    acceleration: 36,
+    acceleration: 70,
     brakeAcceleration: 38,
     rollingFriction: 1.5,
     idleFriction: 2.5,
@@ -12,9 +12,9 @@ export const VEHICLE_PERFORMANCE = {
     steeringResponsiveness: 9.5
   },
   silvia: {
-    maxForwardSpeed: 39,
+    maxForwardSpeed: 65,
     maxReverseSpeed: 8,
-    acceleration: 34,
+    acceleration: 52,
     brakeAcceleration: 36,
     rollingFriction: 1.6,
     idleFriction: 2.6,

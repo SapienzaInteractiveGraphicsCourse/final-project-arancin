@@ -22,7 +22,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/procedural-kart`: kart costruito da zero.
 - [ ] `feature/vehicle-loaders`: loader Porsche/Silvia.
 - [ ] `feature/tracks`: 3 piste principali.
-- [ ] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen; AI e contromano da completare.
+- [x] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen, AI base e contromano.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
@@ -71,7 +71,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Aggiornare script `dev` e `preview` con `--host 0.0.0.0`.
 - [x] Aggiungere documentazione skeleton in `docs/project-skeleton.md`.
 - [x] Verificare `bun run build`.
-O
+
 ## 2. Veicoli
 
 ### Interfaccia Comune
@@ -241,25 +241,51 @@ O
 
 ## 5. Collisioni
 
-- [ ] Collisione player-barriere.
-- [ ] Applicare correzione fisica ogni frame di intersezione.
+- [x] Documentare `docs/collisions.md`.
+
+### Track Interaction System
+
+- [x] Creare `TrackInteractionSystem`.
+- [x] Sostituire `environmentState` hardcoded nella scena.
+- [x] Gestire default robusti se la pista non espone dati completi.
+- [x] Aggiornare `docs/contracts.md`.
+
+### Off-road
+
+- [x] Rilevamento off-road tramite `centerline` e `roadHalfWidth`.
+- [x] Ridurre `surfaceGrip` fuori strada.
+- [x] Ridurre `speedLimitMultiplier` fuori strada.
+- [x] Esporre `surfaceType` per HUD futuro.
+
+### Boost Pad
+
+- [x] Rilevamento boost pad.
+- [x] Applicare `boostFactor`.
+- [x] Cooldown breve boost.
+- [x] Annullare boost su impatto importante.
+
+### Barriere
+
+- [x] Collisione player-barriere.
+- [x] Test punto/veicolo contro collider oriented box 2D.
+- [x] Applicare correzione fisica ogni frame di intersezione.
 - [ ] Cooldown solo per audio/penalita, non per risposta fisica.
-- [ ] Spingere fuori dalla barriera lungo la normale.
-- [ ] Ridurre/invertire velocita su impatto frontale.
-- [ ] Annullare boost su impatto importante.
-- [ ] Collisione player-bot.
-- [ ] Separare posizioni player/bot.
-- [ ] Penalita o feedback collisione.
-- [ ] Rilevamento off-road.
-- [ ] Rilevamento boost pad.
+- [x] Spingere fuori dalla barriera lungo la normale.
+- [x] Ridurre/invertire velocita su impatto frontale.
+
+### Player Vs AI
+
+- [x] Collisione player-bot.
+- [x] Separare posizioni player/bot.
+- [x] Penalita o feedback collisione.
 
 ## 6. Gara E AI
 
 ### Modalita
 
 - [x] Documentare `docs/race-systems.md`.
-- [ ] Supportare modalita `race`:
-  - [ ] gara contro AI;
+- [x] Supportare modalita `race`:
+  - [x] gara contro AI;
   - [x] giri multipli;
   - [x] checkpoint in ordine;
   - [x] classifica semplice player predisposta.
@@ -312,14 +338,15 @@ O
 
 - [x] Predisporre stato `aiEnabled`.
 - [x] Esporre posizione semplice player.
+- [x] Aggiornare posizione player rispetto all'AI.
 - [x] Preparare controller logico AI su centerline.
-- [ ] AI opponent visibile.
-- [ ] AI usa stesso veicolo selezionato dal player.
-- [ ] Velocita AI dipendente dal veicolo.
-- [ ] AI frena prima delle curve.
-- [ ] AI accelera in uscita.
-- [ ] AI segue traiettoria con offset laterale.
-- [ ] AI competitiva ma battibile.
+- [x] AI opponent visibile.
+- [x] AI usa stesso veicolo selezionato dal player.
+- [x] Velocita AI dipendente dal veicolo.
+- [x] AI frena prima delle curve.
+- [x] AI accelera in uscita.
+- [x] AI segue traiettoria con offset laterale.
+- [ ] AI competitiva ma battibile in tuning finale dedicato.
 
 ### Contromano
 
