@@ -3256,7 +3256,7 @@ function addBeachOceanPlane(group) {
   const ocean = new THREE.Mesh(new THREE.PlaneGeometry(600, 1100), material);
   ocean.name = "TropicalBeachPropsOcean";
   ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(380, -0.08, 20);
+  ocean.position.set(250, -0.08, 0);
   ocean.receiveShadow = true;
   group.add(ocean);
 
@@ -3270,7 +3270,7 @@ function addBeachOceanPlane(group) {
   const shallow = new THREE.Mesh(new THREE.PlaneGeometry(70, 1100), shallowMaterial);
   shallow.name = "TropicalBeachShallowWater";
   shallow.rotation.x = -Math.PI / 2;
-  shallow.position.set(148, -0.075, 20);
+  shallow.position.set(126, -0.075, 0);
   group.add(shallow);
 
   // Banda di schiuma/riva
@@ -3281,14 +3281,14 @@ function addBeachOceanPlane(group) {
   const surf = new THREE.Mesh(new THREE.PlaneGeometry(22, 1100), surfMaterial);
   surf.name = "TropicalBeachSurfBand";
   surf.rotation.x = -Math.PI / 2;
-  surf.position.set(105, -0.073, 20);
+  surf.position.set(86, -0.073, 0);
   group.add(surf);
 
   // Secondo specchio d'acqua dal lato opposto (sinistra / tornante)
   const ocean2 = new THREE.Mesh(new THREE.PlaneGeometry(500, 800), material);
   ocean2.name = "TropicalBeachPropsOcean2";
   ocean2.rotation.x = -Math.PI / 2;
-  ocean2.position.set(-340, -0.08, 100);
+  ocean2.position.set(-250, -0.08, 0);
   group.add(ocean2);
 }
 
