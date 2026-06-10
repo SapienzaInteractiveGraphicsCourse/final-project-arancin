@@ -3679,7 +3679,7 @@ export function buildBeachProps(group, curve, trackDef) {
   addBeachGround(propsGroup);
   addBeachOceanPlane(propsGroup);
   addBeachClouds(propsGroup);
-  addBeachCenterDashes(propsGroup, curve, trackDef);
+  // addBeachCenterDashes(propsGroup, curve, trackDef);
   addBeachTropicalPlants(propsGroup, curve, trackDef);
   addBeachHutsStrict(propsGroup, curve, trackDef);
   addBeachUmbrellasStrict(propsGroup, curve, trackDef);
