@@ -621,6 +621,38 @@ Contratto:
 - disegna il marker AI solo se `aiState.position` esiste e `aiState.visible === true` oppure `aiState.hasVisibleModel === true`;
 - mostra marker start/finish e checkpoint usando `trackInfo.checkpoints`;
 - deve mostrare un fallback leggibile se centerline o bounds mancano.
+const cameraController = new CameraController(camera, options)
+```
+
+## Camera Controller
+
+File: `src/systems/CameraController.js`
+
+Contratto:
+
+```js
+cameraController.update(deltaTime, vehicleState, trackInfo, context)
+cameraController.nextMode()
+cameraController.setMode(mode)
+cameraController.applyShake(intensity)
+cameraController.resize(width, height)
+cameraController.getState()
+cameraController.dispose()
+```
+
+Modalita previste:
+
+```js
+"follow" | "top" | "hood" | "orbit"
+```
+
+Regole:
+
+- gestisce posizione e lookAt della camera;
+- non deve conoscere DOM, HUD, RaceManager o classi veicolo;
+- usa `vehicleState.position` e `vehicleState.heading` come input principale;
+- la scena resta responsabile di chiamare `update()`, `nextMode()` e `resize()`;
+- camera shake e solo feedback visivo e non deve influenzare fisica/input.
 
 ## Branch Responsibilities
 

@@ -365,13 +365,28 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 7. Camera
 
-- [ ] Follow camera.
+- [x] Documentare `docs/camera-system.md`.
+
+### Camera Controller
+
+- [x] Creare `CameraController`.
+- [x] Estrarre follow camera da `startScenePreview.js`.
+- [x] Mantenere comportamento follow attuale.
+- [x] Gestire resize camera nel controller.
+- [x] Aggiornare `docs/contracts.md`.
+
+### Modalita Camera
+
+- [x] Follow camera dietro il veicolo.
 - [ ] Top/debug camera.
 - [ ] Driver/hood camera opzionale.
 - [ ] Free/orbit camera opzionale.
 - [ ] Cambio camera con `C`.
+
+### Feedback
+
 - [ ] Camera shake leggero su collisione.
-- [ ] Resize camera su finestra.
+- [ ] Evitare shake fastidioso in modalita debug/top.
 
 ## 8. HUD, UI E Minimap
 
