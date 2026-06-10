@@ -14,7 +14,8 @@ Snapshot previsto:
   setup: {
     trackId: "vegas" | "beach" | "monaco",
     vehicleId: "kart" | "porsche" | "silvia",
-    raceMode: "race" | "time-trial"
+    raceMode: "race" | "time-trial",
+    bodyColor: "#d6332f" // colore carrozzeria scelto nel passaggio pre-gara
   }
 }
 ```
@@ -562,15 +563,70 @@ const vehicle = createVehicleById(setup.vehicleId);
 
 Non creare direttamente piste o veicoli dentro la preview, salvo placeholder temporanei dentro le factory.
 
-## Camera Controller
+## Race HUD
 
-File: `src/systems/CameraController.js`
+File: `src/ui/RaceHud.js`
 
 Firma:
 
 ```js
+createRaceHud() -> {
+  element,
+  update({ raceState, vehicleState, wrongWayState, trackId, trackName }),
+  remove()
+}
+```
+
+Campi DOM stabili:
+
+```text
+speed
+lap
+totalTime
+checkpoint
+track
+surface
+position
+gap
+```
+
+Regole:
+
+- il componente crea il DOM una sola volta;
+- `update()` aggiorna solo i valori testuali dei campi;
+- deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
+- il warning contromano e gli stati di partenza devono usare overlay dedicati, non chip persistenti nell'HUD.
+
+## Minimap System
+
+File: `src/systems/MinimapSystem.js`
+
+Firma:
+
+```js
+const minimap = new MinimapSystem(canvas);
+minimap.setTrack(trackInfo);
+minimap.resize();
+minimap.update({ playerState, aiState });
+```
+
+Contratto:
+
+- usa `trackInfo.centerline` per disegnare il percorso;
+- usa `trackInfo.minimapBounds` per calcolare la scala;
+- ruota la mappa in base a `playerState.heading`;
+- usa `playerState.position` come centro quando disponibile;
+- gestisce `devicePixelRatio` in `resize()`;
+- puo ricevere `aiState` per mostrare il marker AI quando disponibile;
+- disegna il marker AI solo se `aiState.position` esiste e `aiState.visible === true` oppure `aiState.hasVisibleModel === true`;
+- mostra marker start/finish e checkpoint usando `trackInfo.checkpoints`;
+- deve mostrare un fallback leggibile se centerline o bounds mancano.
 const cameraController = new CameraController(camera, options)
 ```
+
+## Camera Controller
+
+File: `src/systems/CameraController.js`
 
 Contratto:
 
