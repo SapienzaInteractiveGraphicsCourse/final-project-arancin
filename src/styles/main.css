@@ -91,8 +91,8 @@ canvas {
 .race-hud[data-track-theme="vegas"] {
   --hud-primary: #c084fc;
   --hud-secondary: #facc15;
-  --hud-speed-mid: #e879f9;
-  --hud-speed-end: #facc15;
+  --hud-speed-mid: #d8b4fe;
+  --hud-speed-end: #a855f7;
   --hud-track-mid: #a855f7;
   --hud-panel-rgb: 16, 8, 28;
   --hud-glow-rgb: 192, 132, 252;
@@ -263,6 +263,16 @@ canvas {
   -webkit-text-fill-color: transparent;
 }
 
+.race-hud[data-track-theme="vegas"] .race-hud-time {
+  background: linear-gradient(180deg, #ffffff 0%, #f3e8ff 42%, #c084fc 78%, #7e22ce 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-stroke: 0.28px rgba(8, 12, 20, 0.48);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(216, 180, 254, 0.34);
+}
+
 .race-hud-place {
   min-width: 120px;
   min-height: 62px;
@@ -420,6 +430,87 @@ canvas {
 
 .wrong-way-overlay[hidden] {
   display: none;
+}
+
+.vehicle-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(56, 189, 248, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(8, 12, 20, 0.92), rgba(15, 23, 42, 0.86));
+  pointer-events: all;
+}
+
+.vehicle-loading-panel {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: min(340px, 92vw);
+  padding: 22px 24px;
+  border: 1px solid rgba(226, 232, 240, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.76);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+.vehicle-loading-eyebrow {
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vehicle-loading-panel strong {
+  font-family: "Arial Black", Impact, system-ui, sans-serif;
+  font-size: 34px;
+  font-style: italic;
+  line-height: 1;
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.72),
+    0 0 18px rgba(125, 211, 252, 0.34);
+  transform: skewX(-8deg);
+}
+
+.vehicle-loading-panel small {
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.vehicle-loading-bar {
+  overflow: hidden;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+}
+
+.vehicle-loading-bar span {
+  display: block;
+  width: 48%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22d3ee, #facc15, #f97316);
+  animation: vehicleLoadingSweep 0.95s ease-in-out infinite;
+}
+
+@keyframes vehicleLoadingSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(230%);
+  }
 }
 
 .race-minimap-panel {
