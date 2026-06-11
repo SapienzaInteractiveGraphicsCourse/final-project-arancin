@@ -3168,8 +3168,9 @@ function createBeachMaterial({
 }
 
 function getRoadFrame(curve, progress) {
-  const point = curve.getPointAt(progress);
-  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const p = progress >= 0.9999 ? 0.0 : progress;
+  const point = curve.getPointAt(p);
+  const tangent = curve.getTangentAt(p).setY(0).normalize();
   const right = getRightVector(tangent);
 
   return {
@@ -3252,8 +3253,9 @@ function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffse
 
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t).setY(0).normalize();
+    const sampleT = t >= 0.9999 ? 0.0 : t;
+    const p = curve.getPointAt(sampleT);
+    const tan = curve.getTangentAt(sampleT).setY(0).normalize();
     const normal = getRightVector(tan);
 
     const nearP = p.clone().addScaledVector(normal, side * nearOffset);
@@ -3294,8 +3296,9 @@ function createBeachGradientBandGeometry(curve, trackDef, side, nearOffset, farO
 
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t).setY(0).normalize();
+    const sampleT = t >= 0.9999 ? 0.0 : t;
+    const p = curve.getPointAt(sampleT);
+    const tan = curve.getTangentAt(sampleT).setY(0).normalize();
     const normal = getRightVector(tan);
 
     const nearP = p.clone().addScaledVector(normal, side * nearOffset);
@@ -3796,6 +3799,302 @@ function createBeachPersonSittingWithStrawHat(seed = 0) {
   return person;
 }
 
+function createBeachGirl(type = "swimsuit", seed = 0) {
+  const girl = new THREE.Group();
+  girl.name = `BeachGirl_${type}_${seed}`;
+
+  // Skin colors
+  const skinColors = [0xdcb38c, 0xe8be9b, 0xbe8c5f, 0xcb9c7a];
+  // Hair colors
+  const hairColors = [0x111111, 0x4a3728, 0xd4af37, 0xb85a1c];
+  // Swimsuit colors
+  const swimColors = [0xff3366, 0x33ff66, 0x33ccff, 0xffcc00, 0xff6600, 0xe60067];
+  // Top/Shorts colors
+  const topColors = [0xfefefa, 0xffdd44, 0xff8833, 0x88ffcc, 0xffaaaa];
+  const shortsColors = [0x2a52be, 0x333333, 0x4e5d6c];
+
+  const skinMat = createBeachMaterial({ color: skinColors[seed % skinColors.length], roughness: 0.6 });
+  const hairMat = createBeachMaterial({ color: hairColors[(seed * 3) % hairColors.length], roughness: 0.8 });
+
+  // Head and Hair
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.20, 8, 8), skinMat));
+  head.position.set(0, 1.48, 0);
+  girl.add(head);
+
+  // Hair base
+  const hairBase = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 8), hairMat));
+  hairBase.position.set(0, 1.50, -0.04);
+  hairBase.scale.set(1.02, 0.9, 1.02);
+  girl.add(hairBase);
+
+  // Ponytail/Long hair hanging down
+  const hairHang = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.08), hairMat));
+  hairHang.position.set(0, 1.22, -0.15);
+  hairHang.rotation.x = 0.08;
+  girl.add(hairHang);
+
+  // Torso
+  if (type === "swimsuit") {
+    const swimMat = createBeachMaterial({ color: swimColors[(seed * 7) % swimColors.length], roughness: 0.6 });
+    // Bikini Top
+    const bikiniTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.20, 0.22), swimMat));
+    bikiniTop.position.set(0, 1.15, 0);
+    // Midriff (Skin)
+    const midriff = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.18), skinMat));
+    midriff.position.set(0, 0.94, 0);
+    // Bikini Bottom
+    const bikiniBottom = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.22), swimMat));
+    bikiniBottom.position.set(0, 0.74, 0);
+    girl.add(bikiniTop, midriff, bikiniBottom);
+  } else {
+    const topMat = createBeachMaterial({ color: topColors[(seed * 7) % topColors.length], roughness: 0.5 });
+    const shortsMat = createBeachMaterial({ color: shortsColors[(seed * 11) % shortsColors.length], roughness: 0.7 });
+    
+    // Top
+    const top = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.22), topMat));
+    top.position.set(0, 1.08, 0);
+    // Denim Shorts
+    const shorts = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.24), shortsMat));
+    shorts.position.set(0, 0.76, 0);
+    girl.add(top, shorts);
+  }
+
+  // Walk cycle phase (varies by seed)
+  const walkPhase = (seed % 3) * 0.35 + 0.15;
+  const swingAngle = Math.sin(walkPhase) * 0.4;
+
+  // Left Leg
+  const legLGroup = new THREE.Group();
+  legLGroup.position.set(-0.13, 0.64, 0);
+  const legL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.64, 6), skinMat));
+  legL.position.y = -0.32;
+  const footL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), skinMat));
+  footL.position.set(0, -0.64, 0.04);
+  legLGroup.add(legL, footL);
+  legLGroup.rotation.x = -swingAngle;
+  girl.add(legLGroup);
+
+  // Right Leg
+  const legRGroup = new THREE.Group();
+  legRGroup.position.set(0.13, 0.64, 0);
+  const legR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.64, 6), skinMat));
+  legR.position.y = -0.32;
+  const footR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), skinMat));
+  footR.position.set(0, -0.64, 0.04);
+  legRGroup.add(legR, footR);
+  legRGroup.rotation.x = swingAngle;
+  girl.add(legRGroup);
+
+  // Left Arm
+  const armLGroup = new THREE.Group();
+  armLGroup.position.set(-0.25, 1.20, 0);
+  const armL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.56, 6), skinMat));
+  armL.position.y = -0.28;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), skinMat));
+  handL.position.set(0, -0.56, 0);
+  armLGroup.add(armL, handL);
+  armLGroup.rotation.x = swingAngle;
+  girl.add(armLGroup);
+
+  // Right Arm
+  const armRGroup = new THREE.Group();
+  armRGroup.position.set(0.25, 1.20, 0);
+  const armR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.56, 6), skinMat));
+  armR.position.y = -0.28;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), skinMat));
+  handR.position.set(0, -0.56, 0);
+  armRGroup.add(armR, handR);
+  armRGroup.rotation.x = -swingAngle;
+  girl.add(armRGroup);
+
+  return girl;
+}
+
+function createBeachBoy(type = "swimsuit", seed = 0) {
+  const boy = new THREE.Group();
+  boy.name = `BeachBoy_${type}_${seed}`;
+
+  // Skin colors
+  const skinColors = [0xdcb38c, 0xe8be9b, 0xbe8c5f, 0xcb9c7a];
+  // Hair colors
+  const hairColors = [0x111111, 0x4a3728, 0xd4af37, 0xb85a1c];
+  // Swim shorts colors
+  const swimColors = [0x11cc22, 0xff5500, 0x0088ff, 0xffbb00, 0xff3366, 0x9933ff];
+  // Shirt/Shorts colors
+  const shirtColors = [0xfefefa, 0xff5566, 0x33ddff, 0xffcc33, 0x77ff77];
+  const shortsColors = [0xcca070, 0x333333, 0x4a7fc4];
+
+  const skinMat = createBeachMaterial({ color: skinColors[seed % skinColors.length], roughness: 0.6 });
+  const hairMat = createBeachMaterial({ color: hairColors[(seed * 5) % hairColors.length], roughness: 0.8 });
+
+  // Head and Short Hair
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.20, 8, 8), skinMat));
+  head.position.set(0, 1.50, 0);
+  boy.add(head);
+
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 8), hairMat));
+  hair.position.set(0, 1.53, 0);
+  hair.scale.set(1.03, 0.82, 1.03);
+  boy.add(hair);
+
+  // Torso
+  if (type === "swimsuit") {
+    const swimMat = createBeachMaterial({ color: swimColors[(seed * 7) % swimColors.length], roughness: 0.7 });
+    // Bare Chest (Skin)
+    const chest = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.44, 0.24), skinMat));
+    chest.position.set(0, 1.14, 0);
+    // Swim Trunks
+    const trunks = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.24, 0.26), swimMat));
+    trunks.position.set(0, 0.80, 0);
+    boy.add(chest, trunks);
+  } else {
+    const shirtMat = createBeachMaterial({ color: shirtColors[(seed * 7) % shirtColors.length], roughness: 0.5 });
+    const shortsMat = createBeachMaterial({ color: shortsColors[(seed * 11) % shortsColors.length], roughness: 0.7 });
+    
+    // T-shirt
+    const shirt = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.46, 0.26), shirtMat));
+    shirt.position.set(0, 1.15, 0);
+    // Shorts
+    const shorts = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.26, 0.26), shortsMat));
+    shorts.position.set(0, 0.79, 0);
+    boy.add(shirt, shorts);
+  }
+
+  // Walk cycle phase
+  const walkPhase = (seed % 3) * 0.35 + 0.32;
+  const swingAngle = Math.sin(walkPhase) * 0.4;
+
+  // Left Leg
+  const legLGroup = new THREE.Group();
+  legLGroup.position.set(-0.13, 0.66, 0);
+  const legL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.66, 6), skinMat));
+  legL.position.y = -0.33;
+  const footL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.15), skinMat));
+  footL.position.set(0, -0.66, 0.04);
+  legLGroup.add(legL, footL);
+  legLGroup.rotation.x = -swingAngle;
+  boy.add(legLGroup);
+
+  // Right Leg
+  const legRGroup = new THREE.Group();
+  legRGroup.position.set(0.13, 0.66, 0);
+  const legR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.66, 6), skinMat));
+  legR.position.y = -0.33;
+  const footR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.15), skinMat));
+  footR.position.set(0, -0.66, 0.04);
+  legRGroup.add(legR, footR);
+  legRGroup.rotation.x = swingAngle;
+  boy.add(legRGroup);
+
+  // Left Arm
+  const armLGroup = new THREE.Group();
+  armLGroup.position.set(-0.27, 1.22, 0);
+  const armL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.58, 6), skinMat));
+  armL.position.y = -0.29;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), skinMat));
+  handL.position.set(0, -0.58, 0);
+  armLGroup.add(armL, handL);
+  armLGroup.rotation.x = swingAngle;
+  boy.add(armLGroup);
+
+  // Right Arm
+  const armRGroup = new THREE.Group();
+  armRGroup.position.set(0.27, 1.22, 0);
+  const armR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.58, 6), skinMat));
+  armR.position.y = -0.29;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), skinMat));
+  handR.position.set(0, -0.58, 0);
+  armRGroup.add(armR, handR);
+  armRGroup.rotation.x = -swingAngle;
+  boy.add(armRGroup);
+
+  return boy;
+}
+
+function addBeachPeople(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  // 1. Swimsuit girls on the beach (side = +1)
+  for (let index = 0; index < 12; index += 1) {
+    const progress = (index + 0.25) / 12;
+    const depthOffset = (index % 3 === 0) ? 7.5 : (index % 3 === 1) ? 14.5 : 19.0;
+    const { position, rotationY } = safePlace(curve, progress, +1, +(roadHalfWidth + depthOffset), roadHalfWidth, 4.5);
+
+    const girl = createBeachGirl("swimsuit", index);
+    girl.position.copy(position);
+    girl.scale.setScalar(2.5);
+
+    if (depthOffset === 7.5) {
+      girl.rotation.y = rotationY + (index % 2 === 0 ? Math.PI / 2 : -Math.PI / 2);
+    } else if (depthOffset === 14.5) {
+      girl.position.y -= 0.22;
+      girl.rotation.y = rotationY + (index % 2 === 0 ? Math.PI / 2 : -Math.PI / 2);
+    } else {
+      girl.position.y -= 1.1;
+      girl.rotation.y = rotationY + Math.PI + (pseudoRandom(index) * 0.4 - 0.2);
+    }
+    group.add(girl);
+  }
+
+  // 2. Swimsuit boys on the beach (side = +1)
+  for (let index = 0; index < 10; index += 1) {
+    const progress = (index + 0.75) / 10;
+    const depthOffset = (index % 3 === 0) ? 8.5 : (index % 3 === 1) ? 15.5 : 18.0;
+    const { position, rotationY } = safePlace(curve, progress, +1, +(roadHalfWidth + depthOffset), roadHalfWidth, 4.5);
+
+    const boy = createBeachBoy("swimsuit", index);
+    boy.position.copy(position);
+    boy.scale.setScalar(2.5); // matches girls
+
+    if (depthOffset === 8.5) {
+      boy.rotation.y = rotationY + (index % 2 === 0 ? -Math.PI / 2 : Math.PI / 2);
+    } else if (depthOffset === 15.5) {
+      boy.position.y -= 0.22;
+      boy.rotation.y = rotationY + (index % 2 === 0 ? -Math.PI / 2 : Math.PI / 2);
+    } else {
+      boy.position.y -= 1.0;
+      boy.rotation.y = rotationY + Math.PI + (pseudoRandom(index * 2) * 0.4 - 0.2);
+    }
+    group.add(boy);
+  }
+
+  // 3. People walking towards the bars (side = -1)
+  const barProgresses = [0.20, 0.55, 0.80];
+  barProgresses.forEach((barP, barIdx) => {
+    const barFrame = safePlace(curve, barP, -1, -(roadHalfWidth + 16.0), roadHalfWidth, 6.0);
+    
+    // Girl A: approaching from the left, standing outside the counter
+    const pA = barP - 0.016;
+    const frameA = safePlace(curve, pA, -1, -(roadHalfWidth + 5.8), roadHalfWidth, 4.5);
+    const girlA = createBeachGirl("shorts_top", barIdx * 10 + 1);
+    girlA.position.copy(frameA.position);
+    girlA.scale.setScalar(2.6);
+    const dirA = barFrame.position.clone().sub(frameA.position).normalize();
+    girlA.rotation.y = Math.atan2(dirA.x, dirA.z);
+    group.add(girlA);
+
+    // Girl B: approaching from the right, standing outside the counter
+    const pB = barP + 0.014;
+    const frameB = safePlace(curve, pB, -1, -(roadHalfWidth + 6.6), roadHalfWidth, 4.5);
+    const girlB = createBeachGirl("shorts_top", barIdx * 10 + 2);
+    girlB.position.copy(frameB.position);
+    girlB.scale.setScalar(2.6);
+    const dirB = barFrame.position.clone().sub(frameB.position).normalize();
+    girlB.rotation.y = Math.atan2(dirB.x, dirB.z);
+    group.add(girlB);
+
+    // Boy C: approaching from the front-left, standing outside the counter
+    const pC = barP - 0.008;
+    const frameC = safePlace(curve, pC, -1, -(roadHalfWidth + 7.2), roadHalfWidth, 4.5);
+    const boyC = createBeachBoy("shorts_shirt", barIdx * 10 + 3);
+    boyC.position.copy(frameC.position);
+    boyC.scale.setScalar(2.6); // matches girls
+    const dirC = barFrame.position.clone().sub(frameC.position).normalize();
+    boyC.rotation.y = Math.atan2(dirC.x, dirC.z);
+    group.add(boyC);
+  });
+}
+
 function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
   // 1. Two chairs, scaled to 2.8x (slightly smaller than 3.5x as requested)
   const chair1 = createBeachChair(index * 2);
@@ -3830,10 +4129,17 @@ function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
 function addBeachTropicalPlants(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
+  // Helper to check if a progress value is near a bar kiosk to prevent overlapping palms
+  const isNearBar = (p) => {
+    const bars = [0.20, 0.55, 0.80];
+    return bars.some(barP => Math.abs(p - barP) < 0.04);
+  };
+
   // 20 palme/cespugli distribuiti attorno alla pista, tenendoli vicini sul lato interno
   for (let index = 0; index < 20; index += 1) {
     const side = -1;
     const progress = (index + 0.3) / 20;
+    if (isNearBar(progress)) continue;
     const offset = side * (roadHalfWidth + 4.5 + (index % 4) * 2.5); // Offset tra roadHalfWidth + 4.5 e roadHalfWidth + 12
     const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 4.5);
     const useBush = index % 5 === 0;
@@ -3849,6 +4155,22 @@ function addBeachTropicalPlants(group, curve, trackDef) {
       addChairsUnderPalm(group, position, rotationY, index);
       addHouseBehindPalm(group, curve, progress, offset, roadHalfWidth, rotationY, index);
     }
+  }
+
+  // Add 45 more palms/bushes on the inside (side = -1) to make the inner ring dense
+  for (let index = 0; index < 45; index += 1) {
+    const side = -1;
+    const progress = (index + 0.75) / 45;
+    if (isNearBar(progress)) continue;
+    const offset = side * (roadHalfWidth + 5.0 + (index % 3) * 3.5);
+    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 4.5);
+    const useBush = index % 4 === 0;
+    const plant = useBush ? createTropicalBush(index + 100) : createTropicalPalm(index + 100);
+    plant.position.copy(position);
+    plant.rotation.y = rotationY + (index % 5) * 0.3;
+    const baseScale = useBush ? 1.35 : 1.05;
+    plant.scale.setScalar(baseScale + pseudoRandom(index + 9.9) * 0.5);
+    group.add(plant);
   }
 }
 
@@ -4026,6 +4348,110 @@ function createBeachHouse(seed = 0) {
   return house;
 }
 
+// Bartender: standing man with straw hat, holding a coconut in his raised right hand
+function createBarBartender() {
+  const person = new THREE.Group();
+  person.name = "TropicalBeachBartender";
+
+  const skinMat  = createBeachMaterial({ color: 0xdcb38c, roughness: 0.6 });
+  const shirtMat = createBeachMaterial({ color: 0xfefefa, roughness: 0.5 });
+  const shortsMat= createBeachMaterial({ color: 0x4a7fc4, roughness: 0.7 });
+  const blackMat = createBeachMaterial({ color: 0x111111, roughness: 0.8 });
+  const strawMat = createBeachMaterial({ color: 0xd4b26f, roughness: 0.8 });
+  const coconutMat = createBeachMaterial({ color: 0x5c3d1e, roughness: 0.9 });
+
+  // --- Torso ---
+  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.32), shirtMat));
+  torso.position.set(0, 1.05, 0);
+  person.add(torso);
+
+  // --- Head ---
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), skinMat));
+  head.position.set(0, 1.62, 0);
+  person.add(head);
+
+  // Hair
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 8), blackMat));
+  hair.position.set(0, 1.66, 0);
+  hair.scale.set(1.02, 0.88, 1.02);
+  person.add(hair);
+
+  // Beard
+  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.10), blackMat));
+  beard.position.set(0, 1.54, 0.09);
+  person.add(beard);
+
+  // --- Straw hat ---
+  const hatGroup = new THREE.Group();
+  hatGroup.position.set(0, 1.78, 0);
+  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 0.25, 8), strawMat));
+  crown.position.y = 0.10;
+  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.80, 0.80, 0.02, 16), strawMat));
+  // Frayed strands
+  const strandGeo = new THREE.CylinderGeometry(0.007, 0.003, 0.5, 4);
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const strand = markShadow(new THREE.Mesh(strandGeo, strawMat));
+    strand.position.set(Math.cos(angle) * 0.76, 0.01, Math.sin(angle) * 0.76);
+    strand.rotation.z = angle + Math.PI / 2 + (pseudoRandom(i) * 0.3 - 0.15);
+    hatGroup.add(strand);
+  }
+  hatGroup.add(crown, brim);
+  person.add(hatGroup);
+
+  // --- Legs ---
+  [-0.16, 0.16].forEach((lx) => {
+    const thigh = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.09, 0.42, 6), shortsMat));
+    thigh.position.set(lx, 0.53, 0);
+    const shin = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.42, 6), skinMat));
+    shin.position.set(lx, 0.10, 0);
+    const foot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMat));
+    foot.position.set(lx, -0.10, 0.05);
+    person.add(thigh, shin, foot);
+  });
+
+  // --- Left arm (relaxed, slightly forward on counter) ---
+  const upperArmL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 6), shirtMat));
+  upperArmL.position.set(-0.32, 1.02, 0);
+  upperArmL.rotation.z = 0.25;
+  const forearmL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.34, 6), skinMat));
+  forearmL.position.set(-0.38, 0.75, -0.08);
+  forearmL.rotation.x = 0.3;
+  forearmL.rotation.z = 0.1;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat));
+  handL.position.set(-0.40, 0.62, -0.18);
+  person.add(upperArmL, forearmL, handL);
+
+  // --- Right arm (raised, holding coconut) ---
+  const upperArmR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 6), shirtMat));
+  upperArmR.position.set(0.32, 1.12, 0);
+  upperArmR.rotation.z = -0.65; // raised outward
+  upperArmR.rotation.x = -0.2;
+  const forearmR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), skinMat));
+  forearmR.position.set(0.50, 1.22, -0.10);
+  forearmR.rotation.z = -0.5;
+  forearmR.rotation.x = -0.4;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat));
+  handR.position.set(0.60, 1.35, -0.22);
+  person.add(upperArmR, forearmR, handR);
+
+  // --- Coconut held in right hand ---
+  const coconut = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), coconutMat));
+  coconut.scale.set(1.0, 1.15, 1.0);
+  coconut.position.set(0.60, 1.45, -0.28);
+  // Straw/drinking straw sticking out
+  const straw = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5),
+    createBeachMaterial({ color: 0xff8800, roughness: 0.5 })
+  ));
+  straw.position.set(0.60, 1.60, -0.30);
+  straw.rotation.z = 0.3;
+  person.add(coconut, straw);
+
+  person.scale.setScalar(1.4);
+  return person;
+}
+
 function createBeachHutStrict(seed = 0) {
   const hut = new THREE.Group();
   hut.name = "TropicalBeachBarKiosk";
@@ -4112,9 +4538,10 @@ function createBeachHutStrict(seed = 0) {
   // Place sign at z=-2.55 (front of counter in local) with lz=-0.06 (protrudes toward road).
   // Pre-mirror ALL letter x coordinates so that after the kiosk PI flip they read correctly.
   const signGroup = new THREE.Group();
-  signGroup.position.set(0, 3.08, -2.55);
+  signGroup.position.set(0, 2.55, -3.2);
   signGroup.rotation.x = 0.04;
   hut.add(signGroup);
+  signGroup.rotation.y = Math.PI; // cancels kiosk +PI flip → letters in natural orientation
 
   // Board: wide warm-wood plank
   const signBoard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.62, 0.08), trimMat));
@@ -4128,59 +4555,69 @@ function createBeachHutStrict(seed = 0) {
     signGroup.add(chain);
   });
 
-  // Big bold raised "BAR" letters in yellow.
-  // lz = -0.06 so letters protrude toward -Z local (= road side after kiosk +PI rotation).
-  // All x coords are NEGATED (pre-mirrored) so the kiosk +PI flip restores correct reading order.
-  const lz = -0.06;
+  // Letters in natural reading order (B left, A centre, R right).
+  // lz = +0.06 protrudes toward the road (sign faces outward after rotation.y=PI).
+  const lz = +0.06;
   const ly = 0;
   const th = 0.05;
 
-  // === B (pre-mirrored: group at +0.52 so after flip it appears left) ===
+  // === B ===
   const bGroup = new THREE.Group();
-  bGroup.position.set(+0.52, ly, 0);
+  bGroup.position.set(-0.52, ly, 0);
+  // Vertical stem (left side)
   const bV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
-  bV.position.set(+0.15, 0, lz);              // stem: right in local → left in world ✓
+  bV.position.set(-0.15, 0, lz);
+  // Top / middle / bottom horizontals
   const bH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
-  bH1.position.set(+0.04, 0.185, lz);
+  bH1.position.set(-0.04, 0.185, lz);
   const bH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
-  bH2.position.set(+0.04, 0, lz);
+  bH2.position.set(-0.04, 0, lz);
   const bH3 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
-  bH3.position.set(+0.04, -0.185, lz);
+  bH3.position.set(-0.04, -0.185, lz);
+  // Top and bottom bump connectors (right side)
   const bC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
-  bC1.position.set(-0.065, 0.093, lz);        // bumps: left in local → right in world ✓
+  bC1.position.set(0.065, 0.093, lz);
   const bC2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
-  bC2.position.set(-0.065, -0.093, lz);
+  bC2.position.set(0.065, -0.093, lz);
   bGroup.add(bV, bH1, bH2, bH3, bC1, bC2);
   signGroup.add(bGroup);
 
-  // === A (symmetric, centre stays at 0) ===
+  // === A ===
   const aGroup = new THREE.Group();
   aGroup.position.set(0, ly, 0);
+  // Left diagonal (leans right)
   const aL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
-  aL.position.set(+0.10, 0, lz);   // x negated; rotation.z negated
+  aL.position.set(-0.10, 0, lz);
   aL.rotation.z = -0.22;
+  // Right diagonal (leans left)
   const aR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
-  aR.position.set(-0.10, 0, lz);
-  aR.rotation.z = +0.22;
+  aR.position.set(0.10, 0, lz);
+  aR.rotation.z = 0.22;
+  // Crossbar
   const aC = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
   aC.position.set(0, -0.04, lz);
   aGroup.add(aL, aR, aC);
   signGroup.add(aGroup);
 
-  // === R (pre-mirrored: group at -0.52 so after flip it appears right) ===
+  // === R ===
   const rGroup = new THREE.Group();
-  rGroup.position.set(-0.52, ly, 0);
+  rGroup.position.set(+0.52, ly, 0);
+  // Vertical stem (left side)
   const rV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
-  rV.position.set(+0.10, 0, lz);             // stem: right in local → left in world ✓
+  rV.position.set(-0.10, 0, lz);
+  // Top horizontal
   const rH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
-  rH1.position.set(+0.01, 0.185, lz);
+  rH1.position.set(-0.01, 0.185, lz);
+  // Middle horizontal
   const rH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
-  rH2.position.set(+0.01, 0.02, lz);
+  rH2.position.set(-0.01, 0.02, lz);
+  // Top-right loop connector
   const rC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.165, th), letterMat));
-  rC1.position.set(-0.055, 0.103, lz);       // loop: left in local → right in world ✓
+  rC1.position.set(0.055, 0.103, lz);
+  // Diagonal leg (bottom-right)
   const rLeg2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, th), letterMat));
-  rLeg2.position.set(-0.072, -0.13, lz);     // leg: left in local → right in world ✓
-  rLeg2.rotation.z = +0.5;                   // rotation.z negated so leg tilts correctly ✓
+  rLeg2.position.set(0.072, -0.13, lz);
+  rLeg2.rotation.z = 0.5;
   rGroup.add(rV, rH1, rH2, rC1, rLeg2);
   signGroup.add(rGroup);
 
@@ -4197,6 +4634,14 @@ function createBeachHutStrict(seed = 0) {
   kayak2.rotation.set(-0.05, 0.25, 0.0);
 
   hut.add(kayak1, kayak2);
+
+  // 8. Bartender — standing behind the counter, holding a coconut
+  const bartender = createBarBartender();
+  // z = +1.2 = bartender side (inside the bar, opposite to road-facing counter)
+  // After kiosk +PI rotation this becomes the interior behind the counter
+  bartender.position.set(0, 0, 0.5);
+  bartender.rotation.y = Math.PI; // face toward the road/customer side
+  hut.add(bartender);
 
   return hut;
 }
@@ -4299,12 +4744,11 @@ function createThatchedUmbrellaWithLoungers(index) {
 function addBeachUmbrellasStrict(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
 
-  // Place 10 thatched umbrella+lounger sets on the SEA SIDE (side=+1)
-  // spread along the widened sand strip (offset 5–12 units from road edge)
-  for (let index = 0; index < 10; index += 1) {
-    const progress = (index + 0.5) * 0.1;
-    // Alternate between two depth rows on the beach
-    const depthOffset = (index % 3 === 0) ? 9.0 : (index % 3 === 1) ? 6.5 : 11.5;
+  // Place 30 thatched umbrella+lounger sets on the SEA SIDE (side=+1)
+  for (let index = 0; index < 30; index += 1) {
+    const progress = (index + 0.5) / 30;
+    // Alternate between depth rows on the beach, keeping them closer to the road to avoid the water
+    const depthOffset = (index % 4 === 0) ? 5.2 : (index % 4 === 1) ? 7.0 : (index % 4 === 2) ? 8.8 : 10.5;
     const { position, rotationY } = safePlace(
       curve, progress, +1,
       +(roadHalfWidth + depthOffset),
@@ -4412,6 +4856,7 @@ export function buildBeachProps(group, curve, trackDef) {
   addBeachTropicalPlants(propsGroup, curve, trackDef);
   addBeachHutsStrict(propsGroup, curve, trackDef);
   addBeachUmbrellasStrict(propsGroup, curve, trackDef);
+  addBeachPeople(propsGroup, curve, trackDef);
   // addBeachLampPostsStrict(propsGroup, curve, trackDef);
 
   group.add(propsGroup);
