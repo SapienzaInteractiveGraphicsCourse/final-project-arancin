@@ -14,7 +14,8 @@ Snapshot previsto:
   setup: {
     trackId: "vegas" | "beach" | "monaco",
     vehicleId: "kart" | "porsche" | "silvia",
-    raceMode: "race" | "time-trial"
+    raceMode: "race" | "time-trial",
+    bodyColor: "#d6332f" // colore carrozzeria scelto nel passaggio pre-gara
   }
 }
 ```
@@ -153,7 +154,8 @@ Regole:
 - non deve conoscere direttamente mesh, DOM, HUD o AI;
 - `update()` deve restituire uno stato adatto a `vehicle.setTransform()` e `vehicle.update()`;
 - `distanceThisFrame` serve all'animazione ruote;
-- `surfaceGrip`, `boostFactor` e collisioni reali verranno forniti da sistemi pista/collisione futuri;
+- `surfaceGrip` influenza trazione e sterzata;
+- `boostFactor` e collisioni reali vengono forniti da sistemi pista/collisione;
 - `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
 
 ## Track Factory
@@ -270,6 +272,12 @@ Stato previsto:
 ]
 ```
 
+La classifica non viene calcolata automaticamente da `RaceManager.update()`: la scena confronta il progresso del player con gli opponent e aggiorna `position` tramite:
+
+```js
+raceManager.setPlayerPosition(position, participantCount)
+```
+
 Checkpoint previsto:
 
 ```js
@@ -330,6 +338,53 @@ Regole:
 - `getOrderedCheckpoints()` non deve mutare `trackInfo.checkpoints`;
 - i checkpoint validi devono avere `position.x`, `position.z` e `order`/`id` numerici;
 - `radius` e opzionale se e presente `size`.
+
+## Track Interaction System
+
+File: `src/systems/TrackInteractionSystem.js`
+
+Firma:
+
+```js
+const trackInteraction = new TrackInteractionSystem();
+```
+
+Contratto:
+
+```js
+trackInteraction.update(playerState, trackInfo, options) -> EnvironmentState
+trackInteraction.reset()
+```
+
+`EnvironmentState` prodotto:
+
+```js
+{
+  surfaceType,
+  surfaceGrip,
+  speedLimitMultiplier,
+  boostFactor,
+  collided,
+  correction,
+  impact
+}
+```
+
+Regole:
+
+- legge `trackInfo.centerline`, `trackInfo.roadHalfWidth`, `trackInfo.boostPads` e `trackInfo.barrierColliders`;
+- restituisce default asfaltati quando i dati pista mancano;
+- usa distanza da `centerline` e `roadHalfWidth` per distinguere asphalt/off-road;
+- fuori strada riduce `surfaceGrip` e `speedLimitMultiplier`;
+- usa `trackInfo.boostPads` per applicare un boost temporaneo con cooldown breve;
+- usa `trackInfo.barrierColliders` per produrre `collided`, `correction` e `impact`;
+- puo ricevere `options.opponentStates` per collisione player-opponent semplificata;
+- un impatto `opponent` applica separazione minima al player e rallenta temporaneamente l'AI, ma non implica avoidance intelligente;
+- non deve conoscere mesh, DOM, HUD o classi veicolo;
+- non deve modificare direttamente la mesh del player;
+- la scena usa l'output per aggiornare `ArcadeVehicleController`;
+- la risposta fisica a una barriera deve essere continua ogni frame di intersezione;
+- eventuali cooldown servono solo per feedback futuri, non per bloccare la correzione fisica.
 
 ## Race Records
 
@@ -440,6 +495,9 @@ Regole:
 - per ora non gestisce mesh;
 - usa la performance del veicolo selezionato per derivare velocita base;
 - serve come base per opponent visibile e classifica player vs AI.
+- la scena puo usare `createVehicleById(setup.vehicleId)` per renderizzare l'opponent con lo stesso veicolo del player.
+- non deve viaggiare sempre alla velocita massima: accelera gradualmente e riduce il target speed in base alla curva davanti.
+- `progress` resta sulla centerline, mentre `position` puo applicare un offset laterale per la mesh dell'opponent.
 
 ## Vehicle Factory
 
@@ -504,6 +562,98 @@ const vehicle = createVehicleById(setup.vehicleId);
 ```
 
 Non creare direttamente piste o veicoli dentro la preview, salvo placeholder temporanei dentro le factory.
+
+## Race HUD
+
+File: `src/ui/RaceHud.js`
+
+Firma:
+
+```js
+createRaceHud() -> {
+  element,
+  update({ raceState, vehicleState, wrongWayState, trackId, trackName }),
+  remove()
+}
+```
+
+Campi DOM stabili:
+
+```text
+speed
+lap
+totalTime
+checkpoint
+track
+surface
+position
+gap
+```
+
+Regole:
+
+- il componente crea il DOM una sola volta;
+- `update()` aggiorna solo i valori testuali dei campi;
+- deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
+- il warning contromano e gli stati di partenza devono usare overlay dedicati, non chip persistenti nell'HUD.
+
+## Minimap System
+
+File: `src/systems/MinimapSystem.js`
+
+Firma:
+
+```js
+const minimap = new MinimapSystem(canvas);
+minimap.setTrack(trackInfo);
+minimap.resize();
+minimap.update({ playerState, aiState });
+```
+
+Contratto:
+
+- usa `trackInfo.centerline` per disegnare il percorso;
+- usa `trackInfo.minimapBounds` per calcolare la scala;
+- ruota la mappa in base a `playerState.heading`;
+- usa `playerState.position` come centro quando disponibile;
+- gestisce `devicePixelRatio` in `resize()`;
+- puo ricevere `aiState` per mostrare il marker AI quando disponibile;
+- disegna il marker AI solo se `aiState.position` esiste e `aiState.visible === true` oppure `aiState.hasVisibleModel === true`;
+- mostra marker start/finish e checkpoint usando `trackInfo.checkpoints`;
+- deve mostrare un fallback leggibile se centerline o bounds mancano.
+const cameraController = new CameraController(camera, options)
+```
+
+## Camera Controller
+
+File: `src/systems/CameraController.js`
+
+Contratto:
+
+```js
+cameraController.update(deltaTime, vehicleState, trackInfo, context)
+cameraController.nextMode()
+cameraController.setMode(mode)
+cameraController.applyShake(intensity)
+cameraController.resize(width, height)
+cameraController.getState()
+cameraController.dispose()
+```
+
+Modalita supportate ora:
+
+```js
+"follow" | "top" | "hood" | "orbit"
+```
+
+Regole:
+
+- gestisce posizione e lookAt della camera;
+- non deve conoscere DOM, HUD, RaceManager o classi veicolo;
+- usa `vehicleState.position` e `vehicleState.heading` come input principale;
+- la scena resta responsabile di chiamare `update()`, `nextMode()` e `resize()`;
+- camera shake e solo feedback visivo e non deve influenzare fisica/input.
+- la modalita `top` non applica camera shake per restare leggibile in debug.
 
 ## Branch Responsibilities
 

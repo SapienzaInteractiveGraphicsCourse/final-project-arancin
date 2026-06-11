@@ -3,14 +3,21 @@ import { createMainCamera } from "./createMainCamera.js";
 import { createRenderer } from "./createRenderer.js";
 import { createScene } from "./createScene.js";
 import { createSceneLights } from "./createSceneLights.js";
+import { VEHICLE_COLOR_OPTIONS } from "../config/raceOptions.js";
 import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
+import { findClosestProgress } from "../tracks/centerline.js";
 import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
+import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { CameraController } from "../systems/CameraController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
+import { MinimapSystem } from "../systems/MinimapSystem.js";
 import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
+import { TrackInteractionSystem } from "../systems/TrackInteractionSystem.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
+import { createRaceHud } from "../ui/RaceHud.js";
 import {
   appendLapRecord,
   ensureBestLapInRecords,
@@ -21,19 +28,34 @@ import {
   writeBestLapTime
 } from "../systems/raceRecords.js";
 
+const VEHICLE_LOADING_MIN_MS = {
+  kart: 420,
+  porsche: 850,
+  silvia: 850
+};
+
+const VEHICLE_DISPLAY_NAMES = {
+  kart: "Kart",
+  porsche: "Porsche",
+  silvia: "Silvia"
+};
+
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
   const scene = createScene();
   const camera = createMainCamera();
-  const cameraTarget = new THREE.Vector3();
-  const cameraLookAt = new THREE.Vector3();
-  const lookTarget = new THREE.Vector3();
+  const cameraController = new CameraController(camera);
   const timer = new THREE.Timer();
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
+  let selectedBodyColor = setup.bodyColor ?? VEHICLE_COLOR_OPTIONS[0].value;
+  vehicle.setBodyColor(selectedBodyColor);
+  const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
+  const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
+  const trackInteraction = new TrackInteractionSystem();
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
@@ -41,6 +63,7 @@ export function startScenePreview(container, setup, options = {}) {
   let savedLapRecords = ensureBestLapInRecords(window.localStorage, lapRecordsKey, savedBestLapTime);
   const raceManager = new RaceManager({
     mode: setup.raceMode,
+    countdownSeconds: 4,
     bestLapTime: savedBestLapTime,
     onLapComplete: (lapRecord) => {
       savedLapRecords = appendLapRecord(window.localStorage, lapRecordsKey, lapRecord);
@@ -52,6 +75,28 @@ export function startScenePreview(container, setup, options = {}) {
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
   const wrongWayOverlay = createWrongWayOverlay();
+  const loadingOverlay = createVehicleLoadingOverlay({
+    ...setup,
+    trackName: track.trackInfo.name
+  });
+  const minimapPanel = createMinimapPanel();
+  const minimapCanvas = minimapPanel.querySelector("canvas");
+  const minimap = new MinimapSystem(minimapCanvas);
+  minimap.setTrack(track.trackInfo);
+  const colorPicker = createPreRaceColorPicker({
+    selectedColor: selectedBodyColor,
+    onSelect: (color) => {
+      selectedBodyColor = color;
+      setup.bodyColor = color;
+      vehicle.setBodyColor(color);
+    },
+    onConfirm: () => {
+      raceArmed = true;
+      colorPicker.hide();
+      raceManager.startCountdown();
+    }
+  });
+  colorPicker.element.hidden = true;
   const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
@@ -63,6 +108,8 @@ export function startScenePreview(container, setup, options = {}) {
   });
   let animationFrameId = 0;
   let paused = false;
+  let raceArmed = false;
+  let disposed = false;
   let renderedFinishSignature = "";
   let totalElapsedTime = 0;
 
@@ -93,21 +140,36 @@ export function startScenePreview(container, setup, options = {}) {
     }
   });
 
+  if (aiVehicle && aiController) {
+    scene.add(aiVehicle.group);
+    applyAiVehicleTransform(aiVehicle, aiController.getState());
+  }
+
   container.appendChild(raceOverlay);
-  container.appendChild(raceHud);
+  container.appendChild(raceHud.element);
   container.appendChild(wrongWayOverlay);
+  container.appendChild(minimapPanel);
+  container.appendChild(loadingOverlay.element);
+  container.appendChild(colorPicker.element);
   container.appendChild(finishScreen.element);
   container.appendChild(pauseMenu.element);
   vehicle.setTransform(controller.position, controller.heading);
-  raceManager.startCountdown();
+  waitForVehicleReadiness([vehicle, aiVehicle], setup.vehicleId).then(() => {
+    if (disposed) {
+      return;
+    }
+
+    loadingOverlay.remove();
+    colorPicker.element.hidden = false;
+  });
 
   function resize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    cameraController.resize(width, height);
     renderer.setSize(width, height);
+    minimap.resize();
   }
 
   function setPaused(nextPaused) {
@@ -121,6 +183,8 @@ export function startScenePreview(container, setup, options = {}) {
 
   function resetRace() {
     controller.reset(track.spawn);
+    aiController?.reset(track.trackInfo);
+    trackInteraction.reset();
     raceManager.reset();
     wrongWayDetector.reset();
     raceManager.startCountdown();
@@ -136,7 +200,27 @@ export function startScenePreview(container, setup, options = {}) {
       setPaused(!paused);
     }
 
+    if (actions.camera) {
+      cameraController.nextMode();
+    }
+
     if (paused) {
+      return;
+    }
+
+    if (!raceArmed) {
+      const state = controller.getState();
+      vehicle.setTransform(state.position, state.heading);
+      vehicle.update(deltaTime, state);
+      cameraController.update(deltaTime, state, track.trackInfo);
+      raceHud.update({
+        raceState: raceManager.getState(),
+        vehicleState: state,
+        wrongWayState: wrongWayDetector.getState(),
+        trackId: track.trackInfo.id,
+        trackName: track.trackInfo.name
+      });
+      minimap.update({ playerState: state });
       return;
     }
 
@@ -151,17 +235,20 @@ export function startScenePreview(container, setup, options = {}) {
     totalElapsedTime += deltaTime;
 
     const currentVehicleState = controller.getState();
-    const raceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
-    const canDrive = raceState.phase === RACE_PHASES.RUNNING;
-    const state = raceState.finished
+    const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
+    const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
+    const opponentStates = aiController ? [aiController.getState()] : [];
+    const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, {
+      deltaTime,
+      opponentStates
+    });
+    if (environmentState.impact?.type === "opponent") {
+      aiController?.registerCollision();
+    }
+
+    const state = updatedRaceState.finished
       ? controller.getState()
-      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, {
-        surfaceType: "asphalt",
-        surfaceGrip: 1,
-        speedLimitMultiplier: 1,
-        boostFactor: 1,
-        collided: false
-      });
+      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, environmentState);
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
@@ -239,31 +326,47 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
+
+    let aiState = null;
+
+    if (aiVehicle && aiController) {
+      aiState = updatedRaceState.phase === RACE_PHASES.RUNNING && !updatedRaceState.finished
+        ? aiController.update(deltaTime, track.trackInfo)
+        : aiController.getState();
+      applyAiVehicleTransform(aiVehicle, aiState);
+      aiVehicle.update(deltaTime, aiState);
+    }
+
+    updatePlayerRacePosition(raceManager, state, aiState, track.trackInfo);
+    const raceState = raceManager.getState();
+
+    if (environmentState.impact) {
+      cameraController.applyShake(environmentState.impact.type === "opponent" ? 0.45 : 1);
+    }
+
+    cameraController.update(deltaTime, state, track.trackInfo);
+    const wrongWayState = wrongWayDetector.update(deltaTime, state, track.trackInfo);
+    updateWrongWayOverlay(wrongWayOverlay, wrongWayState);
+    
     checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);
-    updateRaceHud(raceHud, raceState);
+    raceHud.update({
+      raceState,
+      vehicleState: state,
+      wrongWayState,
+      trackId: track.trackInfo.id,
+      trackName: track.trackInfo.name
+    });
+    minimap.update({
+      playerState: state,
+      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
       raceState,
       savedLapRecords,
       renderedFinishSignature
     );
-  }
-
-  function updateCameraFollow(state) {
-    const targetY = track.spawn.position.y;
-    const cameraDistance = 9.5;
-    const cameraHeight = 6.2;
-    cameraTarget.set(
-      state.position.x + Math.sin(state.heading + Math.PI) * cameraDistance,
-      targetY + cameraHeight,
-      state.position.z + Math.cos(state.heading + Math.PI) * cameraDistance
-    );
-
-    camera.position.lerp(cameraTarget, 0.08);
-    lookTarget.set(state.position.x, targetY + 0.75, state.position.z);
-    cameraLookAt.lerp(lookTarget, 0.16);
-    camera.lookAt(cameraLookAt);
   }
 
   function animate(timestamp) {
@@ -281,23 +384,186 @@ export function startScenePreview(container, setup, options = {}) {
 
   return {
     dispose() {
+      disposed = true;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", resize);
       timer.dispose();
       inputManager.dispose();
       controller.dispose();
+      cameraController.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       raceOverlay.remove();
       raceHud.remove();
       wrongWayOverlay.remove();
+      loadingOverlay.remove();
+      minimapPanel.remove();
+      colorPicker.element.remove();
       finishScreen.element.remove();
       pauseMenu.element.remove();
       checkpointHighlighter.dispose();
       track.dispose();
       vehicle.dispose();
+      aiVehicle?.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
+
+      if (aiVehicle) {
+        scene.remove(aiVehicle.group);
+      }
     }
+  };
+}
+
+function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm }) {
+  const element = document.createElement("section");
+  element.className = "pre-race-color-picker";
+  element.setAttribute("aria-label", "Choose vehicle color");
+
+  const colorButtons = VEHICLE_COLOR_OPTIONS.map((option) => {
+    const button = document.createElement("button");
+    button.className = "pre-race-color-option";
+    button.type = "button";
+    button.dataset.color = option.value;
+    button.style.setProperty("--vehicle-color", option.value);
+    button.setAttribute("aria-label", option.name);
+    button.setAttribute("aria-pressed", String(option.value === selectedColor));
+    button.innerHTML = `
+      <span class="pre-race-color-swatch" aria-hidden="true"></span>
+      <strong>${option.name}</strong>
+    `;
+
+    button.addEventListener("click", () => {
+      selectedColor = option.value;
+      colorButtons.forEach((item) => {
+        item.setAttribute("aria-pressed", String(item.dataset.color === selectedColor));
+      });
+      onSelect?.(selectedColor);
+    });
+
+    return button;
+  });
+
+  const options = document.createElement("div");
+  options.className = "pre-race-color-options";
+  colorButtons.forEach((button) => options.appendChild(button));
+
+  const confirmButton = document.createElement("button");
+  confirmButton.className = "pre-race-start-button";
+  confirmButton.type = "button";
+  confirmButton.textContent = "Start Race";
+  confirmButton.addEventListener("click", () => {
+    onConfirm?.(selectedColor);
+  });
+
+  element.innerHTML = `
+    <div class="pre-race-color-copy">
+      <span>Vehicle Color</span>
+      <strong>Choose your livery</strong>
+    </div>
+  `;
+  element.appendChild(options);
+  element.appendChild(confirmButton);
+
+  return {
+    element,
+    hide: () => {
+      element.hidden = true;
+    }
+  };
+}
+
+function createVehicleLoadingOverlay(setup = {}) {
+  const element = document.createElement("section");
+  element.className = "vehicle-loading-overlay";
+  element.setAttribute("aria-label", "Loading race vehicle");
+  element.setAttribute("aria-live", "polite");
+
+  const vehicleName = VEHICLE_DISPLAY_NAMES[setup.vehicleId] ?? "Vehicle";
+  const trackName = setup.trackName ?? "";
+
+  element.innerHTML = `
+    <div class="vehicle-loading-panel">
+      <span class="vehicle-loading-eyebrow">Preparing Race</span>
+      <strong>${vehicleName}</strong>
+      <div class="vehicle-loading-bar" aria-hidden="true">
+        <span></span>
+      </div>
+      ${trackName ? `<small>${trackName}</small>` : ""}
+    </div>
+  `;
+
+  return {
+    element,
+    remove() {
+      element.remove();
+    }
+  };
+}
+
+function waitForVehicleReadiness(vehicles, vehicleId) {
+  const readyPromises = vehicles
+    .filter(Boolean)
+    .map((vehicle) => vehicle.whenReady?.() ?? Promise.resolve(vehicle));
+  const minimumDelay = wait(VEHICLE_LOADING_MIN_MS[vehicleId] ?? 650);
+
+  return Promise.all([...readyPromises, minimumDelay]);
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+function createMinimapPanel() {
+  const panel = document.createElement("aside");
+  panel.className = "race-minimap-panel";
+  panel.setAttribute("aria-label", "Map");
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "race-minimap";
+  canvas.setAttribute("aria-label", "Rotating track minimap");
+
+  panel.append(canvas);
+  return panel;
+}
+
+function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) {
+  const centerline = Array.isArray(trackInfo.centerline) ? trackInfo.centerline : [];
+  const raceState = raceManager.getState();
+
+  if (!centerline.length || !aiState || raceState.mode !== "race") {
+    raceManager.setPlayerPosition(1, aiState ? 2 : 1);
+    return;
+  }
+
+  const playerProgress = findClosestProgress(centerline, playerState.position.x, playerState.position.z);
+  const playerScore = getRaceProgressScore(raceState.currentLap, playerProgress, raceState.totalLaps);
+  const aiScore = getRaceProgressScore(aiState.lap, aiState.progress, raceState.totalLaps);
+  const playerPosition = playerScore >= aiScore ? 1 : 2;
+
+  raceManager.setPlayerPosition(playerPosition, 2);
+}
+
+function getRaceProgressScore(lap, progress, totalLaps) {
+  return Math.min(totalLaps, Math.max(1, lap) - 1 + Math.max(0, Math.min(1, progress)));
+}
+
+function applyAiVehicleTransform(vehicle, aiState) {
+  vehicle.setTransform(
+    new THREE.Vector3(aiState.position.x, aiState.position.y, aiState.position.z),
+    aiState.heading
+  );
+}
+
+function getVisibleAiMinimapState(aiState, aiVehicle) {
+  if (!aiState?.position || !aiVehicle?.group) {
+    return null;
+  }
+
+  return {
+    ...aiState,
+    hasVisibleModel: aiVehicle.group.visible !== false
   };
 }
 
@@ -525,42 +791,6 @@ function formatLapRows(lapTimes, bestLapTime) {
     .join("");
 }
 
-function createRaceHud() {
-  const hud = document.createElement("aside");
-  hud.className = "race-hud";
-  hud.setAttribute("aria-label", "Race status");
-  return hud;
-}
-
-function updateRaceHud(hud, raceState) {
-  const finalPanel = raceState.mode === "race"
-    ? { label: "Position", value: `${raceState.position}/${raceState.participantCount}` }
-    : { label: "Best", value: formatRaceTime(raceState.bestLapTime) };
-
-  hud.innerHTML = `
-    <div>
-      <span>Mode</span>
-      <strong>${formatMode(raceState.mode)}</strong>
-    </div>
-    <div>
-      <span>Lap</span>
-      <strong>${raceState.currentLap}/${raceState.totalLaps}</strong>
-    </div>
-    <div>
-      <span>Total</span>
-      <strong>${formatRaceTime(raceState.totalTime)}</strong>
-    </div>
-    <div>
-      <span>Lap Time</span>
-      <strong>${formatRaceTime(raceState.lapTime)}</strong>
-    </div>
-    <div>
-      <span>${finalPanel.label}</span>
-      <strong>${finalPanel.value}</strong>
-    </div>
-  `;
-}
-
 function createPauseMenu({ onResume, onExitToSetup }) {
   const element = document.createElement("section");
   element.className = "pause-menu";
@@ -603,29 +833,36 @@ function createPauseMenu({ onResume, onExitToSetup }) {
 function createRaceOverlay() {
   const overlay = document.createElement("div");
   overlay.className = "race-overlay";
+  overlay.hidden = true;
   overlay.setAttribute("aria-live", "polite");
   return overlay;
 }
 
 function updateRaceOverlay(overlay, raceState) {
   if (raceState.phase === RACE_PHASES.COUNTDOWN) {
+    if (raceState.countdown > 3) {
+      setRaceOverlayText(overlay, raceState, "Ready?", "ready");
+      return;
+    }
+
     const countdownNumber = Math.max(1, Math.ceil(raceState.countdown));
-    setRaceOverlayText(overlay, raceState, String(countdownNumber));
+    setRaceOverlayText(overlay, raceState, String(countdownNumber), "countdown");
     return;
   }
 
   if (raceState.phase === RACE_PHASES.RUNNING && raceState.totalTime < 0.65) {
-    setRaceOverlayText(overlay, raceState, "GO");
+    setRaceOverlayText(overlay, raceState, "GO!", "go");
     return;
   }
 
-  setRaceOverlayText(overlay, raceState, "");
+  setRaceOverlayText(overlay, raceState, "", "");
 }
 
-function setRaceOverlayText(overlay, raceState, text) {
+function setRaceOverlayText(overlay, raceState, text, state) {
   overlay.textContent = text;
   overlay.hidden = text.length === 0;
   overlay.dataset.phase = raceState.phase;
+  overlay.dataset.state = state;
 }
 
 function formatMode(mode) {

@@ -26,6 +26,8 @@ This register tracks assets that are not authored procedurally by the team.
 | Procedural Kart | Three.js primitives | Integrated as team-authored hierarchical model |
 | Eiffel Tower | Three.js primitives | Stylized glowing neon landmark on Vegas Neon track |
 | Ferris Wheel | Three.js primitives | Rotating neon Ferris wheel with upright cabins on Vegas Neon track |
+| Main Menu Logo | Raster PNG edited from team-provided artwork | Integrated in setup menu as transparent-background UI logo |
+| Main Menu Vehicle Thumbnails | Browser-rendered PNGs from project vehicle models | Integrated in progressive setup menu vehicle step |
 
 ## Follow-up Checks
 
