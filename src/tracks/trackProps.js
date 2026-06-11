@@ -1,5 +1,20 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "./trackMaterials.js";
+import crowdTextureUrl from "../assets/textures/grandstand_crowd.png";
+
+const ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS = false;
+const UP = new THREE.Vector3(0, 1, 0);
+
+function addDecorativePointLight(parent, color, intensity, distance, decay, position) {
+  if (!ENABLE_VEGAS_DECORATIVE_POINT_LIGHTS) {
+    return null;
+  }
+
+  const light = new THREE.PointLight(color, intensity, distance, decay);
+  light.position.copy(position);
+  parent.add(light);
+  return light;
+}
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -74,6 +89,96 @@ function clampPropPosition(curve, propPos, roadHalfWidth, samples = 200, clearan
   return propPos;
 }
 
+function getSafeRoadsidePosition(curve, progress, side, initialOffset, roadHalfWidth, minClearance = 20) {
+  const point = curve.getPointAt(progress % 1.0);
+  const tangent = curve.getTangentAt(progress % 1.0).setY(0).normalize();
+  const normal = getRightVector(tangent);
+
+  // Determine absolute minimum clearance to prevent physical clipping, scaled with minClearance
+  const safeClearance = Math.max(16, minClearance * 0.35);
+  const absoluteMinClearance = roadHalfWidth + safeClearance;
+
+  let bestPos = null;
+  let bestDist = -1;
+
+  const sidesToTry = [side, -side];
+
+  for (const s of sidesToTry) {
+    let currentOffset = initialOffset;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const testPos = point.clone().addScaledVector(normal, s * currentOffset);
+
+      // Calculate minimum distance from testPos to the entire track
+      let minTrackDist = Infinity;
+      for (let index = 0; index <= 120; index += 1) {
+        const trackPoint = curve.getPointAt(index / 120);
+        const dist = Math.sqrt((testPos.x - trackPoint.x) ** 2 + (testPos.z - trackPoint.z) ** 2);
+        if (dist < minTrackDist) {
+          minTrackDist = dist;
+        }
+      }
+
+      // If this position is safe from physical road clipping
+      if (minTrackDist >= absoluteMinClearance) {
+        // If it also satisfies the desired minClearance, return it immediately
+        if (minTrackDist >= roadHalfWidth + minClearance) {
+          return testPos;
+        }
+
+        // Otherwise, keep track of the one that is furthest from the road
+        if (minTrackDist > bestDist) {
+          bestDist = minTrackDist;
+          bestPos = testPos;
+        }
+      }
+
+      currentOffset += 20;
+    }
+  }
+
+  // If we found a position that doesn't clip, return it
+  if (bestPos) {
+    return bestPos;
+  }
+
+  // Fallback to roadside position with safe clear distance
+  for (const s of [side, -side]) {
+    const safeNearPos = point.clone().addScaledVector(normal, s * (roadHalfWidth + safeClearance + 2));
+    let minTrackDist = Infinity;
+    for (let index = 0; index <= 120; index += 1) {
+      const trackPoint = curve.getPointAt(index / 120);
+      const dist = Math.sqrt((safeNearPos.x - trackPoint.x) ** 2 + (safeNearPos.z - trackPoint.z) ** 2);
+      if (dist < minTrackDist) {
+        minTrackDist = dist;
+      }
+    }
+    if (minTrackDist >= roadHalfWidth + 6) {
+      return safeNearPos;
+    }
+  }
+
+  // Ultimate fallback to initial offset
+  return point.clone().addScaledVector(normal, side * initialOffset);
+}
+
+const windowMaterialCache = new Map();
+function getCachedWindowMaterial(color, lit) {
+  const key = `${color}_${lit}`;
+  if (!windowMaterialCache.has(key)) {
+    windowMaterialCache.set(key, createWindowMaterial(color, lit));
+  }
+  return windowMaterialCache.get(key);
+}
+
+const windowGeometryCache = new Map();
+function getCachedWindowGeometry(w, h, d) {
+  const key = `${w.toFixed(2)}_${h.toFixed(2)}_${d.toFixed(2)}`;
+  if (!windowGeometryCache.has(key)) {
+    windowGeometryCache.set(key, new THREE.BoxGeometry(w, h, d));
+  }
+  return windowGeometryCache.get(key);
+}
+
 function createWindowMaterial(color, lit) {
   return createFlatStandardMaterial({
     color: lit ? color : 0x050509,
@@ -85,28 +190,33 @@ function createWindowMaterial(color, lit) {
 }
 
 function addWindowGrid(group, block, neonColors, seed, face) {
-  const columns = face === "front" ? 4 : 3;
-  const rows = face === "front" ? 8 : 6;
-  const windowWidth = face === "front" ? Math.min(0.7, block.width / (columns * 2.1)) : 0.075;
-  const windowDepth = face === "front" ? 0.075 : Math.min(0.65, block.depth / (columns * 2.1));
-  const windowHeight = Math.min(0.38, block.height / (rows * 3.6));
+  const isFront = face === "front";
+  const columns = Math.max(3, Math.floor((isFront ? block.width : block.depth) / 1.6));
+  const rows = Math.max(6, Math.floor(block.height / 2.2));
+
+  const windowWidth = isFront ? Math.min(0.5, block.width / (columns * 2.2)) : 0.08;
+  const windowDepth = isFront ? 0.08 : Math.min(0.5, block.depth / (columns * 2.2));
+  const windowHeight = Math.min(0.45, block.height / (rows * 2.8));
+
   const xStep = block.width / (columns + 1);
   const zStep = block.depth / (columns + 1);
   const yStep = block.height / (rows + 1);
-  const litMaterial = createWindowMaterial(neonColors[seed % neonColors.length], true);
-  const darkMaterial = createWindowMaterial(0x070811, false);
-  const geometry = new THREE.BoxGeometry(windowWidth, windowHeight, windowDepth);
-  const litMatrices = [];
+
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
+  const darkMaterial = getCachedWindowMaterial(0x070811, false);
+  const geometry = getCachedWindowGeometry(windowWidth, windowHeight, windowDepth);
+
+  const litMatricesByColor = colorsList.map(() => []);
   const darkMatrices = [];
   const matrix = new THREE.Matrix4();
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
-      const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (face === "front" ? 0 : 17));
-      const lit = noise > 0.42;
+      const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (isFront ? 0 : 17));
+      const lit = noise > 0.35;
       const position = new THREE.Vector3();
 
-      if (face === "front") {
+      if (isFront) {
         position.set(
           block.x + (column + 1) * xStep - block.width * 0.5,
           block.y - block.height * 0.5 + (row + 1) * yStep,
@@ -121,31 +231,44 @@ function addWindowGrid(group, block, neonColors, seed, face) {
       }
 
       matrix.makeTranslation(position.x, position.y, position.z);
-      (lit ? litMatrices : darkMatrices).push(matrix.clone());
+      if (lit) {
+        const colorIndex = Math.floor(pseudoRandom(seed + row * 13.3 + column * 7.7) * colorsList.length);
+        litMatricesByColor[colorIndex].push(matrix.clone());
+      } else {
+        darkMatrices.push(matrix.clone());
+      }
     }
   }
 
-  [
-    { matrices: litMatrices, material: litMaterial, name: "LitWindows" },
-    { matrices: darkMatrices, material: darkMaterial, name: "DarkWindows" }
-  ].forEach(({ matrices, material, name }) => {
+  colorsList.forEach((color, colorIndex) => {
+    const matrices = litMatricesByColor[colorIndex];
     if (matrices.length === 0) {
       return;
     }
-
-    const windows = new THREE.InstancedMesh(geometry, material, matrices.length);
-    windows.name = name;
+    const litMaterial = getCachedWindowMaterial(color, true);
+    const windows = new THREE.InstancedMesh(geometry, litMaterial, matrices.length);
+    windows.name = `LitWindows_${colorIndex}`;
     windows.receiveShadow = true;
     matrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
     windows.instanceMatrix.needsUpdate = true;
     group.add(windows);
   });
+
+  if (darkMatrices.length > 0) {
+    const windows = new THREE.InstancedMesh(geometry, darkMaterial, darkMatrices.length);
+    windows.name = "DarkWindows";
+    windows.receiveShadow = true;
+    darkMatrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
+    windows.instanceMatrix.needsUpdate = true;
+    group.add(windows);
+  }
 }
 
 function addVerticalEdgeHighlights(group, block, material) {
-  const edgeGeometry = new THREE.BoxGeometry(0.12, block.height * 1.02, 0.12);
-  const x = block.width * 0.5 + 0.04;
-  const z = block.depth * 0.5 + 0.04;
+  const thickness = 0.22;
+  const edgeGeometry = new THREE.BoxGeometry(thickness, block.height * 1.01, thickness);
+  const x = block.width * 0.5 + thickness * 0.45;
+  const z = block.depth * 0.5 + thickness * 0.45;
   const corners = [
     [-x, -z],
     [x, -z],
@@ -218,6 +341,106 @@ function addRoofDetail(group, topY, width, depth, neonColor, variant) {
   ring.rotation.x = Math.PI / 2;
   ring.position.y = topY + 0.12;
   group.add(ring);
+}
+
+function addRoofBillboard(group, block, neonColors, seed) {
+  const topY = block.y + block.height * 0.5;
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
+
+  // Size scales with the top block (blocks[2] crown)
+  const billboardWidth = Math.max(3.0, block.width * 1.25);
+  const billboardHeight = billboardWidth * 0.5;
+  const billboardDepth = 0.28;
+  const poleHeight = Math.max(1.0, billboardHeight * 0.35);
+
+  const billboardGroup = new THREE.Group();
+  billboardGroup.position.set(block.x, topY, block.z);
+
+  const neonColor = colorsList[seed % colorsList.length];
+  const neonColorHex = colorToHexStr(neonColor);
+
+  // 1. Support poles
+  const poleMaterial = createBillboardMaterial({ color: 0x1a1a24, roughness: 0.68, metalness: 0.2 });
+  const leftPole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, poleHeight, 6), poleMaterial));
+  leftPole.position.set(-billboardWidth * 0.28, poleHeight * 0.5, 0);
+  const rightPole = leftPole.clone();
+  rightPole.position.x = billboardWidth * 0.28;
+  billboardGroup.add(leftPole, rightPole);
+
+  // 2. Billboard backing & frame
+  const frameMaterial = createBillboardMaterial({ color: 0x0a0a0f, roughness: 0.5, metalness: 0.1 });
+  const backing = markShadow(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(billboardWidth, billboardHeight, billboardDepth),
+      frameMaterial
+    )
+  );
+  backing.position.y = poleHeight + billboardHeight * 0.5;
+  billboardGroup.add(backing);
+
+  // 3. Neon glowing borders
+  const borderMaterial = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 4.8,
+    roughness: 0.15
+  });
+
+  const borderThickness = 0.08;
+  const topBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  topBorder.position.set(0, poleHeight + billboardHeight + borderThickness * 0.5, 0);
+
+  const bottomBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  bottomBorder.position.set(0, poleHeight - borderThickness * 0.5, 0);
+  billboardGroup.add(topBorder, bottomBorder);
+
+  // 4. Advertising Titles
+  const vegasTitles = [
+    { title: "JACKPOT", subtitle: "SPIN & WIN" },
+    { title: "CASINO", subtitle: "PLAY NOW" },
+    { title: "777 SLOTS", subtitle: "$1,000,000" },
+    { title: "LAS VEGAS", subtitle: "WELCOME" },
+    { title: "ARANCIN GP", subtitle: "RACING TONIGHT" },
+    { title: "NEON CLUB", subtitle: "OPEN 24H" },
+    { title: "SAPIENZA", subtitle: "GRAPHICS LAB" },
+    { title: "HIGH ROLLER", subtitle: "POKER ROOM" },
+    { title: "HOTEL NEON", subtitle: "VACANCY" },
+    { title: "VIP LOUNGE", subtitle: "FREE DRINKS" }
+  ];
+  const ad = vegasTitles[seed % vegasTitles.length];
+
+  // 5. Canvas Text Texture with black background
+  const textTexture = getCachedVegasCanvasTexture(512, 256, ad.title, ad.subtitle, neonColorHex, "#ffffff");
+  const textMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: textTexture,
+    emissive: 0xffffff,
+    emissiveMap: textTexture,
+    emissiveIntensity: 1.8,
+    roughness: 0.25,
+    metalness: 0.08,
+    flatShading: true
+  });
+
+  const textPlaneFront = new THREE.Mesh(
+    new THREE.PlaneGeometry(billboardWidth - 0.2, billboardHeight - 0.2),
+    textMaterial
+  );
+  textPlaneFront.position.set(0, poleHeight + billboardHeight * 0.5, billboardDepth * 0.5 + 0.01);
+
+  const textPlaneBack = textPlaneFront.clone();
+  textPlaneBack.rotation.y = Math.PI;
+  textPlaneBack.position.z = -(billboardDepth * 0.5 + 0.01);
+
+  billboardGroup.add(textPlaneFront, textPlaneBack);
+
+  group.add(billboardGroup);
 }
 
 function addSkyLaser(group, topY, neonColor, variant) {
@@ -317,10 +540,10 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
 
   const bodyMaterial = createFlatStandardMaterial({
     color,
-    roughness: 0.52,
-    metalness: 0.12,
-    emissive: 0x050006,
-    emissiveIntensity: 0.08
+    roughness: 0.65,
+    metalness: 0.25,
+    emissive: 0x020204,
+    emissiveIntensity: 0.2
   });
 
   const edgeMaterial = createFlatStandardMaterial({
@@ -368,27 +591,26 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
     mesh.position.set(block.x, block.y, block.z);
     group.add(mesh);
 
-    if (blockIndex === 1) {
+    // Add window grids to tower (block 1) and crown (block 2) on both front and side
+    if (blockIndex === 1 || blockIndex === 2) {
       addWindowGrid(group, block, neonColors, index * 31 + blockIndex * 7, "front");
-      addNeonFacadeStrips(group, block, neonColors, index * 17 + blockIndex);
-    }
-    if (blockIndex === 1 && index % 4 === 0) {
       addWindowGrid(group, block, neonColors, index * 43 + blockIndex * 11, "side");
     }
   });
 
+  // Outline both the tower and the crown with glowing vertical corner LEDs
   addVerticalEdgeHighlights(group, blocks[1], edgeMaterial);
-  addRoofDetail(group, height * 1.04, width, depth, neonColor, index);
+  addVerticalEdgeHighlights(group, blocks[2], edgeMaterial);
+
+  // Alternate between roof billboard (50%) and traditional roof details (antennas/rings)
+  if (index % 2 === 0) {
+    addRoofBillboard(group, blocks[2], neonColors, index);
+  } else {
+    addRoofDetail(group, height * 1.04, width, depth, neonColor, index);
+  }
 
   if ([0, 12, 28, 44].includes(index)) {
     addSkyLaser(group, height * 1.06, neonColors[(index + 1) % neonColors.length], index);
-  }
-
-  if (height > 7.2) {
-    addMegaScreen(group, blocks[1], neonColors[(index + 1) % neonColors.length], "front", index);
-  }
-  if (index % 2 === 0 && height > 9) {
-    addMegaScreen(group, blocks[0], neonColors[(index + 2) % neonColors.length], "side", index + 1);
   }
 
   return group;
@@ -397,41 +619,47 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
 function generateCitySkyline(curve, group, definition) {
   const colors = definition.palette.neon;
   const bodyColors = [0x050508, 0x07070b, 0x090812, 0x08050c];
-  const sampleCount = 30;
+  const sampleCount = 20;
 
   for (let index = 0; index < sampleCount; index += 1) {
-    const progress = index / sampleCount;
+    // Alternate left and right side of the track
+    const side = index % 2 === 0 ? 1 : -1;
+
+    // Spaced out progress with a small jitter to keep it natural but prevent overlap
+    const progressJitter = (pseudoRandom(index + 13.7) * 0.4 - 0.2) / sampleCount;
+    const progress = ((index + 0.5) / sampleCount + progressJitter + 1.0) % 1.0;
+
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const progressJitter = pseudoRandom(index + 19.4) * 16 - 8;
 
-    [-1, 1].forEach((side) => {
-      const buildingIndex = index * 2 + (side > 0 ? 1 : 0);
-      const height = 34 + pseudoRandom(buildingIndex + 4.2) * 82;
-      const width = 8 + pseudoRandom(buildingIndex + 8.6) * 10;
-      const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 12;
-      const skylineOffset = definition.roadWidth * 0.5 + 16 + pseudoRandom(buildingIndex + 21.5) * 22;
-      const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-      const position = point
-        .clone()
-        .addScaledVector(normal, side * skylineOffset)
-        .addScaledVector(tangent, progressJitter);
+    const buildingIndex = index;
 
-      const building = createVegasBuilding({
-        position,
-        rotationY: heading,
-        height,
-        width,
-        depth,
-        color: bodyColors[buildingIndex % bodyColors.length],
-        neonColor: colors[buildingIndex % colors.length],
-        neonColors: colors,
-        index: buildingIndex
-      });
+    // Wider, taller, and more proportioned buildings
+    const height = 32 + pseudoRandom(buildingIndex + 4.2) * 33;
+    const width = 8 + pseudoRandom(buildingIndex + 8.6) * 4;
+    const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 4;
 
-      group.add(building);
+    // Position them further out so they are in the background and don't intersect other props
+    const skylineOffset = definition.roadWidth * 0.5 + 82 + pseudoRandom(buildingIndex + 21.5) * 32;
+    const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+
+    // Dynamically calculate a safe position that is guaranteed not to overlap ANY part of the track
+    const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 62);
+
+    const building = createVegasBuilding({
+      position,
+      rotationY: heading,
+      height,
+      width,
+      depth,
+      color: bodyColors[buildingIndex % bodyColors.length],
+      neonColor: colors[buildingIndex % colors.length],
+      neonColors: colors,
+      index: buildingIndex
     });
+
+    group.add(building);
   }
 }
 
@@ -475,15 +703,295 @@ function addVegasTunnel(group, curve, definition, baseProgress, tunnelIndex, arc
     arch.add(left, right, roof);
 
     if (segment % 4 === 0) {
-      const light = new THREE.PointLight(color, 1.25, 17, 1.7);
-      light.position.set(0, 2.7, 0);
-      arch.add(light);
+      addDecorativePointLight(arch, color, 1.25, 17, 1.7, new THREE.Vector3(0, 2.7, 0));
     }
 
     tunnel.add(arch);
   }
 
   group.add(tunnel);
+}
+
+function colorToHexStr(color) {
+  return "#" + color.toString(16).padStart(6, "0");
+}
+
+const vegasCanvasTextureCache = new Map();
+function getCachedVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex) {
+  const key = `${width}_${height}_${title}_${subtitle || ""}_${themeColorHex}_${textColorHex}`;
+  if (!vegasCanvasTextureCache.has(key)) {
+    vegasCanvasTextureCache.set(
+      key,
+      createVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex)
+    );
+  }
+  return vegasCanvasTextureCache.get(key);
+}
+
+function createVegasCanvasTexture(width, height, title, subtitle, themeColorHex, textColorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, width, height);
+
+  // Border
+  ctx.strokeStyle = themeColorHex || "#ff2090";
+  ctx.lineWidth = Math.min(width, height) * 0.08;
+  ctx.strokeRect(ctx.lineWidth * 0.5, ctx.lineWidth * 0.5, width - ctx.lineWidth, height - ctx.lineWidth);
+
+  // Inner border
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.min(width, height) * 0.02;
+  ctx.strokeRect(ctx.lineWidth * 2.5, ctx.lineWidth * 2.5, width - ctx.lineWidth * 5, height - ctx.lineWidth * 5);
+
+  // Text
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = textColorHex || "#ffffff";
+  ctx.shadowColor = themeColorHex || "#ff2090";
+  ctx.shadowBlur = Math.min(width, height) * 0.1;
+
+  if (subtitle) {
+    ctx.font = `bold ${Math.floor(height * 0.28)}px Arial Black, Arial, sans-serif`;
+    ctx.fillText(title, width * 0.5, height * 0.4);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `italic ${Math.floor(height * 0.14)}px Georgia, serif`;
+    ctx.fillText(subtitle, width * 0.5, height * 0.72);
+  } else {
+    ctx.font = `bold ${Math.floor(height * 0.38)}px Arial Black, Arial, sans-serif`;
+    ctx.fillText(title, width * 0.5, height * 0.5);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+let cachedWelcomeTexture = null;
+function getCachedWelcomeToVegasTexture() {
+  if (!cachedWelcomeTexture) {
+    cachedWelcomeTexture = createWelcomeToVegasTexture();
+  }
+  return cachedWelcomeTexture;
+}
+
+function createWelcomeToVegasTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  // Clear transparent
+  ctx.clearRect(0, 0, 512, 512);
+
+  // 1. Draw the blue posts (two vertical thick lines)
+  ctx.fillStyle = "#1e73be";
+  ctx.fillRect(180, 200, 30, 312);
+  ctx.fillRect(302, 200, 30, 312);
+
+  // 2. Draw the blue horizontal cross bar
+  ctx.fillRect(160, 150, 192, 25);
+
+  // 3. Draw the red 8-pointed star at the top (center 256, y 95)
+  const starX = 256;
+  const starY = 95;
+  ctx.save();
+  ctx.translate(starX, starY);
+
+  // Gold spikes (8 points)
+  ctx.fillStyle = "#f5d45a";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    ctx.lineTo(Math.cos(angle) * 35, Math.sin(angle) * 35);
+    ctx.lineTo(Math.cos(angle + Math.PI / 8) * 12, Math.sin(angle + Math.PI / 8) * 12);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Red inner star
+  ctx.fillStyle = "#d12a2a";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    ctx.lineTo(Math.cos(angle) * 28, Math.sin(angle) * 28);
+    ctx.lineTo(Math.cos(angle + Math.PI / 8) * 8, Math.sin(angle + Math.PI / 8) * 8);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // 4. Draw the main Diamond body
+  // Center of diamond is (256, 270), width is 380, height is 230
+  const dX = 256;
+  const dY = 270;
+  const dW = 190;
+  const dH = 115;
+
+  // Outer gold neon border
+  ctx.shadowColor = "#f5d45a";
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = "#f5d45a";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH - 12);
+  ctx.lineTo(dX + dW + 12, dY);
+  ctx.lineTo(dX, dY + dH + 12);
+  ctx.lineTo(dX - dW - 12, dY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Red neon frame inside
+  ctx.fillStyle = "#d12a2a";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH - 4);
+  ctx.lineTo(dX + dW + 4, dY);
+  ctx.lineTo(dX, dY + dH + 4);
+  ctx.lineTo(dX - dW - 4, dY);
+  ctx.closePath();
+  ctx.fill();
+
+  // White/cream center
+  ctx.fillStyle = "#fcfaf0";
+  ctx.beginPath();
+  ctx.moveTo(dX, dY - dH);
+  ctx.lineTo(dX + dW, dY);
+  ctx.lineTo(dX, dY + dH);
+  ctx.lineTo(dX - dW, dY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Little yellow bulb dots around the border
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#f5d45a";
+  ctx.lineWidth = 1.5;
+  const borderPoints = 28;
+  for (let i = 0; i < borderPoints; i++) {
+    const alpha = i / borderPoints;
+    let x, y;
+    if (alpha < 0.25) {
+      const t = alpha / 0.25;
+      x = dX + t * dW;
+      y = (dY - dH) + t * dH;
+    } else if (alpha < 0.5) {
+      const t = (alpha - 0.25) / 0.25;
+      x = (dX + dW) - t * dW;
+      y = dY + t * dH;
+    } else if (alpha < 0.75) {
+      const t = (alpha - 0.5) / 0.25;
+      x = dX - t * dW;
+      y = (dY + dH) - t * dH;
+    } else {
+      const t = (alpha - 0.75) / 0.25;
+      x = (dX - dW) + t * dW;
+      y = dY - t * dH;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 5. Draw "WELCOME" circles & letters
+  const welcomeY = dY - 60;
+  const welcomeXStart = dX - 110;
+  const welcomeXStep = 36;
+  const letters = ["W", "E", "L", "C", "O", "M", "E"];
+
+  letters.forEach((char, i) => {
+    const cx = welcomeXStart + i * welcomeXStep;
+    const cy = welcomeY;
+
+    // Circle border
+    ctx.strokeStyle = "#f5d45a";
+    ctx.lineWidth = 2.5;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Circle inner border
+    ctx.strokeStyle = "#3a4a9f";
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Letter
+    ctx.fillStyle = "#d12a2a";
+    ctx.font = "bold 19px 'Arial Black', Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(char, cx, cy + 1);
+  });
+
+  // 6. Draw "TO Fabulous" text
+  ctx.fillStyle = "#1e73be";
+  ctx.font = "italic bold 17px 'Georgia', serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TO Fabulous", dX, dY - 15);
+
+  // 7. Draw "LAS VEGAS" text
+  ctx.fillStyle = "#d12a2a";
+  ctx.font = "bold 38px 'Arial Black', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.shadowColor = "#f5d45a";
+  ctx.shadowBlur = 6;
+  ctx.fillText("LAS VEGAS", dX, dY + 32);
+  ctx.shadowBlur = 0;
+
+  // 8. Draw "NEVADA" text
+  ctx.fillStyle = "#1e73be";
+  ctx.font = "bold 16px 'Arial Black', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("NEVADA", dX, dY + 70);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createVegasVerticalCanvasTexture(width, height, text, themeColorHex) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = themeColorHex || "#00e5ff";
+  ctx.lineWidth = width * 0.08;
+  ctx.strokeRect(ctx.lineWidth * 0.5, ctx.lineWidth * 0.5, width - ctx.lineWidth, height - ctx.lineWidth);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const fontSize = Math.floor(height / (text.length * 1.35));
+  const startY = (height - (text.length - 1) * fontSize * 1.15) * 0.5;
+
+  for (let i = 0; i < text.length; i++) {
+    ctx.font = `bold ${fontSize}px Arial Black, Arial, sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = themeColorHex || "#00e5ff";
+    ctx.shadowBlur = fontSize * 0.35;
+    ctx.fillText(text[i], width * 0.5, startY + i * fontSize * 1.15);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function createBillboardMaterial({ color, emissive, emissiveIntensity = 0, roughness = 0.38, metalness = 0.04 }) {
@@ -498,55 +1006,117 @@ function createBillboardMaterial({ color, emissive, emissiveIntensity = 0, rough
 }
 
 function addClassicVegasPylonSign(sign, color, contrastColor) {
-  const panelMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.7 });
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
+  const panelMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const brightMaterial = createBillboardMaterial({
     color: contrastColor,
     emissive: contrastColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.4
   });
   const darkMaterial = createBillboardMaterial({ color: 0x07070b, roughness: 0.62 });
   const whiteMaterial = createBillboardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 1.2
+    emissiveIntensity: 1.0
   });
   const poleMaterial = createBillboardMaterial({ color: 0x161620, roughness: 0.72, metalness: 0.12 });
 
-  const panel = markShadow(new THREE.Mesh(new THREE.BoxGeometry(10, 16, 0.6), panelMaterial));
-  const marquee = new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.8), brightMaterial);
-  const reader = markShadow(new THREE.Mesh(new THREE.BoxGeometry(10, 3, 0.5), darkMaterial));
-  const pole = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.2, 8, 1.2), poleMaterial));
+  // 0.55x scaled sizes
+  const panelWidth = 5.5;
+  const panelHeight = 8.8;
+  const panelDepth = 0.35;
+  const panelMesh = markShadow(new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth), panelMaterial));
+  panelMesh.position.y = 7.7;
+  sign.add(panelMesh);
 
-  panel.position.y = 14;
-  marquee.position.y = 24;
-  reader.position.y = 5;
-  pole.position.y = 0.2;
-  sign.add(panel, marquee, reader, pole);
+  const marqueeWidth = 6.6;
+  const marqueeHeight = 2.2;
+  const marqueeDepth = 0.45;
+  const marquee = new THREE.Mesh(new THREE.BoxGeometry(marqueeWidth, marqueeHeight, marqueeDepth), brightMaterial);
+  marquee.position.y = 13.2;
+  sign.add(marquee);
 
-  for (let line = 0; line < 3; line += 1) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 0.12), whiteMaterial);
-    stripe.position.set(0, 5.7 - line * 0.8, 0.36);
-    sign.add(stripe);
-  }
+  const readerWidth = 5.5;
+  const readerHeight = 1.65;
+  const readerDepth = 0.3;
+  const reader = markShadow(new THREE.Mesh(new THREE.BoxGeometry(readerWidth, readerHeight, readerDepth), darkMaterial));
+  reader.position.y = 2.75;
+  sign.add(reader);
 
+  const pole = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.66, 4.4, 0.66), poleMaterial));
+  pole.position.y = 0.1;
+  sign.add(pole);
+
+  // Text Planes on front faces (z offset slightly)
+  const panelTex = getCachedVegasCanvasTexture(256, 512, "JACKPOT", "SPIN & WIN", contrastHex, "#ffeb3b");
+  const panelTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: panelTex,
+    emissive: 0xffffff,
+    emissiveMap: panelTex,
+    emissiveIntensity: 1.5,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const panelTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 0.2, panelHeight - 0.2), panelTextMat);
+  panelTextPlane.position.set(0, 7.7, panelDepth * 0.5 + 0.02);
+  sign.add(panelTextPlane);
+
+  const marqueeTex = getCachedVegasCanvasTexture(256, 128, "777", "SLOTS", themeHex, "#ffffff");
+  const marqueeTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: marqueeTex,
+    emissive: 0xffffff,
+    emissiveMap: marqueeTex,
+    emissiveIntensity: 1.6,
+    roughness: 0.2,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const marqueeTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(marqueeWidth - 0.2, marqueeHeight - 0.2), marqueeTextMat);
+  marqueeTextPlane.position.set(0, 13.2, marqueeDepth * 0.5 + 0.02);
+  sign.add(marqueeTextPlane);
+
+  const readerTex = getCachedVegasCanvasTexture(256, 128, "PLAY NOW", null, "#39ff14", "#39ff14");
+  const readerTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: readerTex,
+    emissive: 0xffffff,
+    emissiveMap: readerTex,
+    emissiveIntensity: 1.2,
+    roughness: 0.3,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const readerTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(readerWidth - 0.2, readerHeight - 0.2), readerTextMat);
+  readerTextPlane.position.set(0, 2.75, readerDepth * 0.5 + 0.02);
+  sign.add(readerTextPlane);
+
+  // Scaled coordinates for stars
   [
-    [-4.4, 21.5],
-    [4.4, 21.5],
-    [-4.4, 6.5],
-    [4.4, 6.5]
+    [-2.42, 11.82],
+    [2.42, 11.82],
+    [-2.42, 3.57],
+    [2.42, 3.57]
   ].forEach(([x, y]) => {
-    const star = new THREE.Mesh(new THREE.SphereGeometry(0.4, 4, 3), whiteMaterial);
-    star.position.set(x, y, 0.45);
+    const star = new THREE.Mesh(new THREE.SphereGeometry(0.22, 4, 3), whiteMaterial);
+    star.position.set(x, y, 0.25);
     sign.add(star);
   });
 }
 
 function addCasinoNameBoardSign(sign, color, contrastColor) {
-  const boardMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.75 });
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
+  const boardMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const frameMaterial = createBillboardMaterial({
     color: contrastColor,
     emissive: contrastColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.5
   });
   const poleMaterial = createBillboardMaterial({ color: 0x171724, roughness: 0.72, metalness: 0.12 });
   const bulbMaterial = createBillboardMaterial({
@@ -557,76 +1127,123 @@ function addCasinoNameBoardSign(sign, color, contrastColor) {
   const underMaterial = createBillboardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 1.5
+    emissiveIntensity: 1.2
   });
 
-  const board = markShadow(new THREE.Mesh(new THREE.BoxGeometry(22, 8, 0.5), boardMaterial));
-  board.position.y = 10;
+  const boardWidth = 12.0;
+  const boardHeight = 4.4;
+  const boardDepth = 0.3;
+  const board = markShadow(new THREE.Mesh(new THREE.BoxGeometry(boardWidth, boardHeight, boardDepth), boardMaterial));
+  board.position.y = 5.5;
   sign.add(board);
 
+  // Frames
   [
-    [0, 14.15, 23.2, 0.35],
-    [0, 5.85, 23.2, 0.35],
-    [-11.15, 10, 0.35, 8.6],
-    [11.15, 10, 0.35, 8.6]
-  ].forEach(([x, y, width, height]) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.62), frameMaterial);
-    frame.position.set(x, y, 0.08);
+    [0, 7.8, boardWidth + 0.6, 0.2],
+    [0, 3.2, boardWidth + 0.6, 0.2],
+    [-(boardWidth * 0.5 + 0.15), 5.5, 0.2, boardHeight + 4.8],
+    [boardWidth * 0.5 + 0.15, 5.5, 0.2, boardHeight + 4.8]
+  ].forEach(([x, y, w, h]) => {
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.36), frameMaterial);
+    frame.position.set(x, y, 0.04);
     sign.add(frame);
   });
 
-  [-7.4, 7.4].forEach((x) => {
-    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 10, 5), poleMaterial));
-    pole.position.set(x, 2.5, -0.1);
+  [-4.0, 4.0].forEach((x) => {
+    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5.5, 5), poleMaterial));
+    pole.position.set(x, 2.75, -0.05);
     sign.add(pole);
   });
 
+  // Text Plane
+  const boardTex = getCachedVegasCanvasTexture(512, 128, "CASINO", "ROYALE", themeHex, "#ffeb3b");
+  const boardTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: boardTex,
+    emissive: 0xffffff,
+    emissiveMap: boardTex,
+    emissiveIntensity: 1.6,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const boardTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(boardWidth - 0.2, boardHeight - 0.2), boardTextMat);
+  boardTextPlane.position.set(0, 5.5, boardDepth * 0.5 + 0.02);
+  sign.add(boardTextPlane);
+
   for (let index = 0; index < 12; index += 1) {
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 3), bulbMaterial);
-    bulb.position.set(-9.9 + index * 1.8, 14.72, 0.48);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 4, 3), bulbMaterial);
+    bulb.position.set(-(boardWidth * 0.45) + index * (boardWidth * 0.9 / 11), 7.9, 0.25);
     sign.add(bulb);
   }
 
-  const underLight = new THREE.Mesh(new THREE.BoxGeometry(20, 0.3, 0.5), underMaterial);
-  underLight.position.set(0, 5.55, 0.45);
+  const underLight = new THREE.Mesh(new THREE.BoxGeometry(boardWidth - 1, 0.15, 0.3), underMaterial);
+  underLight.position.set(0, 3.05, 0.22);
   sign.add(underLight);
 }
 
 function addSpectacularTowerSign(sign, color, contrastColor) {
-  const bodyMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.75 });
+  const themeHex = colorToHexStr(color);
+
+  const bodyMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const goldMaterial = createBillboardMaterial({
     color: 0xffd700,
     emissive: 0xffd700,
-    emissiveIntensity: 1.2,
+    emissiveIntensity: 0.8,
     roughness: 0.26
   });
   const baseMaterial = createBillboardMaterial({ color: 0x11111b, roughness: 0.72, metalness: 0.12 });
   const barMaterials = [color, contrastColor].map((barColor) => createBillboardMaterial({
     color: barColor,
     emissive: barColor,
-    emissiveIntensity: 1.1
+    emissiveIntensity: 0.7
   }));
 
-  const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(6, 28, 0.5), bodyMaterial));
-  body.position.y = 14;
+  const bodyWidth = 3.3;
+  const bodyHeight = 15.4;
+  const bodyDepth = 0.3;
+  const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyDepth), bodyMaterial));
+  body.position.y = 7.7;
   sign.add(body);
 
-  [-8, 0, 8].forEach((yOffset, index) => {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 0.6), barMaterials[index % 2]);
-    bar.position.set(0, 14 + yOffset, 0.32);
+  [-4.4, 0, 4.4].forEach((yOffset, index) => {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.33, 0.35), barMaterials[index % 2]);
+    bar.position.set(0, 7.7 + yOffset, 0.18);
     sign.add(bar);
   });
 
-  const finial = new THREE.Mesh(new THREE.OctahedronGeometry(2, 0), goldMaterial);
-  finial.position.y = 29;
-  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8, 3, 3), baseMaterial));
-  base.position.y = 1.5;
+  const finial = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), goldMaterial);
+  finial.position.y = 15.95;
+  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.65, 1.65), baseMaterial));
+  base.position.y = 0.825;
   sign.add(finial, base);
+
+  // Vertical text Plane
+  const texts = ["SLOTS", "POKER", "VEGAS", "CASINO"];
+  // Let's pick a text based on the color to have variety
+  const textVal = texts[themeHex.charCodeAt(1) % texts.length];
+  const bodyTex = createVegasVerticalCanvasTexture(128, 512, textVal, themeHex);
+  const bodyTextMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: bodyTex,
+    emissive: 0xffffff,
+    emissiveMap: bodyTex,
+    emissiveIntensity: 1.5,
+    roughness: 0.25,
+    metalness: 0.1,
+    flatShading: true
+  });
+  const bodyTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(bodyWidth - 0.2, bodyHeight - 0.2), bodyTextMat);
+  bodyTextPlane.position.set(0, 7.7, bodyDepth * 0.5 + 0.02);
+  sign.add(bodyTextPlane);
 }
 
 function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
+  const themeHex = colorToHexStr(color);
+  const contrastHex = colorToHexStr(contrastColor);
+
   const pillarMaterial = createBillboardMaterial({ color: 0x171724, roughness: 0.68, metalness: 0.12 });
-  const barMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.8 });
+  const barMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
   const bulbMaterial = createBillboardMaterial({
     color: 0xffffaa,
     emissive: 0xffffaa,
@@ -634,38 +1251,76 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
   });
   const glowColors = [color, contrastColor, 0xffe600];
 
-  [-6, 6].forEach((x) => {
-    const pillar = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.5, 12, 1.5), pillarMaterial));
-    pillar.position.set(x, 6, 0);
+  const pillarWidth = 0.8;
+  const pillarHeight = 6.6;
+  const pillarDepth = 0.8;
+  [-3.3, 3.3].forEach((x) => {
+    const pillar = markShadow(new THREE.Mesh(new THREE.BoxGeometry(pillarWidth, pillarHeight, pillarDepth), pillarMaterial));
+    pillar.position.set(x, 3.3, 0);
     sign.add(pillar);
   });
 
-  const topBar = new THREE.Mesh(new THREE.BoxGeometry(14, 1.5, 1.5), barMaterial);
-  topBar.position.y = 12;
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(7.7, 0.8, 0.8), barMaterial);
+  topBar.position.y = 6.6;
   sign.add(topBar);
+
+  const letters = ["W", "I", "N"];
+  const panelWidth = 1.65;
+  const panelHeight = 3.3;
+  const panelDepth = 0.16;
 
   for (let index = 0; index < 3; index += 1) {
     const panelColor = glowColors[(seed + index) % glowColors.length];
     const panelMaterial = createBillboardMaterial({
       color: panelColor,
       emissive: panelColor,
-      emissiveIntensity: 1.05
+      emissiveIntensity: 0.5
     });
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(3, 6, 0.3), panelMaterial);
-    panel.position.set((index - 1) * 3.4, 7.5, 0.7);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, panelDepth), panelMaterial);
+    panel.position.set((index - 1) * 1.87, 4.12, 0.38);
     sign.add(panel);
+
+    const letterTex = getCachedVegasCanvasTexture(128, 256, letters[index], null, colorToHexStr(panelColor), "#ffffff");
+    const letterTextMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: letterTex,
+      emissive: 0xffffff,
+      emissiveMap: letterTex,
+      emissiveIntensity: 1.5,
+      roughness: 0.25,
+      metalness: 0.1,
+      flatShading: true
+    });
+    const letterTextPlane = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 0.1, panelHeight - 0.1), letterTextMat);
+    letterTextPlane.position.set((index - 1) * 1.87, 4.12, 0.38 + panelDepth * 0.5 + 0.01);
+    sign.add(letterTextPlane);
   }
 
   for (let index = 0; index < 6; index += 1) {
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 4, 3), bulbMaterial);
-    bulb.position.set(-5 + index * 2, 11.0 - (index % 2) * 0.5, 0.95);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 4, 3), bulbMaterial);
+    bulb.position.set(-2.75 + index * 1.1, 6.05 - (index % 2) * 0.28, 0.52);
     sign.add(bulb);
   }
 }
 
+function isNearGrandstand(progress, side, threshold = 0.05) {
+  const locations = [
+    { progress: 0.1, side: 1 },
+    { progress: 0.18, side: -1 },
+    { progress: 0.38, side: 1 },
+    { progress: 0.52, side: -1 },
+    { progress: 0.66, side: 1 },
+    { progress: 0.82, side: -1 },
+    { progress: 0.92, side: 1 }
+  ];
+  return locations.some((loc) => {
+    return loc.side === side && Math.abs(progress - loc.progress) < threshold;
+  });
+}
+
 function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.08, 0.16, 0.28, 0.42, 0.52, 0.64, 0.74, 0.86];
+  const progressPoints = [0.10, 0.28, 0.45, 0.59, 0.74, 0.87];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -677,24 +1332,37 @@ function buildVegasBillboards(group, curve, roadHalfWidth) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
+
+    // Choose side, and flip to opposite side if we are near a grandstand
+    let side = index % 2 === 0 ? -1 : 1;
+    if (isNearGrandstand(progress, side, 0.05)) {
+      side = -side;
+    }
+
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
-    const distance = roadHalfWidth + 12 + pseudoRandom(index * 19.3 + 2.8) * 8;
+
+    // Scale down distance since billboards are smaller and we want them visible
+    const distance = roadHalfWidth + 9 + pseudoRandom(index * 19.3 + 2.8) * 4;
     const position = point.clone().addScaledVector(normal, side * distance);
     const sign = new THREE.Group();
 
     sign.name = `VegasBillboard:${index}`;
     sign.position.copy(position);
-    clampPropPosition(curve, sign.position, roadHalfWidth);
-    sign.lookAt(point.x, 10, point.z);
+
+    // Clamp closer to road with custom clearance so it fits beautifully
+    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 8, 9);
+
+    // Stand straight/upright! Point at the track horizontally (y = sign.position.y)
+    sign.lookAt(point.x, sign.position.y, point.z);
 
     typeBuilders[index % typeBuilders.length](sign, color, contrastColor, index);
 
-    const light = new THREE.PointLight(color, 18, 22, 2);
-    light.name = `VegasBillboardLight:${index}`;
-    light.position.set(0, 11, 2.2);
-    sign.add(light);
+    // Adjusted light intensity/range/position for smaller sign
+    const light = addDecorativePointLight(sign, color, 10, 15, 1.8, new THREE.Vector3(0, 6, 1.2));
+    if (light) {
+      light.name = `VegasBillboardLight:${index}`;
+    }
     group.add(sign);
   });
 }
@@ -759,13 +1427,18 @@ function addNeonPalms(group, curve, definition) {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
+
+    let side = index % 2 === 0 ? 1 : -1;
+    if (isNearGrandstand(progress, side, 0.05)) {
+      side = -side;
+    }
+
     const basePosition = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 2.9));
 
     for (let palmIndex = 0; palmIndex < 5; palmIndex += 1) {
       const offset = tangent.clone().multiplyScalar((palmIndex - 2) * 1.55);
       const position = basePosition.clone().add(offset).addScaledVector(normal, side * (palmIndex % 2) * 0.82);
-      clampPropPosition(curve, position, roadHalfWidth);
+      clampPropPosition(curve, position, roadHalfWidth, 200, 6, 7);
       const palm = createNeonPalm({
         position,
         rotationY: getHeading(tangent) + pseudoRandom(index + palmIndex) * 0.8,
@@ -1140,7 +1813,7 @@ function addMsgSphere(group, curve, definition) {
   sphere.name = "VegasMSGSphere";
   sphere.position
     .copy(point)
-      .addScaledVector(normal, definition.roadWidth * 0.5 + 58);
+    .addScaledVector(normal, definition.roadWidth * 0.5 + 58);
 
   const sphereMaterial = createFlatStandardMaterial({
     color: 0x2810ff,
@@ -1347,40 +2020,54 @@ function createGrandstand({ position, rotationY, width, rows, accentColor, index
   return stand;
 }
 
+const spectatorMaterialCache = {
+  shirts: [],
+  skins: [],
+  hairs: [],
+  pants: null
+};
+
+function getSpectatorMaterials(shirtColors, skinColors, hairColors) {
+  if (spectatorMaterialCache.shirts.length === 0) {
+    spectatorMaterialCache.shirts = shirtColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.skins = skinColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.hairs = hairColors.map((color) => new THREE.MeshBasicMaterial({ color }));
+    spectatorMaterialCache.pants = new THREE.MeshBasicMaterial({ color: 0x18202a });
+  }
+  return spectatorMaterialCache;
+}
+
 function addSeatedSpectators(stand, width, rows, seed) {
   const shirtColors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78, 0xf4f2e8, 0x6aa7ff, 0xff7a59];
   const skinColors = [0xf0c7a0, 0xd49a6a, 0x8b5a3c, 0xf4d2b5];
-  const shirtMaterials = shirtColors.map((color) => createFlatStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: 0.1,
-    roughness: 0.74
-  }));
-  const skinMaterials = skinColors.map((color) => createFlatStandardMaterial({
-    color,
-    roughness: 0.8,
-    metalness: 0
-  }));
-  const pantsMaterial = createFlatStandardMaterial({
-    color: 0x18202a,
-    roughness: 0.76,
-    metalness: 0.02
-  });
-  const torsoGeometry = new THREE.BoxGeometry(0.46, 0.68, 0.3);
-  const headGeometry = new THREE.DodecahedronGeometry(0.22, 0);
-  const legGeometry = new THREE.BoxGeometry(0.17, 0.16, 0.62);
-  const armGeometry = new THREE.BoxGeometry(0.11, 0.46, 0.1);
-  const seatsPerRow = Math.max(7, Math.floor(width / 1.45));
+  const hairColors = [0x15100c, 0x4a2b18, 0x8a5a2b, 0xd8b15f, 0x5f6470];
+
+  const mats = getSpectatorMaterials(shirtColors, skinColors, hairColors);
+  const shirtMaterials = mats.shirts;
+  const skinMaterials = mats.skins;
+  const hairMaterials = mats.hairs;
+  const pantsMaterial = mats.pants;
+
+  const torsoGeometry = new THREE.CylinderGeometry(0.3, 0.24, 0.82, 8);
+  const headGeometry = new THREE.SphereGeometry(0.26, 12, 12);
+  const hairGeometry = new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
+  const legGeometry = new THREE.CylinderGeometry(0.12, 0.1, 0.72, 8);
+  const armGeometry = new THREE.CylinderGeometry(0.095, 0.07, 0.55, 8);
+
+  const seatsPerRow = Math.max(7, Math.floor(width / 1.62));
   const torsoMatrices = shirtMaterials.map(() => []);
   const headMatrices = skinMaterials.map(() => []);
+  const hairMatrices = hairMaterials.map(() => []);
   const leftArmMatrices = skinMaterials.map(() => []);
   const rightArmMatrices = skinMaterials.map(() => []);
   const leftLegMatrices = [];
   const rightLegMatrices = [];
+
   const matrix = new THREE.Matrix4();
   const torsoQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0, 0));
   const headQuaternion = new THREE.Quaternion();
-  const legQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.28, 0, 0));
+  // Cylinders point along Y, legs point forward (Z) so rotate +90deg (PI/2) on X
+  const legQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 + 0.28, 0, 0));
   const leftArmQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, 0.26));
   const rightArmQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, -0.26));
   const variedScale = new THREE.Vector3();
@@ -1388,10 +2075,7 @@ function addSeatedSpectators(stand, width, rows, seed) {
   for (let row = 0; row < rows; row += 1) {
     for (let seat = 0; seat < seatsPerRow; seat += 1) {
       const noise = pseudoRandom(seed * 19 + row * 7.3 + seat * 2.1);
-
-      if (noise < 0.08) {
-        continue;
-      }
+      if (noise < 0.08) continue;
 
       const jitter = (pseudoRandom(seed * 11 + row * 5.1 + seat * 3.7) - 0.5) * 0.12;
       const x = (seat / (seatsPerRow - 1) - 0.5) * width * 0.86 + jitter;
@@ -1399,55 +2083,53 @@ function addSeatedSpectators(stand, width, rows, seed) {
       const z = 0.02 - row * 1.15;
       const shirtIndex = (seat + row + seed) % shirtMaterials.length;
       const skinIndex = (seat * 2 + row + seed) % skinMaterials.length;
-      const scaleNoise = 1.04 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.18;
+      const hairIndex = (seat * 3 + row + seed) % hairMaterials.length;
+      const scaleNoise = 1.08 + pseudoRandom(seed * 23 + row * 13 + seat) * 0.2;
 
       variedScale.set(scaleNoise, scaleNoise, scaleNoise);
+
       matrix.compose(new THREE.Vector3(x, y + 0.04, z), torsoQuaternion, variedScale);
       torsoMatrices[shirtIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x, y + 0.58, z + 0.03), headQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x, y + 0.68, z + 0.03), headQuaternion, variedScale);
       headMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x - 0.29, y + 0.04, z + 0.03), leftArmQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x, y + 0.69, z + 0.03), headQuaternion, variedScale);
+      hairMatrices[hairIndex].push(matrix.clone());
+
+      matrix.compose(new THREE.Vector3(x - 0.35, y + 0.04, z + 0.03), leftArmQuaternion, variedScale);
       leftArmMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x + 0.29, y + 0.04, z + 0.03), rightArmQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x + 0.35, y + 0.04, z + 0.03), rightArmQuaternion, variedScale);
       rightArmMatrices[skinIndex].push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x - 0.13, y - 0.28, z + 0.38), legQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x - 0.16, y - 0.33, z + 0.44), legQuaternion, variedScale);
       leftLegMatrices.push(matrix.clone());
 
-      matrix.compose(new THREE.Vector3(x + 0.13, y - 0.28, z + 0.38), legQuaternion, variedScale);
+      matrix.compose(new THREE.Vector3(x + 0.16, y - 0.33, z + 0.44), legQuaternion, variedScale);
       rightLegMatrices.push(matrix.clone());
     }
   }
 
   torsoMatrices.forEach((matrices, materialIndex) => {
-    if (matrices.length === 0) {
-      return;
-    }
-
     addInstancedSpectatorPart(stand, torsoGeometry, shirtMaterials[materialIndex], matrices, `Torso:${materialIndex}`);
   });
-
   headMatrices.forEach((matrices, materialIndex) => {
     addInstancedSpectatorPart(stand, headGeometry, skinMaterials[materialIndex], matrices, `Head:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], leftArmMatrices[materialIndex], `LeftArm:${materialIndex}`);
     addInstancedSpectatorPart(stand, armGeometry, skinMaterials[materialIndex], rightArmMatrices[materialIndex], `RightArm:${materialIndex}`);
   });
-
+  hairMatrices.forEach((matrices, materialIndex) => {
+    addInstancedSpectatorPart(stand, hairGeometry, hairMaterials[materialIndex], matrices, `Hair:${materialIndex}`);
+  });
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, leftLegMatrices, "LeftLeg");
   addInstancedSpectatorPart(stand, legGeometry, pantsMaterial, rightLegMatrices, "RightLeg");
 }
 
 function addInstancedSpectatorPart(stand, geometry, material, matrices, name) {
-  if (matrices.length === 0) {
-    return;
-  }
-
+  if (matrices.length === 0) return;
   const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
   mesh.name = `VegasGrandstandSpectator${name}`;
-  mesh.receiveShadow = true;
   matrices.forEach((partMatrix, partIndex) => mesh.setMatrixAt(partIndex, partMatrix));
   mesh.instanceMatrix.needsUpdate = true;
   stand.add(mesh);
@@ -1529,9 +2211,9 @@ function addVegasF1Venue(group, curve, definition) {
     const side = index % 2 === 0 ? 1 : -1;
     const position = point
       .clone()
-      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 15))
+      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 38))
       .addScaledVector(tangent, pseudoRandom(index + 2.2) * 8 - 4);
-    clampPropPosition(curve, position, roadHalfWidth);
+    clampPropPosition(curve, position, roadHalfWidth, 200, 30, 35);
 
     group.add(createGrandstand({
       position,
@@ -1770,30 +2452,29 @@ function addVegasLightPosts(group, curve, definition) {
     head.position.set(0, 9.2, 0);
     head.receiveShadow = true;
 
-    const light = new THREE.PointLight(lampColor, 25, 20, 2);
-    light.name = `VegasStreetLampLight:${index}`;
-    light.position.copy(head.position);
+    const light = addDecorativePointLight(lamp, lampColor, 25, 20, 2, head.position);
+    if (light) {
+      light.name = `VegasStreetLampLight:${index}`;
+    }
 
-    lamp.add(pole, head, light);
+    lamp.add(pole, head);
     group.add(lamp);
   }
 }
 
-function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth) {
+function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth, minClearance = 20) {
   const point = curve.getPointAt(progress);
   const tangent = curve.getTangentAt(progress).setY(0).normalize();
-  const normal = getRightVector(tangent);
-  const position = point.clone().addScaledVector(normal, side * offset);
-  clampPropPosition(curve, position, roadHalfWidth);
+  const position = getSafeRoadsidePosition(curve, progress, side, offset, roadHalfWidth, minClearance);
   const rotationY = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
 
   return { position, rotationY };
 }
 
-function createVegasMaterial({ color, emissive, emissiveIntensity = 0, roughness = 0.85, metalness = 0.05 }) {
+function createVegasMaterial({ color, emissive, emissiveIntensity = 0.6, roughness = 0.85, metalness = 0.05 }) {
   return new THREE.MeshStandardMaterial({
     color,
-    emissive: emissive ?? 0x000000,
+    emissive: emissive ?? color,
     emissiveIntensity,
     roughness,
     metalness,
@@ -1826,18 +2507,17 @@ function addFacadeNeonSign(parent, { position, seed, color, lineCount = 4 }) {
     sign.add(segment);
   }
 
-  const light = new THREE.PointLight(color, 12, 15, 2);
-  light.position.set(0, -lineCount, 2.2);
-  sign.add(light);
+  addDecorativePointLight(sign, color, 12, 15, 2, new THREE.Vector3(0, -lineCount, 2.2));
   parent.add(sign);
 }
 
 function buildCaesarsPalace(group, curve, roadHalfWidth) {
   const palace = new THREE.Group();
   palace.name = "VegasSkyline:CaesarsPalace";
-  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 55, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 145, roadHalfWidth, 70);
   palace.position.copy(transform.position);
   palace.rotation.y = transform.rotationY;
+  palace.scale.set(0.52, 0.52, 0.52);
 
   const cream = createVegasMaterial({ color: 0xc8b89a });
   const domeMaterial = createVegasMaterial({ color: 0xb8a882, roughness: 0.68 });
@@ -1890,9 +2570,10 @@ function buildCaesarsPalace(group, curve, roadHalfWidth) {
 function buildMgmGrand(group, curve, roadHalfWidth) {
   const mgm = new THREE.Group();
   mgm.name = "VegasSkyline:MGMGrand";
-  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 62, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 110, roadHalfWidth, 45);
   mgm.position.copy(transform.position);
   mgm.rotation.y = transform.rotationY;
+  mgm.scale.set(0.5, 0.5, 0.5);
 
   const towerMaterial = createVegasMaterial({ color: 0x1a3d1a });
   const lionMaterial = createVegasMaterial({ color: 0xd4af37, roughness: 0.42, metalness: 0.16 });
@@ -1956,9 +2637,10 @@ function buildMgmGrand(group, curve, roadHalfWidth) {
 function buildBellagio(group, curve, roadHalfWidth) {
   const bellagio = new THREE.Group();
   bellagio.name = "VegasSkyline:Bellagio";
-  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 65, roadHalfWidth);
+  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 175, roadHalfWidth, 90);
   bellagio.position.copy(transform.position);
   bellagio.rotation.y = transform.rotationY;
+  bellagio.scale.set(0.42, 0.42, 0.42);
 
   const facadeMaterial = createVegasMaterial({ color: 0xe0d0b8 });
   const glassMaterial = createVegasMaterial({ color: 0x1a3050, roughness: 0.42, metalness: 0.1 });
@@ -2023,50 +2705,284 @@ function buildBellagio(group, curve, roadHalfWidth) {
 function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
-  const transform = getRoadsideTransform(curve, 0, -1, roadHalfWidth + 28, roadHalfWidth);
+
+  // progress=0.055 → midway between start (0) and first grandstand (0.1), right side of track.
+  // offset roadHalfWidth+18 = 23.25u clears absoluteMinClearance from the approach track segment.
+  // rotation +PI*0.5: front face points toward the road center so it's readable while driving.
+  const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
   signGroup.position.copy(transform.position);
-  signGroup.rotation.y = transform.rotationY;
+  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5;
 
-  const goldMaterial = createVegasMaterial({
-    color: 0xd4af37,
-    emissive: 0xffd700,
-    emissiveIntensity: 0.8,
-    roughness: 0.3,
-    metalness: 0.12
-  });
-  const frameMaterial = createVegasMaterial({
-    color: 0xff2090,
-    emissive: 0xff2090,
-    emissiveIntensity: 1,
-    roughness: 0.18
-  });
-  const poleMaterial = createVegasMaterial({ color: 0xa9a9b4, roughness: 0.42, metalness: 0.28 });
-
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), goldMaterial);
-  panel.position.set(0, 12, 0.04);
-  panel.rotation.z = Math.PI / 4;
-  signGroup.add(panel);
-
-  const frameParts = [
-    [0, 16.95, 10, Math.PI / 4],
-    [0, 7.05, 10, Math.PI / 4],
-    [-4.95, 12, 10, -Math.PI / 4],
-    [4.95, 12, 10, -Math.PI / 4]
-  ];
-  frameParts.forEach(([x, y, length, rotationZ]) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(length, 0.28, 0.28), frameMaterial);
-    frame.position.set(x, y, 0.1);
-    frame.rotation.z = rotationZ;
-    signGroup.add(frame);
+  const welcomeTex = getCachedWelcomeToVegasTexture();
+  const welcomeMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: welcomeTex,
+    emissive: 0xffffff,
+    emissiveMap: welcomeTex,
+    emissiveIntensity: 1.5,
+    transparent: true,
+    alphaTest: 0.15,
+    side: THREE.DoubleSide,
+    roughness: 0.25,
+    metalness: 0.08
   });
 
-  [-3.2, 3.2].forEach((x) => {
-    const pole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 5), poleMaterial));
-    pole.position.set(x, 3, -0.05);
-    signGroup.add(pole);
-  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), welcomeMat);
+  plane.position.y = 10; // rests on the ground, 20m tall
+  signGroup.add(plane);
+
+  // Spotlight to illuminate the sign at night
+  addDecorativePointLight(signGroup, 0xffffff, 8, 15, 1.5, new THREE.Vector3(0, 8, 3.5));
 
   group.add(signGroup);
+}
+
+function buildEiffelTower(group, curve, roadHalfWidth) {
+  const tower = new THREE.Group();
+  tower.name = "VegasSkyline:EiffelTower";
+
+  // Position it at progress 0.11, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.11, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  tower.position.copy(transform.position);
+  tower.rotation.y = transform.rotationY;
+
+  const metalMaterial = createVegasMaterial({
+    color: 0x1f1d24,
+    roughness: 0.6,
+    metalness: 0.4
+  });
+
+  const goldNeonMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffb800,
+    emissive: 0xffb800,
+    emissiveIntensity: 1.5,
+    roughness: 0.2
+  });
+
+  // Base legs
+  const legGeo = new THREE.CylinderGeometry(0.8, 1.6, 20, 5);
+  const angles = [Math.PI / 4, 3 * Math.PI / 4, -Math.PI / 4, -3 * Math.PI / 4];
+  const legSpacing = 12;
+
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(legGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * legSpacing, 10, Math.sin(angle) * legSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.25;
+    leg.rotation.x = Math.sin(angle) * 0.25;
+    tower.add(leg);
+
+    // Glowing neon strips along the legs
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 20.2, 0.3), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.8;
+    neonStrip.position.z += Math.sin(angle) * 0.8;
+    tower.add(neonStrip);
+  });
+
+  // Platform 1
+  const plat1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(20, 2.5, 20), metalMaterial));
+  plat1.position.y = 20;
+  tower.add(plat1);
+
+  // Platform 1 neon border
+  const plat1Neon = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.6, 20.4), goldNeonMaterial);
+  plat1Neon.position.y = 20;
+  tower.add(plat1Neon);
+
+  // Decorative arches under platform 1
+  const archMat = new THREE.MeshStandardMaterial({
+    color: 0xff4400,
+    emissive: 0xff4400,
+    emissiveIntensity: 0.8
+  });
+  for (let i = 0; i < 4; i++) {
+    const rot = (i * Math.PI) / 2;
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.4, 6, 16, Math.PI), archMat);
+    arch.position.set(0, 18.8, 0);
+    arch.rotation.y = rot;
+    arch.position.x += Math.cos(rot) * (legSpacing - 2);
+    arch.position.z += Math.sin(rot) * (legSpacing - 2);
+    arch.rotation.z = Math.PI;
+    tower.add(arch);
+  }
+
+  // Mid legs
+  const midLegGeo = new THREE.CylinderGeometry(0.5, 0.8, 18, 5);
+  const midLegSpacing = 7;
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(midLegGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * midLegSpacing, 29, Math.sin(angle) * midLegSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.16;
+    leg.rotation.x = Math.sin(angle) * 0.16;
+    tower.add(leg);
+
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 18.2, 0.2), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.5;
+    neonStrip.position.z += Math.sin(angle) * 0.5;
+    tower.add(neonStrip);
+  });
+
+  // Platform 2
+  const plat2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(11, 1.8, 11), metalMaterial));
+  plat2.position.y = 38;
+  tower.add(plat2);
+
+  const plat2Neon = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.4, 11.4), goldNeonMaterial);
+  plat2Neon.position.y = 38;
+  tower.add(plat2Neon);
+
+  // Spire / Top section
+  const spireGeo = new THREE.CylinderGeometry(0.1, 0.5, 27, 4);
+  const spire = markShadow(new THREE.Mesh(spireGeo, metalMaterial));
+  spire.position.set(0, 51.5, 0);
+  tower.add(spire);
+
+  const spireNeon = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.55, 27.2, 4), goldNeonMaterial);
+  spireNeon.position.set(0, 51.5, 0);
+  tower.add(spireNeon);
+
+  // Top Beacon Light
+  const beaconMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 3.0
+  });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), beaconMat);
+  beacon.position.set(0, 65.5, 0);
+  tower.add(beacon);
+
+  addDecorativePointLight(tower, 0xffffff, 25, 45, 1.2, new THREE.Vector3(0, 65.5, 0));
+
+  group.add(tower);
+}
+
+function buildFerrisWheel(group, curve, roadHalfWidth) {
+  const ferrisGroup = new THREE.Group();
+  ferrisGroup.name = "VegasSkyline:FerrisWheel";
+
+  // Position at progress 0.13, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.13, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  ferrisGroup.position.copy(transform.position);
+  // Orient it so the wheel is parallel to the road
+  ferrisGroup.rotation.y = transform.rotationY + Math.PI / 2;
+
+  const metalMaterial = createVegasMaterial({ color: 0x222026, roughness: 0.7, metalness: 0.3 });
+
+  const neonCyan = new THREE.MeshStandardMaterial({
+    color: 0x00e5ff,
+    emissive: 0x00e5ff,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  const neonMagenta = new THREE.MeshStandardMaterial({
+    color: 0xff2090,
+    emissive: 0xff2090,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  // Supports (A-frame structure)
+  [-1.5, 1.5].forEach((zOffset) => {
+    const legLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legLeft.position.set(-6, 14, zOffset);
+    legLeft.rotation.z = -0.2;
+    ferrisGroup.add(legLeft);
+
+    const legRight = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legRight.position.set(6, 14, zOffset);
+    legRight.rotation.z = 0.2;
+    ferrisGroup.add(legRight);
+  });
+
+  const axle = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.2, 8), metalMaterial));
+  axle.position.set(0, 28, 0);
+  axle.rotation.x = Math.PI / 2;
+  ferrisGroup.add(axle);
+
+  // Rotating part group (this is what spins)
+  const rotatingPart = new THREE.Group();
+  rotatingPart.name = "FerrisWheelRotatingPart";
+  rotatingPart.position.set(0, 28, 0);
+
+  // Set the rotation spin! (slowly rotates around Z-axis)
+  const spinSpeed = 0.08;
+  rotatingPart.userData.spin = { x: 0, y: 0, z: spinSpeed };
+
+  // Double outer rings
+  const ringRadius = 18;
+  [-0.9, 0.9].forEach((zOffset, ringIndex) => {
+    const ringMat = ringIndex === 0 ? neonCyan : neonMagenta;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.35, 8, 36), ringMat);
+    ring.position.set(0, 0, zOffset);
+    rotatingPart.add(ring);
+  });
+
+  // Spokes connecting hub to outer rings
+  const spokeMat = createVegasMaterial({
+    color: 0x0088ff,
+    emissive: 0x0088ff,
+    emissiveIntensity: 0.8,
+    roughness: 0.3
+  });
+  const spokeCount = 12;
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    [-0.9, 0.9].forEach((zOffset) => {
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, ringRadius, 4), spokeMat);
+      spoke.position.set(Math.cos(angle) * (ringRadius * 0.5), Math.sin(angle) * (ringRadius * 0.5), zOffset);
+      spoke.rotation.z = angle + Math.PI / 2;
+      rotatingPart.add(spoke);
+    });
+  }
+
+  // Cabins hanging off the outer edge
+  const cabinColors = [0xffe600, 0xff2090, 0x39ff14, 0x00e5ff, 0xff8800];
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    const cabinColor = cabinColors[i % cabinColors.length];
+
+    const cabinGroup = new THREE.Group();
+    cabinGroup.name = `FerrisCabin:${i}`;
+    cabinGroup.position.set(Math.cos(angle) * ringRadius, Math.sin(angle) * ringRadius, 0);
+
+    // Apply counter-spin to keep cabin upright!
+    cabinGroup.userData.spin = { x: 0, y: 0, z: -spinSpeed };
+
+    // Support hanger
+    const hanger = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 1.8, 4),
+      metalMaterial
+    );
+    hanger.position.set(0, 0.9, 0);
+    cabinGroup.add(hanger);
+
+    // Main cabin box
+    const cabinMat = new THREE.MeshStandardMaterial({
+      color: cabinColor,
+      emissive: cabinColor,
+      emissiveIntensity: 1.4,
+      roughness: 0.2
+    });
+    const cabinBox = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.4), cabinMat));
+    cabinBox.position.set(0, 0, 0);
+    cabinGroup.add(cabinBox);
+
+    // Light inside/under the cabin
+    addDecorativePointLight(cabinGroup, cabinColor, 3, 5, 2.0, new THREE.Vector3(0, -0.6, 0));
+
+    rotatingPart.add(cabinGroup);
+  }
+
+  ferrisGroup.add(rotatingPart);
+
+  // Center hub light
+  addDecorativePointLight(ferrisGroup, 0x00ffcc, 15, 25, 1.5, new THREE.Vector3(0, 28, 0));
+
+  group.add(ferrisGroup);
 }
 
 function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
@@ -2081,17 +2997,16 @@ function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
     const width = 20 + pseudoRandom(index + 1.2) * 20;
     const height = 60 + pseudoRandom(index + 2.4) * 90;
     const depth = 20 + pseudoRandom(index + 3.6) * 20;
-    const distance = 80 + pseudoRandom(index + 4.8) * 70;
-    const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth);
+    const distance = 85 + pseudoRandom(index + 4.8) * 65;
+    const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth, 65);
     const material = createVegasMaterial({ color: colors[index % colors.length], roughness: 0.62, metalness: 0.08 });
     const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material));
 
     tower.position.copy(transform.position);
     tower.position.addScaledVector(
       curve.getTangentAt(progress).setY(0).normalize(),
-      (pseudoRandom(index + 9) - 0.5) * 32
+      (pseudoRandom(index + 9) - 0.5) * 20
     );
-    clampPropPosition(curve, tower.position, roadHalfWidth, 200, 80, 92);
     tower.rotation.y = transform.rotationY;
     body.position.y = height * 0.5;
     tower.add(body);
@@ -2124,6 +3039,81 @@ function buildVegasSkyline(group, curve, roadHalfWidth) {
   buildMgmGrand(group, curve, roadHalfWidth);
   buildBellagio(group, curve, roadHalfWidth);
   buildBackgroundVegasTowers(group, curve, roadHalfWidth);
+  buildEiffelTower(group, curve, roadHalfWidth);
+  buildFerrisWheel(group, curve, roadHalfWidth);
+}
+
+function resolvePropClipping(propsGroup, curve, roadHalfWidth) {
+  propsGroup.children.forEach((child) => {
+    const name = child.name || "";
+    // Skip objects that are meant to span the road (tunnels, gantries, start line, checkpoint gates)
+    // or roadside lamps that are already carefully placed close to the road.
+    if (
+      name.includes("Tunnel") ||
+      name.includes("Gantry") ||
+      name.includes("Checkpoint") ||
+      name.includes("Start") ||
+      name.includes("StreetLamp") ||
+      name.includes("LightPost")
+    ) {
+      return;
+    }
+
+    // Determine safety clearance based on the type of prop
+    let minSafeDistance = roadHalfWidth + 3.0; // default for small props
+
+    if (name.includes("CaesarsPalace") || name.includes("MGMGrand") || name.includes("Bellagio") || name.includes("EiffelTower") || name.includes("FerrisWheel")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("BackgroundTower") || name.includes("Skyscraper")) {
+      minSafeDistance = roadHalfWidth + 25.0;
+    } else if (name.includes("Grandstand") || name.includes("LuxorPyramid") || name.includes("Paddock")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("Billboard")) {
+      minSafeDistance = roadHalfWidth + 7.5;
+    } else if (name.includes("WelcomeToLasVegasSign")) {
+      minSafeDistance = roadHalfWidth + 9.0;
+    } else if (name.includes("HologramDie")) {
+      if (child.position.y < 3.0) {
+        minSafeDistance = roadHalfWidth + 3.0;
+      } else {
+        return;
+      }
+    }
+
+    const pos = child.position;
+
+    // We run up to 3 relaxation iterations to resolve clipping from all parts of the track
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      let closestPoint = null;
+      let minTrackDist = Infinity;
+      let closestT = 0;
+
+      for (let index = 0; index <= 120; index += 1) {
+        const t = index / 120;
+        const trackPoint = curve.getPointAt(t);
+        const dist = Math.sqrt((pos.x - trackPoint.x) ** 2 + (pos.z - trackPoint.z) ** 2);
+        if (dist < minTrackDist) {
+          minTrackDist = dist;
+          closestPoint = trackPoint;
+          closestT = t;
+        }
+      }
+
+      if (minTrackDist < minSafeDistance) {
+        const pushDir = new THREE.Vector3(pos.x - closestPoint.x, 0, pos.z - closestPoint.z);
+        if (pushDir.lengthSq() < 0.0001) {
+          const tangent = curve.getTangentAt(closestT).setY(0).normalize();
+          pushDir.copy(getRightVector(tangent));
+        } else {
+          pushDir.normalize();
+        }
+        pos.x = closestPoint.x + pushDir.x * minSafeDistance;
+        pos.z = closestPoint.z + pushDir.z * minSafeDistance;
+      } else {
+        break;
+      }
+    }
+  });
 }
 
 function disableDecorativeCastShadows(group) {
@@ -2139,6 +3129,7 @@ function addVegasProps(group, curve, definition) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "VegasDecorativeProps";
 
+  generateCitySkyline(curve, propsGroup, definition);
   addVegasTunnel(propsGroup, curve, definition, 0.36, 0, 18, 0.009);
   buildVegasSkyline(propsGroup, curve, definition.roadWidth * 0.5);
   buildVegasBillboards(propsGroup, curve, definition.roadWidth * 0.5);
@@ -2146,8 +3137,1740 @@ function addVegasProps(group, curve, definition) {
   addVegasLightPosts(propsGroup, curve, definition);
   addNeonPalms(propsGroup, curve, definition);
   addCasinoDice(propsGroup, curve, definition);
+
+  // Clean up and resolve any remaining prop intersections/clipping
+  resolvePropClipping(propsGroup, curve, definition.roadWidth * 0.5);
+
   disableDecorativeCastShadows(propsGroup);
   group.add(propsGroup);
+}
+
+function createBeachMaterial({
+  color,
+  emissive,
+  emissiveIntensity = 0,
+  roughness = 0.85,
+  metalness = 0.02
+}) {
+  const parameters = {
+    color,
+    roughness,
+    metalness,
+    flatShading: true
+  };
+
+  if (emissive !== undefined) {
+    parameters.emissive = emissive;
+    parameters.emissiveIntensity = emissiveIntensity;
+  }
+
+  return new THREE.MeshStandardMaterial(parameters);
+}
+
+function getRoadFrame(curve, progress) {
+  const p = progress >= 0.9999 ? 0.0 : progress;
+  const point = curve.getPointAt(p);
+  const tangent = curve.getTangentAt(p).setY(0).normalize();
+  const right = getRightVector(tangent);
+
+  return {
+    point,
+    tangent,
+    right,
+    heading: getHeading(tangent)
+  };
+}
+
+function safePlace(curve, progress, side, offset, roadHalfWidth, minClearance = 12) {
+  const frame = getRoadFrame(curve, progress);
+  const safeOffset = Math.max(Math.abs(offset), roadHalfWidth + minClearance);
+  const position = frame.point.clone().addScaledVector(frame.right, side * safeOffset);
+  clampPropPosition(curve, position, roadHalfWidth, 220, minClearance, minClearance);
+  return {
+    position,
+    rotationY: frame.heading + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+    frame
+  };
+}
+
+function makeBasisMatrix(position, tangent, right, scale = new THREE.Vector3(1, 1, 1)) {
+  const matrix = new THREE.Matrix4();
+  matrix.makeBasis(right.clone().normalize(), UP, tangent.clone().setY(0).normalize().negate());
+  matrix.scale(scale);
+  matrix.setPosition(position);
+  return matrix;
+}
+
+function addTransformedBox(target, geometry, matrix) {
+  const sourcePosition = geometry.getAttribute("position");
+  const sourceIndex = geometry.getIndex();
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+  const vertex = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const baseIndex = target.positions.length / 3;
+
+  for (let index = 0; index < sourcePosition.count; index += 1) {
+    vertex.fromBufferAttribute(sourcePosition, index).applyMatrix4(matrix);
+    target.positions.push(vertex.x, vertex.y, vertex.z);
+  }
+
+  const sourceNormal = geometry.getAttribute("normal");
+  for (let index = 0; index < sourceNormal.count; index += 1) {
+    normal.fromBufferAttribute(sourceNormal, index).applyMatrix3(normalMatrix).normalize();
+    target.normals.push(normal.x, normal.y, normal.z);
+  }
+
+  for (let index = 0; index < sourceIndex.count; index += 1) {
+    target.indices.push(baseIndex + sourceIndex.getX(index));
+  }
+}
+
+function createMergedGeometry(parts) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(parts.positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(parts.normals, 3));
+  geometry.setIndex(parts.indices);
+  return geometry;
+}
+
+function addBeachGround(group) {
+  const material = createBeachMaterial({
+    color: 0xe4c06c,
+    roughness: 0.95
+  });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100), material);
+  ground.name = "TropicalBeachPropsGround";
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.05;
+  ground.receiveShadow = true;
+  group.add(ground);
+}
+
+function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y) {
+  const vertices = [];
+  const indices = [];
+  const segments = trackDef.segments || 200;
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const sampleT = t >= 0.9999 ? 0.0 : t;
+    const p = curve.getPointAt(sampleT);
+    const tan = curve.getTangentAt(sampleT).setY(0).normalize();
+    const normal = getRightVector(tan);
+
+    const nearP = p.clone().addScaledVector(normal, side * nearOffset);
+    const farP = p.clone().addScaledVector(normal, side * farOffset);
+
+    vertices.push(
+      nearP.x, y, nearP.z,
+      farP.x, y, farP.z
+    );
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const current = i * 2;
+    const next = (i + 1) * 2;
+    if (side < 0) {
+      indices.push(current, current + 1, next);
+      indices.push(current + 1, next + 1, next);
+    } else {
+      indices.push(current, next, current + 1);
+      indices.push(current + 1, next, next + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// Like createBeachSideBandGeometry but adds a per-vertex 'aShoreT' attribute:
+// 0.0 = near shore edge, 1.0 = far ocean edge — used for gradient coloring.
+function createBeachGradientBandGeometry(curve, trackDef, side, nearOffset, farOffset, y) {
+  const vertices = [];
+  const shoreT  = [];   // gradient attribute
+  const indices = [];
+  const segments = trackDef.segments || 200;
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const sampleT = t >= 0.9999 ? 0.0 : t;
+    const p = curve.getPointAt(sampleT);
+    const tan = curve.getTangentAt(sampleT).setY(0).normalize();
+    const normal = getRightVector(tan);
+
+    const nearP = p.clone().addScaledVector(normal, side * nearOffset);
+    const farP  = p.clone().addScaledVector(normal, side * farOffset);
+
+    vertices.push(nearP.x, y, nearP.z);  // near vertex
+    shoreT.push(0.0);
+    vertices.push(farP.x,  y, farP.z);   // far vertex
+    shoreT.push(1.0);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const current = i * 2;
+    const next = (i + 1) * 2;
+    if (side < 0) {
+      indices.push(current, current + 1, next);
+      indices.push(current + 1, next + 1, next);
+    } else {
+      indices.push(current, next, current + 1);
+      indices.push(current + 1, next, next + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("aShoreT",  new THREE.Float32BufferAttribute(shoreT, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, material, name, y) {
+  const geometry = createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  return mesh;
+}
+
+function addBeachOceanPlane(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  // Shore Sand (widened)
+  const sandMaterial = createBeachMaterial({ color: 0xe0c66f, roughness: 0.95 });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 14.0, sandMaterial, "TropicalBeachOceanShore", -0.012);
+
+  // Surf/Foam
+  const surfMaterial = createBeachMaterial({ color: 0xf0f5e8, roughness: 0.50 });
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 14.0, roadHalfWidth + 18.0, surfMaterial, "TropicalBeachOceanSurf", -0.010);
+
+  // Gradient ocean: turquoise (riva) → mid blue → deep blue (largo)
+  // Uses a static ShaderMaterial with per-vertex aShoreT attribute (0=riva, 1=largo)
+  const gradientShader = new THREE.ShaderMaterial({
+    uniforms: {
+      uColorA: { value: new THREE.Color(0x2ddde8) }, // turchese chiaro
+      uColorB: { value: new THREE.Color(0x0772b0) }, // blu intermedio
+      uColorC: { value: new THREE.Color(0x003a6e) }, // blu profondo
+    },
+    vertexShader: /* glsl */`
+      attribute float aShoreT;
+      varying float vT;
+      void main() {
+        vT = aShoreT;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+      uniform vec3 uColorC;
+      varying float vT;
+      void main() {
+        // Two-stop blend: A -> B at t=0..0.45, B -> C at t=0.4..1.0
+        vec3 col = mix(uColorA, uColorB, smoothstep(0.0, 0.45, vT));
+        col = mix(col, uColorC, smoothstep(0.4, 1.0, vT));
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+    side: THREE.DoubleSide,
+  });
+
+  const oceanGeo = createBeachGradientBandGeometry(
+    curve, trackDef, 1,
+    roadHalfWidth + 18.0, roadHalfWidth + 1155,
+    -0.014
+  );
+  const oceanMesh = new THREE.Mesh(oceanGeo, gradientShader);
+  oceanMesh.name = "TropicalBeachGradientOcean";
+  oceanMesh.receiveShadow = false;
+  group.add(oceanMesh);
+}
+
+
+function addBeachEdgeStrips(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+  const material = createBeachMaterial({
+    color: 0xff6600,
+    emissive: 0xff6600,
+    emissiveIntensity: 1,
+    roughness: 0.55
+  });
+  const segmentCount = trackDef.segments;
+  const source = new THREE.BoxGeometry(0.12, 0.08, 1);
+  const parts = [0, 1, 2, 3].map(() => ({ positions: [], normals: [], indices: [] }));
+  const stripOffsets = [
+    { side: -1, offset: roadHalfWidth + 0.05 },
+    { side: -1, offset: roadHalfWidth - 0.45 },
+    { side: 1, offset: roadHalfWidth - 0.45 },
+    { side: 1, offset: roadHalfWidth + 0.05 }
+  ];
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const a = index / segmentCount;
+    const b = (index + 1) / segmentCount;
+    const start = getRoadFrame(curve, a);
+    const end = getRoadFrame(curve, b);
+    const segLen = start.point.distanceTo(end.point);
+    const midProgress = (a + b) * 0.5;
+    const frame = getRoadFrame(curve, midProgress >= 1 ? midProgress - 1 : midProgress);
+
+    stripOffsets.forEach(({ side, offset }, partIndex) => {
+      const position = frame.point.clone().addScaledVector(frame.right, side * offset);
+      position.y = 0.08;
+      const matrix = makeBasisMatrix(position, frame.tangent, frame.right, new THREE.Vector3(1, 1, segLen));
+      addTransformedBox(parts[partIndex], source, matrix);
+    });
+  }
+
+  parts.forEach((part, index) => {
+    const mesh = new THREE.Mesh(createMergedGeometry(part), material);
+    mesh.name = `TropicalBeachEdgeStrip:${index}`;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
+
+  source.dispose();
+}
+
+function addBeachCenterDashes(group, curve, trackDef) {
+  const material = createBeachMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.6,
+    roughness: 0.48
+  });
+  const totalLength = curve.getLength();
+  const dashCount = Math.floor(totalLength / 10);
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.06, 3), material, dashCount);
+  const matrix = new THREE.Matrix4();
+
+  for (let index = 0; index < dashCount; index += 1) {
+    const progress = ((index * 10) + 1.5) / totalLength;
+    const frame = getRoadFrame(curve, progress % 1);
+    const position = frame.point.clone();
+    position.y = 0.07;
+    matrix.copy(makeBasisMatrix(position, frame.tangent, frame.right));
+    dashes.setMatrixAt(index, matrix);
+  }
+
+  dashes.name = "TropicalBeachCenterDashes";
+  dashes.instanceMatrix.needsUpdate = true;
+  dashes.receiveShadow = true;
+  group.add(dashes);
+}
+
+function createTropicalPalm(seed = 0) {
+  const palm = new THREE.Group();
+  palm.name = "TropicalBeachPalm";
+
+  const trunkMaterial = createBeachMaterial({ color: 0x6f4726, roughness: 0.9 });
+  const trunkBandMaterial = createBeachMaterial({ color: 0xa87a44, roughness: 0.88 });
+  const ribMaterial = createBeachMaterial({ color: 0x174d25, roughness: 0.82 });
+  const leafMaterials = [
+    createBeachMaterial({ color: 0x2d8f34, roughness: 0.78, metalness: 0 }),
+    createBeachMaterial({ color: 0x3eaa43, roughness: 0.78, metalness: 0 }),
+    createBeachMaterial({ color: 0x1f6f2b, roughness: 0.82, metalness: 0 })
+  ];
+  leafMaterials.forEach((material) => {
+    material.side = THREE.DoubleSide;
+  });
+  ribMaterial.side = THREE.DoubleSide;
+
+  const trunkHeight = 8.8 + (seed % 3) * 0.7;
+  const segmentCount = 9;
+  const lean = seed % 2 === 0 ? 0.075 : -0.075;
+  const segmentHeight = trunkHeight / segmentCount;
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const taper = 1 - index / segmentCount;
+    const segment = markShadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17 + taper * 0.07, 0.27 + taper * 0.1, segmentHeight * 1.04, 8),
+      trunkMaterial
+    ));
+    segment.position.set(lean * index * 0.34, segmentHeight * (index + 0.5), 0);
+    segment.rotation.z = lean;
+    palm.add(segment);
+
+    if (index % 2 === 0) {
+      const band = markShadow(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.19 + taper * 0.07, 0.2 + taper * 0.08, 0.12, 8),
+        trunkBandMaterial
+      ));
+      band.position.copy(segment.position);
+      band.rotation.z = lean;
+      palm.add(band);
+    }
+  }
+
+  const crown = new THREE.Group();
+  crown.position.set(lean * segmentCount * 0.34, trunkHeight + 0.15, 0);
+
+  const createFrond = (length, material, droop, leafletCount = 8) => {
+    const frond = new THREE.Group();
+    const rib = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, length), ribMaterial));
+    rib.position.z = -length * 0.5;
+    frond.add(rib);
+
+    const leafletGeometry = new THREE.PlaneGeometry(0.22, length * 0.3);
+    for (let index = 0; index < leafletCount; index += 1) {
+      const progress = (index + 1) / (leafletCount + 1);
+      const z = -progress * length;
+      const span = Math.sin(progress * Math.PI);
+
+      [-1, 1].forEach((side) => {
+        const leaflet = markShadow(new THREE.Mesh(leafletGeometry, material));
+        leaflet.position.set(side * (0.28 + span * 0.75), -progress * droop, z);
+        leaflet.rotation.y = side * (Math.PI / 2.8);
+        leaflet.rotation.z = side * (0.5 + progress * 0.28);
+        leaflet.scale.set(0.8 + span * 0.65, 1, 1);
+        frond.add(leaflet);
+      });
+    }
+
+    return frond;
+  };
+
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    const length = 5.8 + pseudoRandom(seed + index * 0.7) * 1.2;
+    const frond = createFrond(length, leafMaterials[index % leafMaterials.length], 1.1 + (index % 3) * 0.28, 7);
+    frond.rotation.y = angle;
+    frond.rotation.x = Math.PI / 3.6 + (index % 4) * 0.07;
+    frond.rotation.z = (index % 2 === 0 ? 1 : -1) * 0.12;
+    frond.position.set(Math.cos(angle) * 0.34, 0.12, Math.sin(angle) * 0.34);
+    crown.add(frond);
+  }
+
+  [0, 1, 2].forEach((index) => {
+    const angle = (index / 4) * Math.PI * 2 + 0.35;
+    const uprightFrond = createFrond(4.2, leafMaterials[(index + 1) % leafMaterials.length], 0.35, 6);
+    uprightFrond.rotation.y = angle;
+    uprightFrond.rotation.x = Math.PI / 5.4;
+    uprightFrond.position.y = 0.45;
+    crown.add(uprightFrond);
+  });
+
+  // Cluster of 3 brown coconuts nestled right under the fronds
+  const coconutMaterial = createBeachMaterial({ color: 0x4d321d, roughness: 0.82 });
+  const coconutGeo = new THREE.SphereGeometry(0.18, 6, 6);
+  for (let c = 0; c < 3; c++) {
+    const coconut = markShadow(new THREE.Mesh(coconutGeo, coconutMaterial));
+    // Position coconuts around the center of the crown
+    const angle = (c / 3) * Math.PI * 2 + (seed % 5) * 0.4;
+    const r = 0.22;
+    coconut.position.set(Math.cos(angle) * r, -0.1 - (c % 2) * 0.04, Math.sin(angle) * r);
+    // Give them a slightly organic, non-perfectly-spherical shape
+    coconut.scale.set(1.0, 1.15, 0.95);
+    crown.add(coconut);
+  }
+
+  palm.add(crown);
+  return palm;
+}
+
+function createTropicalBush(seed = 0) {
+  const bush = new THREE.Group();
+  bush.name = "TropicalBeachBush";
+
+  const material = createBeachMaterial({
+    color: seed % 2 === 0 ? 0x2f9b4b : 0x1f7a3a,
+    roughness: 0.82
+  });
+
+  for (let index = 0; index < 4; index += 1) {
+    const leaf = markShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 + index * 0.08, 0), material));
+    leaf.position.set((index - 1.5) * 0.45, 0.55 + index * 0.1, (pseudoRandom(seed + index) - 0.5) * 0.8);
+    leaf.scale.set(1.25, 0.72, 0.9);
+    bush.add(leaf);
+  }
+
+  return bush;
+}
+
+function createBeachChair(seed = 0) {
+  const chair = new THREE.Group();
+  chair.name = "BeachPlasticChair";
+
+  const material = createBeachMaterial({
+    color: 0xf5f5f5, // White plastic
+    roughness: 0.45,
+    metalness: 0.05
+  });
+
+  // Seat
+  const seat = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.8), material));
+  seat.position.y = 0.4;
+  chair.add(seat);
+
+  // Legs
+  const legGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.4, 5);
+  const legOffsets = [
+    [-0.32, 0.2, -0.32],
+    [0.32, 0.2, -0.32],
+    [-0.32, 0.2, 0.32],
+    [0.32, 0.2, 0.32]
+  ];
+  legOffsets.forEach(([lx, ly, lz]) => {
+    const leg = markShadow(new THREE.Mesh(legGeo, material));
+    leg.position.set(lx, ly, lz);
+    leg.rotation.z = lx * -0.12;
+    leg.rotation.x = lz * 0.12;
+    chair.add(leg);
+  });
+
+  // Backrest frame
+  const backFrameLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.06), material));
+  backFrameLeft.position.set(-0.34, 0.75, 0.34);
+  const backFrameRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.06), material));
+  backFrameRight.position.set(0.34, 0.75, 0.34);
+  const backTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.1, 0.06), material));
+  backTop.position.set(0, 1.1, 0.34);
+  chair.add(backFrameLeft, backFrameRight, backTop);
+
+  // Vertical slats
+  const slatGeo = new THREE.BoxGeometry(0.05, 0.6, 0.03);
+  [-0.2, 0, 0.2].forEach((sx) => {
+    const slat = markShadow(new THREE.Mesh(slatGeo, material));
+    slat.position.set(sx, 0.75, 0.34);
+    chair.add(slat);
+  });
+
+  // Armrests
+  const armGeo = new THREE.BoxGeometry(0.05, 0.04, 0.6);
+  const armSupportGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.25, 5);
+  [-0.36, 0.36].forEach((ax) => {
+    const arm = markShadow(new THREE.Mesh(armGeo, material));
+    arm.position.set(ax, 0.62, 0.06);
+    const support = markShadow(new THREE.Mesh(armSupportGeo, material));
+    support.position.set(ax, 0.525, -0.2);
+    chair.add(arm, support);
+  });
+
+  return chair;
+}
+
+function createBeachPersonSittingWithStrawHat(seed = 0) {
+  const person = new THREE.Group();
+  person.name = "TropicalBeachPersonSitting";
+
+  // Skin material
+  const skinMaterial = createBeachMaterial({ color: 0xdcb38c, roughness: 0.6 });
+  // Shirt material (white/cream)
+  const shirtMaterial = createBeachMaterial({ color: 0xfefefa, roughness: 0.5 });
+  // Pants/shorts material (beige/tan)
+  const pantsMaterial = createBeachMaterial({ color: 0xcca070, roughness: 0.7 });
+  // Hair/beard material (black)
+  const blackMaterial = createBeachMaterial({ color: 0x111111, roughness: 0.8 });
+  // Straw hat material (straw yellow)
+  const strawMaterial = createBeachMaterial({ color: 0xd4b26f, roughness: 0.8 });
+
+  // 1. Torso (Busto camicia bianca, reclinato)
+  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.35), shirtMaterial));
+  torso.position.set(0, 0.4, 0.05);
+  torso.rotation.x = 0.12; // Reclined slightly back
+  person.add(torso);
+
+  // 2. Head (Testa color pelle, sopra il busto reclinato)
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), skinMaterial));
+  head.position.set(0, 0.92, 0.12);
+  person.add(head);
+
+  // Hair (Capelli ricci neri)
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), blackMaterial));
+  hair.position.set(0, 0.96, 0.14);
+  hair.scale.set(1.02, 0.9, 1.02);
+  person.add(hair);
+
+  // Beard (Barba corta nera)
+  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.12), blackMaterial));
+  beard.position.set(0, 0.82, 0.02);
+  person.add(beard);
+
+  // 3. Legs (Thighs extending horizontally forward)
+  // Pantaloncini (shorts) part of thighs
+  const thighLeftPants = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.35, 6), pantsMaterial));
+  thighLeftPants.position.set(-0.18, 0.06, -0.175);
+  thighLeftPants.rotation.x = Math.PI / 2;
+  
+  const thighRightPants = thighLeftPants.clone();
+  thighRightPants.position.x = 0.18;
+  person.add(thighLeftPants, thighRightPants);
+
+  // Skin (knee) part of thighs
+  const thighLeftSkin = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 6), skinMaterial));
+  thighLeftSkin.position.set(-0.18, 0.06, -0.4);
+  thighLeftSkin.rotation.x = Math.PI / 2;
+  
+  const thighRightSkin = thighLeftSkin.clone();
+  thighRightSkin.position.x = 0.18;
+  person.add(thighLeftSkin, thighRightSkin);
+
+  // 4. Shins (Gambe che scendono verticalmente)
+  const shinLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), skinMaterial));
+  shinLeft.position.set(-0.18, -0.165, -0.5);
+  
+  const shinRight = shinLeft.clone();
+  shinRight.position.x = 0.18;
+  person.add(shinLeft, shinRight);
+
+  // Feet (Piedi orizzontali)
+  const footLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMaterial));
+  footLeft.position.set(-0.18, -0.38, -0.54);
+  footLeft.rotation.y = 0.1;
+  
+  const footRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMaterial));
+  footRight.position.set(0.18, -0.38, -0.54);
+  footRight.rotation.y = -0.1;
+  person.add(footLeft, footRight);
+
+  // 5. Arms (Braccia che si appoggiano sui braccioli)
+  // Upper arms (sloping down and slightly forward)
+  const upperArmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), shirtMaterial));
+  upperArmLeft.position.set(-0.34, 0.5, -0.02);
+  upperArmLeft.rotation.x = 0.35;
+  upperArmLeft.rotation.z = 0.08;
+  
+  const upperArmRight = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), shirtMaterial));
+  upperArmRight.position.set(0.34, 0.5, -0.02);
+  upperArmRight.rotation.x = 0.35;
+  upperArmRight.rotation.z = -0.08;
+  person.add(upperArmLeft, upperArmRight);
+
+  // Forearms (resting flat on armrests: x = +/-0.36, y = 0.22)
+  const forearmLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.35, 6), skinMaterial));
+  forearmLeft.position.set(-0.36, 0.24, -0.28);
+  forearmLeft.rotation.x = Math.PI / 2;
+  
+  const forearmRight = forearmLeft.clone();
+  forearmRight.position.x = 0.36;
+  person.add(forearmLeft, forearmRight);
+
+  // Hands (on front of armrest)
+  const handLeft = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 6), skinMaterial));
+  handLeft.position.set(-0.36, 0.24, -0.47);
+  const handRight = handLeft.clone();
+  handRight.position.x = 0.36;
+  person.add(handLeft, handRight);
+
+  // 6. STRAW HAT (Cappellaccio di paglia gigante)
+  const hatGroup = new THREE.Group();
+  hatGroup.position.set(0, 1.08, 0.12);
+  hatGroup.rotation.x = 0.15;
+  hatGroup.rotation.z = -0.1;
+
+  // Hat Crown (Cupola centrale)
+  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.28, 0.28, 8), strawMaterial));
+  crown.position.y = 0.12;
+  hatGroup.add(crown);
+
+  // Hat Brim (Tesa larga e piatta)
+  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.02, 16), strawMaterial));
+  hatGroup.add(brim);
+
+  // Frayed Straw Strands (Fili di paglia sporgenti dalla tesa)
+  const strandGeo = new THREE.CylinderGeometry(0.008, 0.004, 0.6, 4);
+  const strandCount = 18;
+  for (let i = 0; i < strandCount; i++) {
+    const angle = (i / strandCount) * Math.PI * 2;
+    const strand = markShadow(new THREE.Mesh(strandGeo, strawMaterial));
+    
+    // Position at the edge of the brim
+    const radius = 0.86;
+    strand.position.set(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius);
+    
+    // Rotate to point outwards with some random variations
+    strand.rotation.z = angle + Math.PI / 2 + (pseudoRandom(seed + i) * 0.3 - 0.15);
+    strand.rotation.y = pseudoRandom(seed + i * 2) * 0.4 - 0.2;
+    
+    hatGroup.add(strand);
+  }
+
+  person.add(hatGroup);
+
+  // Proportional scale to fit chair seat nicely
+  person.scale.setScalar(0.9);
+
+  return person;
+}
+
+function createBeachGirl(type = "swimsuit", seed = 0) {
+  const girl = new THREE.Group();
+  girl.name = `BeachGirl_${type}_${seed}`;
+
+  // Skin colors
+  const skinColors = [0xdcb38c, 0xe8be9b, 0xbe8c5f, 0xcb9c7a];
+  // Hair colors
+  const hairColors = [0x111111, 0x4a3728, 0xd4af37, 0xb85a1c];
+  // Swimsuit colors
+  const swimColors = [0xff3366, 0x33ff66, 0x33ccff, 0xffcc00, 0xff6600, 0xe60067];
+  // Top/Shorts colors
+  const topColors = [0xfefefa, 0xffdd44, 0xff8833, 0x88ffcc, 0xffaaaa];
+  const shortsColors = [0x2a52be, 0x333333, 0x4e5d6c];
+
+  const skinMat = createBeachMaterial({ color: skinColors[seed % skinColors.length], roughness: 0.6 });
+  const hairMat = createBeachMaterial({ color: hairColors[(seed * 3) % hairColors.length], roughness: 0.8 });
+
+  // Head and Hair
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.20, 8, 8), skinMat));
+  head.position.set(0, 1.48, 0);
+  girl.add(head);
+
+  // Hair base
+  const hairBase = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 8), hairMat));
+  hairBase.position.set(0, 1.50, -0.04);
+  hairBase.scale.set(1.02, 0.9, 1.02);
+  girl.add(hairBase);
+
+  // Ponytail/Long hair hanging down
+  const hairHang = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.08), hairMat));
+  hairHang.position.set(0, 1.22, -0.15);
+  hairHang.rotation.x = 0.08;
+  girl.add(hairHang);
+
+  // Torso
+  if (type === "swimsuit") {
+    const swimMat = createBeachMaterial({ color: swimColors[(seed * 7) % swimColors.length], roughness: 0.6 });
+    // Bikini Top
+    const bikiniTop = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.20, 0.22), swimMat));
+    bikiniTop.position.set(0, 1.15, 0);
+    // Midriff (Skin)
+    const midriff = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.18), skinMat));
+    midriff.position.set(0, 0.94, 0);
+    // Bikini Bottom
+    const bikiniBottom = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.22), swimMat));
+    bikiniBottom.position.set(0, 0.74, 0);
+    girl.add(bikiniTop, midriff, bikiniBottom);
+  } else {
+    const topMat = createBeachMaterial({ color: topColors[(seed * 7) % topColors.length], roughness: 0.5 });
+    const shortsMat = createBeachMaterial({ color: shortsColors[(seed * 11) % shortsColors.length], roughness: 0.7 });
+    
+    // Top
+    const top = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.22), topMat));
+    top.position.set(0, 1.08, 0);
+    // Denim Shorts
+    const shorts = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.24), shortsMat));
+    shorts.position.set(0, 0.76, 0);
+    girl.add(top, shorts);
+  }
+
+  // Walk cycle phase (varies by seed)
+  const walkPhase = (seed % 3) * 0.35 + 0.15;
+  const swingAngle = Math.sin(walkPhase) * 0.4;
+
+  // Left Leg
+  const legLGroup = new THREE.Group();
+  legLGroup.position.set(-0.13, 0.64, 0);
+  const legL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.64, 6), skinMat));
+  legL.position.y = -0.32;
+  const footL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), skinMat));
+  footL.position.set(0, -0.64, 0.04);
+  legLGroup.add(legL, footL);
+  legLGroup.rotation.x = -swingAngle;
+  girl.add(legLGroup);
+
+  // Right Leg
+  const legRGroup = new THREE.Group();
+  legRGroup.position.set(0.13, 0.64, 0);
+  const legR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.64, 6), skinMat));
+  legR.position.y = -0.32;
+  const footR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), skinMat));
+  footR.position.set(0, -0.64, 0.04);
+  legRGroup.add(legR, footR);
+  legRGroup.rotation.x = swingAngle;
+  girl.add(legRGroup);
+
+  // Left Arm
+  const armLGroup = new THREE.Group();
+  armLGroup.position.set(-0.25, 1.20, 0);
+  const armL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.56, 6), skinMat));
+  armL.position.y = -0.28;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), skinMat));
+  handL.position.set(0, -0.56, 0);
+  armLGroup.add(armL, handL);
+  armLGroup.rotation.x = swingAngle;
+  girl.add(armLGroup);
+
+  // Right Arm
+  const armRGroup = new THREE.Group();
+  armRGroup.position.set(0.25, 1.20, 0);
+  const armR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.56, 6), skinMat));
+  armR.position.y = -0.28;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), skinMat));
+  handR.position.set(0, -0.56, 0);
+  armRGroup.add(armR, handR);
+  armRGroup.rotation.x = -swingAngle;
+  girl.add(armRGroup);
+
+  return girl;
+}
+
+function createBeachBoy(type = "swimsuit", seed = 0) {
+  const boy = new THREE.Group();
+  boy.name = `BeachBoy_${type}_${seed}`;
+
+  // Skin colors
+  const skinColors = [0xdcb38c, 0xe8be9b, 0xbe8c5f, 0xcb9c7a];
+  // Hair colors
+  const hairColors = [0x111111, 0x4a3728, 0xd4af37, 0xb85a1c];
+  // Swim shorts colors
+  const swimColors = [0x11cc22, 0xff5500, 0x0088ff, 0xffbb00, 0xff3366, 0x9933ff];
+  // Shirt/Shorts colors
+  const shirtColors = [0xfefefa, 0xff5566, 0x33ddff, 0xffcc33, 0x77ff77];
+  const shortsColors = [0xcca070, 0x333333, 0x4a7fc4];
+
+  const skinMat = createBeachMaterial({ color: skinColors[seed % skinColors.length], roughness: 0.6 });
+  const hairMat = createBeachMaterial({ color: hairColors[(seed * 5) % hairColors.length], roughness: 0.8 });
+
+  // Head and Short Hair
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.20, 8, 8), skinMat));
+  head.position.set(0, 1.50, 0);
+  boy.add(head);
+
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 8), hairMat));
+  hair.position.set(0, 1.53, 0);
+  hair.scale.set(1.03, 0.82, 1.03);
+  boy.add(hair);
+
+  // Torso
+  if (type === "swimsuit") {
+    const swimMat = createBeachMaterial({ color: swimColors[(seed * 7) % swimColors.length], roughness: 0.7 });
+    // Bare Chest (Skin)
+    const chest = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.44, 0.24), skinMat));
+    chest.position.set(0, 1.14, 0);
+    // Swim Trunks
+    const trunks = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.24, 0.26), swimMat));
+    trunks.position.set(0, 0.80, 0);
+    boy.add(chest, trunks);
+  } else {
+    const shirtMat = createBeachMaterial({ color: shirtColors[(seed * 7) % shirtColors.length], roughness: 0.5 });
+    const shortsMat = createBeachMaterial({ color: shortsColors[(seed * 11) % shortsColors.length], roughness: 0.7 });
+    
+    // T-shirt
+    const shirt = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.46, 0.26), shirtMat));
+    shirt.position.set(0, 1.15, 0);
+    // Shorts
+    const shorts = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.26, 0.26), shortsMat));
+    shorts.position.set(0, 0.79, 0);
+    boy.add(shirt, shorts);
+  }
+
+  // Walk cycle phase
+  const walkPhase = (seed % 3) * 0.35 + 0.32;
+  const swingAngle = Math.sin(walkPhase) * 0.4;
+
+  // Left Leg
+  const legLGroup = new THREE.Group();
+  legLGroup.position.set(-0.13, 0.66, 0);
+  const legL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.66, 6), skinMat));
+  legL.position.y = -0.33;
+  const footL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.15), skinMat));
+  footL.position.set(0, -0.66, 0.04);
+  legLGroup.add(legL, footL);
+  legLGroup.rotation.x = -swingAngle;
+  boy.add(legLGroup);
+
+  // Right Leg
+  const legRGroup = new THREE.Group();
+  legRGroup.position.set(0.13, 0.66, 0);
+  const legR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.66, 6), skinMat));
+  legR.position.y = -0.33;
+  const footR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.15), skinMat));
+  footR.position.set(0, -0.66, 0.04);
+  legRGroup.add(legR, footR);
+  legRGroup.rotation.x = swingAngle;
+  boy.add(legRGroup);
+
+  // Left Arm
+  const armLGroup = new THREE.Group();
+  armLGroup.position.set(-0.27, 1.22, 0);
+  const armL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.58, 6), skinMat));
+  armL.position.y = -0.29;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), skinMat));
+  handL.position.set(0, -0.58, 0);
+  armLGroup.add(armL, handL);
+  armLGroup.rotation.x = swingAngle;
+  boy.add(armLGroup);
+
+  // Right Arm
+  const armRGroup = new THREE.Group();
+  armRGroup.position.set(0.27, 1.22, 0);
+  const armR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.58, 6), skinMat));
+  armR.position.y = -0.29;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), skinMat));
+  handR.position.set(0, -0.58, 0);
+  armRGroup.add(armR, handR);
+  armRGroup.rotation.x = -swingAngle;
+  boy.add(armRGroup);
+
+  return boy;
+}
+
+function addBeachPeople(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  // 1. Swimsuit girls on the beach (side = +1)
+  for (let index = 0; index < 12; index += 1) {
+    const progress = (index + 0.25) / 12;
+    const depthOffset = (index % 3 === 0) ? 7.5 : (index % 3 === 1) ? 14.5 : 19.0;
+    const { position, rotationY } = safePlace(curve, progress, +1, +(roadHalfWidth + depthOffset), roadHalfWidth, 4.5);
+
+    const girl = createBeachGirl("swimsuit", index);
+    girl.position.copy(position);
+    girl.scale.setScalar(2.5);
+
+    if (depthOffset === 7.5) {
+      girl.rotation.y = rotationY + (index % 2 === 0 ? Math.PI / 2 : -Math.PI / 2);
+    } else if (depthOffset === 14.5) {
+      girl.position.y -= 0.22;
+      girl.rotation.y = rotationY + (index % 2 === 0 ? Math.PI / 2 : -Math.PI / 2);
+    } else {
+      girl.position.y -= 1.1;
+      girl.rotation.y = rotationY + Math.PI + (pseudoRandom(index) * 0.4 - 0.2);
+    }
+    group.add(girl);
+  }
+
+  // 2. Swimsuit boys on the beach (side = +1)
+  for (let index = 0; index < 10; index += 1) {
+    const progress = (index + 0.75) / 10;
+    const depthOffset = (index % 3 === 0) ? 8.5 : (index % 3 === 1) ? 15.5 : 18.0;
+    const { position, rotationY } = safePlace(curve, progress, +1, +(roadHalfWidth + depthOffset), roadHalfWidth, 4.5);
+
+    const boy = createBeachBoy("swimsuit", index);
+    boy.position.copy(position);
+    boy.scale.setScalar(2.5); // matches girls
+
+    if (depthOffset === 8.5) {
+      boy.rotation.y = rotationY + (index % 2 === 0 ? -Math.PI / 2 : Math.PI / 2);
+    } else if (depthOffset === 15.5) {
+      boy.position.y -= 0.22;
+      boy.rotation.y = rotationY + (index % 2 === 0 ? -Math.PI / 2 : Math.PI / 2);
+    } else {
+      boy.position.y -= 1.0;
+      boy.rotation.y = rotationY + Math.PI + (pseudoRandom(index * 2) * 0.4 - 0.2);
+    }
+    group.add(boy);
+  }
+
+  // 3. People walking towards the bars (side = -1)
+  const barProgresses = [0.20, 0.55, 0.80];
+  barProgresses.forEach((barP, barIdx) => {
+    const barFrame = safePlace(curve, barP, -1, -(roadHalfWidth + 16.0), roadHalfWidth, 6.0);
+    
+    // Girl A: approaching from the left, standing outside the counter
+    const pA = barP - 0.016;
+    const frameA = safePlace(curve, pA, -1, -(roadHalfWidth + 5.8), roadHalfWidth, 4.5);
+    const girlA = createBeachGirl("shorts_top", barIdx * 10 + 1);
+    girlA.position.copy(frameA.position);
+    girlA.scale.setScalar(2.6);
+    const dirA = barFrame.position.clone().sub(frameA.position).normalize();
+    girlA.rotation.y = Math.atan2(dirA.x, dirA.z);
+    group.add(girlA);
+
+    // Girl B: approaching from the right, standing outside the counter
+    const pB = barP + 0.014;
+    const frameB = safePlace(curve, pB, -1, -(roadHalfWidth + 6.6), roadHalfWidth, 4.5);
+    const girlB = createBeachGirl("shorts_top", barIdx * 10 + 2);
+    girlB.position.copy(frameB.position);
+    girlB.scale.setScalar(2.6);
+    const dirB = barFrame.position.clone().sub(frameB.position).normalize();
+    girlB.rotation.y = Math.atan2(dirB.x, dirB.z);
+    group.add(girlB);
+
+    // Boy C: approaching from the front-left, standing outside the counter
+    const pC = barP - 0.008;
+    const frameC = safePlace(curve, pC, -1, -(roadHalfWidth + 7.2), roadHalfWidth, 4.5);
+    const boyC = createBeachBoy("shorts_shirt", barIdx * 10 + 3);
+    boyC.position.copy(frameC.position);
+    boyC.scale.setScalar(2.6); // matches girls
+    const dirC = barFrame.position.clone().sub(frameC.position).normalize();
+    boyC.rotation.y = Math.atan2(dirC.x, dirC.z);
+    group.add(boyC);
+  });
+}
+
+function addChairsUnderPalm(group, palmPosition, palmRotationY, index) {
+  // 1. Two chairs, scaled to 2.8x (slightly smaller than 3.5x as requested)
+  const chair1 = createBeachChair(index * 2);
+  const chair2 = createBeachChair(index * 2 + 1);
+
+  chair1.scale.setScalar(2.8);
+  chair2.scale.setScalar(2.8);
+
+  const angle = palmRotationY;
+  // Spacing offsets optimized for 2.8x scale
+  const dx1 = Math.sin(angle) * 3.0 + Math.cos(angle) * -2.0;
+  const dz1 = Math.cos(angle) * 3.0 - Math.sin(angle) * -2.0;
+
+  const dx2 = Math.sin(angle) * 3.0 + Math.cos(angle) * 2.0;
+  const dz2 = Math.cos(angle) * 3.0 - Math.sin(angle) * 2.0;
+
+  chair1.position.set(palmPosition.x + dx1, palmPosition.y - 0.05, palmPosition.z + dz1);
+  chair1.rotation.y = angle + Math.PI + 0.15;
+
+  chair2.position.set(palmPosition.x + dx2, palmPosition.y - 0.05, palmPosition.z + dz2);
+  chair2.rotation.y = angle + Math.PI - 0.15;
+
+  group.add(chair1, chair2);
+
+  // 2. The sitting person on chair1
+  const person = createBeachPersonSittingWithStrawHat(index);
+  // Place on seat: y = 0.43 (slightly above y=0.4 seat mesh), z = 0.05
+  person.position.set(0, 0.43, 0.05);
+  chair1.add(person);
+}
+
+function addBeachTropicalPlants(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  // Helper to check if a progress value is near a bar kiosk to prevent overlapping palms
+  const isNearBar = (p) => {
+    const bars = [0.20, 0.55, 0.80];
+    return bars.some(barP => Math.abs(p - barP) < 0.04);
+  };
+
+  // 20 palme/cespugli distribuiti attorno alla pista, tenendoli vicini sul lato interno
+  for (let index = 0; index < 20; index += 1) {
+    const side = -1;
+    const progress = (index + 0.3) / 20;
+    if (isNearBar(progress)) continue;
+    const offset = side * (roadHalfWidth + 4.5 + (index % 4) * 2.5); // Offset tra roadHalfWidth + 4.5 e roadHalfWidth + 12
+    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 4.5);
+    const useBush = index % 5 === 0;
+    const plant = useBush ? createTropicalBush(index) : createTropicalPalm(index);
+    plant.position.copy(position);
+    plant.rotation.y = rotationY + (index % 5) * 0.22;
+    // Scale: palme 1.1–1.6x, cespugli 1.2–1.8x
+    const baseScale = useBush ? 1.4 : 1.1;
+    plant.scale.setScalar(baseScale + pseudoRandom(index + 4.1) * 0.5);
+    group.add(plant);
+
+    if (!useBush && index === 2) {
+      addChairsUnderPalm(group, position, rotationY, index);
+      addHouseBehindPalm(group, curve, progress, offset, roadHalfWidth, rotationY, index);
+    }
+  }
+
+  // Add 45 more palms/bushes on the inside (side = -1) to make the inner ring dense
+  for (let index = 0; index < 45; index += 1) {
+    const side = -1;
+    const progress = (index + 0.75) / 45;
+    if (isNearBar(progress)) continue;
+    const offset = side * (roadHalfWidth + 5.0 + (index % 3) * 3.5);
+    const { position, rotationY } = safePlace(curve, progress, side, offset, roadHalfWidth, 4.5);
+    const useBush = index % 4 === 0;
+    const plant = useBush ? createTropicalBush(index + 100) : createTropicalPalm(index + 100);
+    plant.position.copy(position);
+    plant.rotation.y = rotationY + (index % 5) * 0.3;
+    const baseScale = useBush ? 1.35 : 1.05;
+    plant.scale.setScalar(baseScale + pseudoRandom(index + 9.9) * 0.5);
+    group.add(plant);
+  }
+}
+
+function addHouseBehindPalm(group, curve, progress, palmOffset, roadHalfWidth, palmRotationY, index) {
+  // Compute position behind the palm.
+  // The palm has a negative offset (inside loop, side = -1).
+  // So we move it further away by subtracting 25 meters to accommodate the larger 3.2x scale.
+  const houseOffset = palmOffset - 25.0;
+  
+  // Use safePlace to sample coordinates and height correctly.
+  // Using side = -1, minClearance = 12.0 for safety.
+  const { position, rotationY } = safePlace(curve, progress, -1, houseOffset, roadHalfWidth, 12.0);
+  
+  const house = createBeachHouse(index);
+  house.position.copy(position);
+  // Scale up the house to 3.2x to make it beautifully proportioned
+  house.scale.setScalar(3.2);
+  // Rotate 180 degrees (add Math.PI) so the front porch faces the track/road
+  house.rotation.y = rotationY + Math.PI;
+  
+  group.add(house);
+}
+
+function createBeachHouse(seed = 0) {
+  const house = new THREE.Group();
+  house.name = "TropicalBeachHouse";
+
+  // Materials
+  const wallMaterial = createBeachMaterial({ color: 0xfa9b93, roughness: 0.8 }); // Pink/peach plaster
+  const roofMaterial = createBeachMaterial({ color: 0xfa9b93, roughness: 0.8 }); // Pink/peach roof
+  const trimMaterial = createBeachMaterial({ color: 0xfad02c, roughness: 0.6, metalness: 0.1 }); // Bright yellow trim
+  const floorMaterial = createBeachMaterial({ color: 0xdcdcdc, roughness: 0.7 }); // Light grey concrete floor
+  const grassMaterial = createBeachMaterial({ color: 0x3d7042, roughness: 0.9 }); // Dark grass green base
+  const doorMaterial = createBeachMaterial({ color: 0x5c3b21, roughness: 0.85 }); // Dark brown door
+  const windowBackMaterial = createBeachMaterial({ color: 0x2b2b2b, roughness: 0.9 }); // Dark glass/shutter background
+  const slatMaterial = createBeachMaterial({ color: 0xf0f0f0, roughness: 0.6 }); // White horizontal slats
+  const metalMaterial = createBeachMaterial({ color: 0x333333, roughness: 0.6, metalness: 0.6 }); // Metallic staircase
+
+  // 1. Platform / Grass Base
+  const base = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.3, 6.0), grassMaterial));
+  base.position.set(0, 0.15, 0);
+  house.add(base);
+
+  // 2. Porch Floor
+  const floor = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.15, 1.8), floorMaterial));
+  floor.position.set(0, 0.375, -1.8);
+  house.add(floor);
+
+  // 3. Main Room Box (Peach/Pink walls)
+  const room = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.6, 2.8, 3.4), wallMaterial));
+  room.position.set(0, 1.7, 0.8);
+  house.add(room);
+
+  // 4. Porch Columns (Pillars)
+  const colGeo = new THREE.BoxGeometry(0.2, 2.7, 0.2);
+  const colXPositions = [-3.5, -1.2, 1.2, 3.5];
+  colXPositions.forEach((cx) => {
+    const col = markShadow(new THREE.Mesh(colGeo, wallMaterial));
+    col.position.set(cx, 1.65, -2.6);
+    house.add(col);
+  });
+
+  // 5. Arches (Horizontal header beam + diagonal corner brackets)
+  const header = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.3, 0.2), wallMaterial));
+  header.position.set(0, 2.85, -2.6);
+  house.add(header);
+
+  const bracketGeo = new THREE.BoxGeometry(0.25, 0.25, 0.22);
+  const bracketXOffsets = [-3.25, -1.45, -0.95, 0.95, 1.45, 3.25];
+  bracketXOffsets.forEach((bx, idx) => {
+    const bracket = markShadow(new THREE.Mesh(bracketGeo, wallMaterial));
+    bracket.position.set(bx, 2.65, -2.6);
+    bracket.rotation.z = (idx % 2 === 0) ? -Math.PI / 4 : Math.PI / 4;
+    house.add(bracket);
+  });
+
+  // 6. Roof Slab
+  const roof = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.2, 5.6), roofMaterial));
+  roof.position.set(0, 3.1, -0.3);
+  house.add(roof);
+
+  // Yellow Roof Trim / Fascia
+  const frontTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.22, 0.3, 0.05), trimMaterial));
+  frontTrim.position.set(0, 3.15, -3.12);
+  const leftTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 5.62), trimMaterial));
+  leftTrim.position.set(-4.11, 3.15, -0.3);
+  const rightTrim = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 5.62), trimMaterial));
+  rightTrim.position.set(4.11, 3.15, -0.3);
+  house.add(frontTrim, leftTrim, rightTrim);
+
+  // 7. Door (dark brown wooden door)
+  const door = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.08), doorMaterial));
+  door.position.set(0.2, 1.3, -0.9);
+  house.add(door);
+
+  // Door handle (gold sphere)
+  const handle = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), trimMaterial));
+  handle.position.set(0.55, 1.3, -0.85);
+  house.add(handle);
+
+  // 8. Front Windows (two windows, left and right of door)
+  const frameGeo = new THREE.BoxGeometry(1.6, 1.1, 0.08);
+  const glassGeo = new THREE.BoxGeometry(1.4, 0.9, 0.04);
+  const slatGeo = new THREE.BoxGeometry(1.4, 0.05, 0.02);
+
+  [-2.35, 2.35].forEach((wx) => {
+    // Window Frame (Yellow)
+    const frame = markShadow(new THREE.Mesh(frameGeo, trimMaterial));
+    frame.position.set(wx, 1.5, -0.9);
+    house.add(frame);
+
+    // Glass/Backplane (Dark)
+    const glass = markShadow(new THREE.Mesh(glassGeo, windowBackMaterial));
+    glass.position.set(wx, 1.5, -0.91);
+    house.add(glass);
+
+    // Horizontal louvers/slats
+    for (let s = 0; s < 5; s++) {
+      const slat = markShadow(new THREE.Mesh(slatGeo, slatMaterial));
+      slat.position.set(wx, 1.2 + s * 0.15, -0.89);
+      house.add(slat);
+    }
+  });
+
+  // 9. Side Window (Left side)
+  const sideFrame = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 1.6), trimMaterial));
+  sideFrame.position.set(-3.8, 1.5, 0.8);
+  house.add(sideFrame);
+  const sideGlass = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 1.4), windowBackMaterial));
+  sideGlass.position.set(-3.81, 1.5, 0.8);
+  house.add(sideGlass);
+  const sideSlatGeo = new THREE.BoxGeometry(0.02, 0.05, 1.4);
+  for (let s = 0; s < 5; s++) {
+    const slat = markShadow(new THREE.Mesh(sideSlatGeo, slatMaterial));
+    slat.position.set(-3.79, 1.2 + s * 0.15, 0.8);
+    house.add(slat);
+  }
+
+  // 10. Spiral Staircase on the Left
+  const post = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.2, 6), metalMaterial));
+  post.position.set(-4.1, 1.9, 1.2);
+  house.add(post);
+
+  const stairs = new THREE.Group();
+  const stepGeo = new THREE.BoxGeometry(0.65, 0.04, 0.22);
+  const stairCount = 15;
+  for (let i = 0; i < stairCount; i++) {
+    const theta = i * (Math.PI * 1.5 / (stairCount - 1));
+    const h = (i / (stairCount - 1)) * 2.8;
+    const step = markShadow(new THREE.Mesh(stepGeo, metalMaterial));
+    step.position.set(
+      Math.cos(theta) * 0.32,
+      h + 0.02,
+      Math.sin(theta) * 0.32
+    );
+    step.rotation.y = -theta;
+    stairs.add(step);
+  }
+  stairs.position.set(-4.1, 0.3, 1.2);
+  house.add(stairs);
+
+  // 11. Ornamental Bushes in Front
+  const bushPositions = [
+    [-3.2, 0.3, -2.8],
+    [3.2, 0.3, -2.8],
+    [-0.8, 0.3, -2.8]
+  ];
+  bushPositions.forEach(([bx, by, bz], bidx) => {
+    const bush = createTropicalBush(seed + bidx + 50);
+    bush.position.set(bx, by, bz);
+    bush.scale.setScalar(0.7);
+    house.add(bush);
+  });
+
+  return house;
+}
+
+// Bartender: standing man with straw hat, holding a coconut in his raised right hand
+function createBarBartender() {
+  const person = new THREE.Group();
+  person.name = "TropicalBeachBartender";
+
+  const skinMat  = createBeachMaterial({ color: 0xdcb38c, roughness: 0.6 });
+  const shirtMat = createBeachMaterial({ color: 0xfefefa, roughness: 0.5 });
+  const shortsMat= createBeachMaterial({ color: 0x4a7fc4, roughness: 0.7 });
+  const blackMat = createBeachMaterial({ color: 0x111111, roughness: 0.8 });
+  const strawMat = createBeachMaterial({ color: 0xd4b26f, roughness: 0.8 });
+  const coconutMat = createBeachMaterial({ color: 0x5c3d1e, roughness: 0.9 });
+
+  // --- Torso ---
+  const torso = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.32), shirtMat));
+  torso.position.set(0, 1.05, 0);
+  person.add(torso);
+
+  // --- Head ---
+  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), skinMat));
+  head.position.set(0, 1.62, 0);
+  person.add(head);
+
+  // Hair
+  const hair = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 8), blackMat));
+  hair.position.set(0, 1.66, 0);
+  hair.scale.set(1.02, 0.88, 1.02);
+  person.add(hair);
+
+  // Beard
+  const beard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.10), blackMat));
+  beard.position.set(0, 1.54, 0.09);
+  person.add(beard);
+
+  // --- Straw hat ---
+  const hatGroup = new THREE.Group();
+  hatGroup.position.set(0, 1.78, 0);
+  const crown = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 0.25, 8), strawMat));
+  crown.position.y = 0.10;
+  const brim = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.80, 0.80, 0.02, 16), strawMat));
+  // Frayed strands
+  const strandGeo = new THREE.CylinderGeometry(0.007, 0.003, 0.5, 4);
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const strand = markShadow(new THREE.Mesh(strandGeo, strawMat));
+    strand.position.set(Math.cos(angle) * 0.76, 0.01, Math.sin(angle) * 0.76);
+    strand.rotation.z = angle + Math.PI / 2 + (pseudoRandom(i) * 0.3 - 0.15);
+    hatGroup.add(strand);
+  }
+  hatGroup.add(crown, brim);
+  person.add(hatGroup);
+
+  // --- Legs ---
+  [-0.16, 0.16].forEach((lx) => {
+    const thigh = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.09, 0.42, 6), shortsMat));
+    thigh.position.set(lx, 0.53, 0);
+    const shin = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.42, 6), skinMat));
+    shin.position.set(lx, 0.10, 0);
+    const foot = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.16), skinMat));
+    foot.position.set(lx, -0.10, 0.05);
+    person.add(thigh, shin, foot);
+  });
+
+  // --- Left arm (relaxed, slightly forward on counter) ---
+  const upperArmL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 6), shirtMat));
+  upperArmL.position.set(-0.32, 1.02, 0);
+  upperArmL.rotation.z = 0.25;
+  const forearmL = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.34, 6), skinMat));
+  forearmL.position.set(-0.38, 0.75, -0.08);
+  forearmL.rotation.x = 0.3;
+  forearmL.rotation.z = 0.1;
+  const handL = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat));
+  handL.position.set(-0.40, 0.62, -0.18);
+  person.add(upperArmL, forearmL, handL);
+
+  // --- Right arm (raised, holding coconut) ---
+  const upperArmR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 6), shirtMat));
+  upperArmR.position.set(0.32, 1.12, 0);
+  upperArmR.rotation.z = -0.65; // raised outward
+  upperArmR.rotation.x = -0.2;
+  const forearmR = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), skinMat));
+  forearmR.position.set(0.50, 1.22, -0.10);
+  forearmR.rotation.z = -0.5;
+  forearmR.rotation.x = -0.4;
+  const handR = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat));
+  handR.position.set(0.60, 1.35, -0.22);
+  person.add(upperArmR, forearmR, handR);
+
+  // --- Coconut held in right hand ---
+  const coconut = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), coconutMat));
+  coconut.scale.set(1.0, 1.15, 1.0);
+  coconut.position.set(0.60, 1.45, -0.28);
+  // Straw/drinking straw sticking out
+  const straw = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5),
+    createBeachMaterial({ color: 0xff8800, roughness: 0.5 })
+  ));
+  straw.position.set(0.60, 1.60, -0.30);
+  straw.rotation.z = 0.3;
+  person.add(coconut, straw);
+
+  person.scale.setScalar(1.4);
+  return person;
+}
+
+function createBeachHutStrict(seed = 0) {
+  const hut = new THREE.Group();
+  hut.name = "TropicalBeachBarKiosk";
+
+  // Materials
+  const slatMat = createBeachMaterial({ color: 0xc68a4c, roughness: 0.85 }); // Warm natural light wood slats
+  const trimMat = createBeachMaterial({ color: 0x4d301c, roughness: 0.88 }); // Darker wood countertop/trim
+  const poleMat = createBeachMaterial({ color: 0x4d301c, roughness: 0.9 }); // Dark log poles
+  const roofMat = createBeachMaterial({ color: 0x8c6239, roughness: 0.95 }); // Thatched palm roof
+  const letterMat = createBeachMaterial({ color: 0xfad02c, roughness: 0.5 }); // Yellow sign letters
+  const kayakYellowMat = createBeachMaterial({ color: 0xffd700, roughness: 0.6 }); // Yellow kayak
+  const kayakOrangeMat = createBeachMaterial({ color: 0xff4500, roughness: 0.6 }); // Orange-red kayak
+
+  // 1. Semi-circular slatted bar counter
+  const slatGeo = new THREE.BoxGeometry(0.32, 1.4, 0.1);
+  for (let i = 0; i < 24; i++) {
+    const angle = -Math.PI * 0.6 + (i / 23) * Math.PI * 1.2;
+    const x = Math.sin(angle) * 2.8;
+    const z = -Math.cos(angle) * 2.8; // Z negative is front
+    const slat = markShadow(new THREE.Mesh(slatGeo, slatMat));
+    slat.position.set(x, 0.7, z);
+    slat.rotation.y = -angle;
+    hut.add(slat);
+  }
+
+  // 2. Curved Countertop and Bottom Trim segments
+  const counterGeo = new THREE.BoxGeometry(0.95, 0.08, 0.45);
+  const baseTrimGeo = new THREE.BoxGeometry(0.95, 0.1, 0.25);
+  for (let j = 0; j < 10; j++) {
+    const angleStart = -Math.PI * 0.6 + (j / 10) * Math.PI * 1.2;
+    const angleEnd = -Math.PI * 0.6 + ((j + 1) / 10) * Math.PI * 1.2;
+    const angleMid = (angleStart + angleEnd) / 2;
+    const x = Math.sin(angleMid) * 2.8;
+    const z = -Math.cos(angleMid) * 2.8;
+
+    // Countertop
+    const counterSegment = markShadow(new THREE.Mesh(counterGeo, trimMat));
+    counterSegment.position.set(x, 1.44, z);
+    counterSegment.rotation.y = -angleMid;
+    hut.add(counterSegment);
+
+    // Bottom Base Trim
+    const baseSegment = markShadow(new THREE.Mesh(baseTrimGeo, trimMat));
+    baseSegment.position.set(x, 0.05, z);
+    baseSegment.rotation.y = -angleMid;
+    hut.add(baseSegment);
+  }
+
+  // 3. Timber poles/posts
+  const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 3.2, 6);
+  const postPositions = [
+    [-2.2, 1.6, -0.8],
+    [2.2, 1.6, -0.8],
+    [-1.8, 1.6, 1.4],
+    [1.8, 1.6, 1.4]
+  ];
+  postPositions.forEach(([px, py, pz]) => {
+    const post = markShadow(new THREE.Mesh(poleGeo, poleMat));
+    post.position.set(px, py, pz);
+    hut.add(post);
+  });
+
+  // 4. Horizontal timber beams at top
+  const beamLeft = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.3), poleMat));
+  beamLeft.position.set(-2.0, 3.14, 0.3);
+  const beamRight = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.3), poleMat));
+  beamRight.position.set(2.0, 3.14, 0.3);
+  const beamBack = markShadow(new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.12, 0.12), poleMat));
+  beamBack.position.set(0, 3.14, 1.4);
+  const beamFront = markShadow(new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 0.12), poleMat));
+  beamFront.position.set(0, 3.14, -0.8);
+  hut.add(beamLeft, beamRight, beamBack, beamFront);
+
+  // 5. Thatched Roof — full 360° disc so orientation does not matter
+  const roof = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(3.2, 3.6, 0.4, 16),
+    roofMat
+  ));
+  roof.position.set(0, 3.3, 0.0);
+  hut.add(roof);
+
+  // 6. Sign Board "BAR" — placed on the back-local face (z=+2.55)
+  // The kiosk is spawned with rotation.y += Math.PI which flips the X axis.
+  // Place sign at z=-2.55 (front of counter in local) with lz=-0.06 (protrudes toward road).
+  // Pre-mirror ALL letter x coordinates so that after the kiosk PI flip they read correctly.
+  const signGroup = new THREE.Group();
+  signGroup.position.set(0, 2.55, -3.2);
+  signGroup.rotation.x = 0.04;
+  hut.add(signGroup);
+  signGroup.rotation.y = Math.PI; // cancels kiosk +PI flip → letters in natural orientation
+
+  // Board: wide warm-wood plank
+  const signBoard = markShadow(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.62, 0.08), trimMat));
+  signGroup.add(signBoard);
+
+  // Two small hanging chains/brackets at top corners
+  const chainGeo = new THREE.BoxGeometry(0.04, 0.22, 0.04);
+  [-0.88, 0.88].forEach((cx) => {
+    const chain = markShadow(new THREE.Mesh(chainGeo, poleMat));
+    chain.position.set(cx, 0.42, 0);
+    signGroup.add(chain);
+  });
+
+  // Letters in natural reading order (B left, A centre, R right).
+  // lz = +0.06 protrudes toward the road (sign faces outward after rotation.y=PI).
+  const lz = +0.06;
+  const ly = 0;
+  const th = 0.05;
+
+  // === B ===
+  const bGroup = new THREE.Group();
+  bGroup.position.set(-0.52, ly, 0);
+  // Vertical stem (left side)
+  const bV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
+  bV.position.set(-0.15, 0, lz);
+  // Top / middle / bottom horizontals
+  const bH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH1.position.set(-0.04, 0.185, lz);
+  const bH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH2.position.set(-0.04, 0, lz);
+  const bH3 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  bH3.position.set(-0.04, -0.185, lz);
+  // Top and bottom bump connectors (right side)
+  const bC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
+  bC1.position.set(0.065, 0.093, lz);
+  const bC2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.185, th), letterMat));
+  bC2.position.set(0.065, -0.093, lz);
+  bGroup.add(bV, bH1, bH2, bH3, bC1, bC2);
+  signGroup.add(bGroup);
+
+  // === A ===
+  const aGroup = new THREE.Group();
+  aGroup.position.set(0, ly, 0);
+  // Left diagonal (leans right)
+  const aL = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
+  aL.position.set(-0.10, 0, lz);
+  aL.rotation.z = -0.22;
+  // Right diagonal (leans left)
+  const aR = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.48, th), letterMat));
+  aR.position.set(0.10, 0, lz);
+  aR.rotation.z = 0.22;
+  // Crossbar
+  const aC = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, th), letterMat));
+  aC.position.set(0, -0.04, lz);
+  aGroup.add(aL, aR, aC);
+  signGroup.add(aGroup);
+
+  // === R ===
+  const rGroup = new THREE.Group();
+  rGroup.position.set(+0.52, ly, 0);
+  // Vertical stem (left side)
+  const rV = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, th), letterMat));
+  rV.position.set(-0.10, 0, lz);
+  // Top horizontal
+  const rH1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
+  rH1.position.set(-0.01, 0.185, lz);
+  // Middle horizontal
+  const rH2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, th), letterMat));
+  rH2.position.set(-0.01, 0.02, lz);
+  // Top-right loop connector
+  const rC1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.165, th), letterMat));
+  rC1.position.set(0.055, 0.103, lz);
+  // Diagonal leg (bottom-right)
+  const rLeg2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, th), letterMat));
+  rLeg2.position.set(0.072, -0.13, lz);
+  rLeg2.rotation.z = 0.5;
+  rGroup.add(rV, rH1, rH2, rC1, rLeg2);
+  signGroup.add(rGroup);
+
+  // 7. Decorative Kayaks next to the bar (Yellow & Orange-Red)
+  const kayakGeo = new THREE.SphereGeometry(1.0, 8, 8);
+  const kayak1 = markShadow(new THREE.Mesh(kayakGeo, kayakYellowMat));
+  kayak1.scale.set(0.35, 0.18, 2.4);
+  kayak1.position.set(3.4, 0.1, -0.2);
+  kayak1.rotation.set(0.05, 0.35, 0.0);
+  
+  const kayak2 = markShadow(new THREE.Mesh(kayakGeo, kayakOrangeMat));
+  kayak2.scale.set(0.35, 0.18, 2.4);
+  kayak2.position.set(4.0, 0.1, -0.6);
+  kayak2.rotation.set(-0.05, 0.25, 0.0);
+
+  hut.add(kayak1, kayak2);
+
+  // 8. Bartender — standing behind the counter, holding a coconut
+  const bartender = createBarBartender();
+  // z = +1.2 = bartender side (inside the bar, opposite to road-facing counter)
+  // After kiosk +PI rotation this becomes the interior behind the counter
+  bartender.position.set(0, 0, 0.5);
+  bartender.rotation.y = Math.PI; // face toward the road/customer side
+  hut.add(bartender);
+
+  return hut;
+}
+
+function addBeachHutsStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  [0.20, 0.55, 0.80].forEach((progress, index) => {
+    const side = -1;
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 16.0), roadHalfWidth, 6.0);
+    const hut = createBeachHutStrict(index);
+    hut.position.copy(position);
+    hut.rotation.y = rotationY + Math.PI; // +Math.PI so open counter faces the road
+    hut.scale.setScalar(2.0);
+    group.add(hut);
+  });
+}
+
+function createThatchedUmbrellaWithLoungers(index) {
+  const group = new THREE.Group();
+  group.name = "TropicalBeachUmbrellaStrict";
+
+  // --- Pole (bamboo-tan cylinder) ---
+  const poleMat = createBeachMaterial({ color: 0xb89050, roughness: 0.75 });
+  const pole = markShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.15, 4.8, 6),
+    poleMat
+  ));
+  pole.position.y = 2.4;
+  // Slight tilt for a natural beach look
+  pole.rotation.z = (index % 2 === 0 ? 0.06 : -0.06);
+  group.add(pole);
+
+  // --- Canopy: straw thatched layers (3 stacked cones, decreasing size) ---
+  const strawMat = createBeachMaterial({ color: 0xd4a843, roughness: 0.92 });
+  const strawDarkMat = createBeachMaterial({ color: 0xb8883a, roughness: 0.95 });
+
+  // Bottom layer — widest
+  const canopy1 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(3.8, 0.7, 12), strawMat));
+  canopy1.position.y = 4.8;
+  // Middle layer
+  const canopy2 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(2.8, 0.65, 12), strawDarkMat));
+  canopy2.position.y = 5.3;
+  // Top layer — smallest cap
+  const canopy3 = markShadow(new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.5, 10), strawMat));
+  canopy3.position.y = 5.8;
+  // Tip sphere
+  const tip = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), strawDarkMat));
+  tip.position.y = 6.1;
+  group.add(canopy1, canopy2, canopy3, tip);
+
+  // --- Sun Loungers (sdraio) — two on either side of the pole ---
+  const woodMat  = createBeachMaterial({ color: 0x8b5a2b, roughness: 0.80 });
+  const fabricMat = createBeachMaterial({ color: 0x4a8fc4, roughness: 0.65 }); // beach-blue
+  const fabricMat2 = createBeachMaterial({ color: 0xd4af37, roughness: 0.65 }); // golden
+
+  function makeLounger(side, mat) {
+    const lounger = new THREE.Group();
+
+    // Main flat bed
+    const bed = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.10, 2.0), mat));
+    bed.position.y = 0.30;
+    // Raised headrest
+    const headrest = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.30, 0.60), mat));
+    headrest.position.set(0, 0.45, -0.75);
+    headrest.rotation.x = -0.4;
+
+    // Two wooden side rails
+    [-0.35, 0.35].forEach((rx) => {
+      const rail = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 2.0), woodMat));
+      rail.position.set(rx, 0.25, 0);
+      lounger.add(rail);
+    });
+    // Four legs
+    [[-0.3, -0.8], [-0.3, 0.7], [0.3, -0.8], [0.3, 0.7]].forEach(([lx, lz]) => {
+      const leg = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 4), woodMat));
+      leg.position.set(lx, 0.15, lz);
+      lounger.add(leg);
+    });
+
+    lounger.add(bed, headrest);
+    // Position to one side of the umbrella
+    lounger.position.set(side * 1.4, 0, 0.2);
+    return lounger;
+  }
+
+  const lounger1 = makeLounger(-1, index % 2 === 0 ? fabricMat : fabricMat2);
+  lounger1.scale.setScalar(2.0);
+  lounger1.rotation.y = Math.PI;
+
+  const lounger2 = makeLounger(+1, index % 2 === 0 ? fabricMat2 : fabricMat);
+  lounger2.scale.setScalar(2.0);
+  lounger2.rotation.y = Math.PI;
+
+  group.add(lounger1, lounger2);
+
+  return group;
+}
+
+function addBeachUmbrellasStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+
+  // Place 30 thatched umbrella+lounger sets on the SEA SIDE (side=+1)
+  for (let index = 0; index < 30; index += 1) {
+    const progress = (index + 0.5) / 30;
+    // Alternate between depth rows on the beach, keeping them closer to the road to avoid the water
+    const depthOffset = (index % 4 === 0) ? 5.2 : (index % 4 === 1) ? 7.0 : (index % 4 === 2) ? 8.8 : 10.5;
+    const { position, rotationY } = safePlace(
+      curve, progress, +1,
+      +(roadHalfWidth + depthOffset),
+      roadHalfWidth, 5.0
+    );
+    const umbrellaGroup = createThatchedUmbrellaWithLoungers(index);
+    umbrellaGroup.position.copy(position);
+    umbrellaGroup.rotation.y = rotationY;
+    group.add(umbrellaGroup);
+  }
+}
+
+function addBeachLampPostsStrict(group, curve, trackDef) {
+  const roadHalfWidth = trackDef.roadWidth / 2;
+  const poleMaterial = createBeachMaterial({ color: 0xd4c8a0, roughness: 0.62 });
+  const topMaterial = createBeachMaterial({
+    color: 0xffd080,
+    emissive: 0xffd080,
+    emissiveIntensity: 0.7,
+    roughness: 0.36
+  });
+  const poleGeometry = new THREE.CylinderGeometry(0.2, 0.25, 7, 6);
+  const topGeometry = new THREE.SphereGeometry(0.5, 5, 4);
+
+  for (let index = 0; index < 16; index += 1) {
+    const side = -1;
+    const progress = (index + 0.25) / 16;
+    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 2.0);
+    const lamp = new THREE.Group();
+    lamp.name = "TropicalBeachLampPostStrict";
+    lamp.position.copy(position);
+    lamp.rotation.y = rotationY;
+
+    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
+    const top = markShadow(new THREE.Mesh(topGeometry, topMaterial));
+    pole.position.y = 3.5;
+    top.position.y = 7.3;
+    const light = new THREE.PointLight(0xffd080, 20, 18, 2);
+    light.position.y = 7.5;
+
+    lamp.add(pole, top, light);
+    group.add(lamp);
+  }
+}
+
+function createBeachCloud(seed = 0) {
+  const cloud = new THREE.Group();
+  cloud.name = "TropicalBeachCloud";
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xf7fbff,
+    roughness: 0.9,
+    metalness: 0,
+    flatShading: true,
+    fog: false
+  });
+  const geometry = new THREE.SphereGeometry(1, 8, 6);
+  const puffCount = 4 + (seed % 3);
+
+  for (let index = 0; index < puffCount; index += 1) {
+    const puff = new THREE.Mesh(geometry, material);
+    const side = index - (puffCount - 1) * 0.5;
+    puff.position.set(side * 4.2, (index % 2) * 0.7, pseudoRandom(seed + index) * 1.4);
+    puff.scale.set(
+      3.6 + pseudoRandom(seed + index * 1.7) * 1.7,
+      1.0 + pseudoRandom(seed + index * 2.3) * 0.45,
+      1.3 + pseudoRandom(seed + index * 3.1) * 0.6
+    );
+    puff.castShadow = false;
+    puff.receiveShadow = false;
+    cloud.add(puff);
+  }
+
+  return cloud;
+}
+
+function addBeachClouds(group) {
+  const cloudPositions = [
+    [-180, 48, -155, 0.25, 1.25],
+    [-70, 58, -235, -0.12, 1.55],
+    [92, 52, -190, 0.18, 1.35],
+    [190, 46, -70, -0.28, 1.45],
+    [-210, 54, 80, 0.08, 1.65],
+    [42, 62, 142, -0.2, 1.35],
+    [230, 56, 190, 0.14, 1.5]
+  ];
+
+  cloudPositions.forEach(([x, y, z, rotationY, scale], index) => {
+    const cloud = createBeachCloud(index);
+    cloud.position.set(x, y, z);
+    cloud.rotation.y = rotationY;
+    cloud.scale.setScalar(scale);
+    group.add(cloud);
+  });
+}
+
+export function buildBeachProps(group, curve, trackDef) {
+  const propsGroup = new THREE.Group();
+  propsGroup.name = "TropicalBeachProps";
+
+  addBeachGround(propsGroup);
+  addBeachOceanPlane(propsGroup, curve, trackDef);
+  addBeachClouds(propsGroup);
+  // addBeachCenterDashes(propsGroup, curve, trackDef);
+  addBeachTropicalPlants(propsGroup, curve, trackDef);
+  addBeachHutsStrict(propsGroup, curve, trackDef);
+  addBeachUmbrellasStrict(propsGroup, curve, trackDef);
+  addBeachPeople(propsGroup, curve, trackDef);
+  // addBeachLampPostsStrict(propsGroup, curve, trackDef);
+
+  group.add(propsGroup);
+  group.userData.disposeProps = () => {
+    propsGroup.traverse((child) => {
+      child.geometry?.dispose();
+
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material?.dispose();
+      }
+    });
+  };
 }
 
 export function addTrackProps(group, curve, definition) {

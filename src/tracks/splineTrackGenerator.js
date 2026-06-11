@@ -152,8 +152,8 @@ function addSegmentedNeonRoadEdges(group, edgeSamples, definition) {
   const segmentCount = Math.floor(totalDistance / NEON_EDGE_INTERVAL);
   const geometry = new THREE.BoxGeometry(NEON_EDGE_WIDTH, 0.035, NEON_EDGE_LENGTH);
   const materials = [
-    createNeonEdgeMaterial(0xff2090),
-    createNeonEdgeMaterial(0x00e5ff)
+    createNeonEdgeMaterial(0xffffff),
+    createNeonEdgeMaterial(0xff2020)
   ];
   const matrices = [[], []];
   const matrix = new THREE.Matrix4();
@@ -266,11 +266,16 @@ function getCurveSide(edgeSamples, index) {
 }
 
 function addApexCurbs(group, edgeSamples, definition, materials) {
-  if (definition.id !== "vegas") {
+  if (definition.id !== "monaco") {
     return;
   }
 
-  const curbGeometry = new THREE.BoxGeometry(CURB_WIDTH, 0.035, CURB_LENGTH);
+  const isVegas = definition.id === "vegas";
+  const curbWidth = isVegas ? 0.12 : CURB_WIDTH;
+  const curbHeight = isVegas ? 0.02 : 0.035;
+  const curbLength = isVegas ? CURB_LENGTH * 0.85 : CURB_LENGTH;
+  
+  const curbGeometry = new THREE.BoxGeometry(curbWidth, curbHeight, curbLength);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3(1, 1, 1);
@@ -278,6 +283,11 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
   const whiteMatrices = [];
 
   for (let index = 3; index < edgeSamples.length - 3; index += CURB_SAMPLE_STEP) {
+    const progress = index / (edgeSamples.length - 1);
+    if (progress < 0.05 || progress > 0.95) {
+      continue;
+    }
+
     const curveSide = getCurveSide(edgeSamples, index);
 
     if (curveSide === 0) {
@@ -288,8 +298,8 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
     const insideSide = -curveSide;
     const position = sample.center
       .clone()
-      .addScaledVector(sample.normal, insideSide * (sample.roadHalfWidth - CURB_WIDTH * 0.5));
-    position.y = ROAD_Y + 0.055;
+      .addScaledVector(sample.normal, insideSide * (sample.roadHalfWidth - curbWidth * 0.5));
+    position.y = ROAD_Y + (isVegas ? 0.02 : 0.055);
 
     quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), getHeading(sample.tangent));
     matrix.compose(position, quaternion, scale);
@@ -301,49 +311,135 @@ function addApexCurbs(group, edgeSamples, definition, materials) {
     }
   }
 
-  [
-    { matrices: redMatrices, material: materials.curbRed, name: "ApexCurbRed" },
-    { matrices: whiteMatrices, material: materials.curbWhite, name: "ApexCurbWhite" }
-  ].forEach(({ matrices, material, name }) => {
-    if (matrices.length === 0) {
-      return;
+  if (isVegas) {
+    const neonCurbMaterial = new THREE.MeshStandardMaterial({
+      color: 0x32f6ff,
+      emissive: 0x32f6ff,
+      emissiveIntensity: 2.8,
+      roughness: 0.2,
+      metalness: 0.1
+    });
+    const allMatrices = redMatrices.concat(whiteMatrices);
+    if (allMatrices.length > 0) {
+      const curbs = new THREE.InstancedMesh(curbGeometry, neonCurbMaterial, allMatrices.length);
+      curbs.name = `${definition.name}:ApexCurbNeon`;
+      allMatrices.forEach((curbMatrix, i) => curbs.setMatrixAt(i, curbMatrix));
+      curbs.instanceMatrix.needsUpdate = true;
+      group.add(curbs);
     }
-
-    const curbs = new THREE.InstancedMesh(curbGeometry, material, matrices.length);
-    curbs.name = `${definition.name}:${name}`;
-    curbs.receiveShadow = true;
-    matrices.forEach((curbMatrix, curbIndex) => curbs.setMatrixAt(curbIndex, curbMatrix));
-    curbs.instanceMatrix.needsUpdate = true;
-    group.add(curbs);
-  });
+  } else {
+    [
+      { matrices: redMatrices, material: materials.curbRed, name: "ApexCurbRed" },
+      { matrices: whiteMatrices, material: materials.curbWhite, name: "ApexCurbWhite" }
+    ].forEach(({ matrices, material, name }) => {
+      if (matrices.length === 0) {
+        return;
+      }
+      const curbs = new THREE.InstancedMesh(curbGeometry, material, matrices.length);
+      curbs.name = `${definition.name}:${name}`;
+      curbs.receiveShadow = true;
+      matrices.forEach((curbMatrix, curbIndex) => curbs.setMatrixAt(curbIndex, curbMatrix));
+      curbs.instanceMatrix.needsUpdate = true;
+      group.add(curbs);
+    });
+  }
 }
 
-function createBarrierSegment(material, start, end, height, thickness) {
+function createBarrierCollider(start, end, height, thickness) {
   const dx = end.x - start.x;
   const dz = end.z - start.z;
   const length = Math.hypot(dx, dz);
   const visualLength = length + 0.08;
-  const segment = new THREE.Mesh(new THREE.BoxGeometry(visualLength, height, thickness), material);
 
-  segment.position.set((start.x + end.x) * 0.5, height * 0.5, (start.z + end.z) * 0.5);
-  segment.rotation.y = -Math.atan2(dz, dx);
-  segment.castShadow = true;
-  segment.receiveShadow = true;
-  segment.userData.collider = {
-    center: segment.position.clone(),
-    rotationY: segment.rotation.y,
+  return {
+    center: new THREE.Vector3((start.x + end.x) * 0.5, height * 0.5, (start.z + end.z) * 0.5),
+    rotationY: -Math.atan2(dz, dx),
     halfLength: visualLength * 0.5,
     halfThickness: thickness * 0.5
   };
+}
 
-  return segment;
+function createBarrierRibbonGeometry(edgeSamples, side, offset, height, thickness) {
+  const vertices = [];
+  const indices = [];
+  const sampleCount = edgeSamples.length;
+
+  edgeSamples.forEach((sample) => {
+    const base = (side < 0 ? sample.left : sample.right)
+      .clone()
+      .addScaledVector(sample.normal, side * offset);
+    const outer = base.clone().addScaledVector(sample.normal, side * thickness);
+    base.y = ROAD_Y;
+    outer.y = ROAD_Y;
+
+    vertices.push(
+      base.x, ROAD_Y, base.z,
+      outer.x, ROAD_Y, outer.z,
+      base.x, ROAD_Y + height, base.z,
+      outer.x, ROAD_Y + height, outer.z
+    );
+  });
+
+  for (let index = 0; index < sampleCount - 1; index += 1) {
+    const current = index * 4;
+    const next = (index + 1) * 4;
+
+    indices.push(
+      current, next, current + 2,
+      current + 2, next, next + 2,
+      current + 1, current + 3, next + 1,
+      current + 3, next + 3, next + 1,
+      current + 2, next + 2, current + 3,
+      current + 3, next + 2, next + 3
+    );
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createBeachShoulderGeometry(edgeSamples, side, width) {
+  const vertices = [];
+  const indices = [];
+
+  edgeSamples.forEach((sample) => {
+    const roadEdge = side < 0 ? sample.left.clone() : sample.right.clone();
+    const shoulderEdge = roadEdge.clone().addScaledVector(sample.normal, side * width);
+    roadEdge.y = ROAD_Y + 0.012;
+    shoulderEdge.y = ROAD_Y + 0.012;
+
+    vertices.push(
+      roadEdge.x, roadEdge.y, roadEdge.z,
+      shoulderEdge.x, shoulderEdge.y, shoulderEdge.z
+    );
+  });
+
+  for (let index = 0; index < edgeSamples.length - 1; index += 1) {
+    const current = index * 2;
+    const next = (index + 1) * 2;
+    indices.push(current, next, current + 1, current + 1, next, next + 1);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function addBarriers(group, edgeSamples, definition, material) {
-  const barrierMeshes = [];
+  const colliders = [];
+  const matrices = [];
   const offset = definition.barrierOffset ?? 0.85;
   const height = definition.barrierHeight ?? 0.68;
   const thickness = definition.barrierThickness ?? 0.44;
+  const geometry = new THREE.BoxGeometry(1, height, thickness);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
 
   for (let index = 0; index < edgeSamples.length - 1; index += BARRIER_SAMPLE_STEP) {
     const current = edgeSamples[index];
@@ -352,16 +448,57 @@ function addBarriers(group, edgeSamples, definition, material) {
     const leftEnd = next.left.clone().addScaledVector(next.normal, -offset);
     const rightStart = current.right.clone().addScaledVector(current.normal, offset);
     const rightEnd = next.right.clone().addScaledVector(next.normal, offset);
-    const left = createBarrierSegment(material, leftStart, leftEnd, height, thickness);
-    const right = createBarrierSegment(material, rightStart, rightEnd, height, thickness);
+    const left = createBarrierCollider(leftStart, leftEnd, height, thickness);
+    const right = createBarrierCollider(rightStart, rightEnd, height, thickness);
 
-    left.name = `${definition.name}:LeftBarrier`;
-    right.name = `${definition.name}:RightBarrier`;
-    barrierMeshes.push(left, right);
-    group.add(left, right);
+    [left, right].forEach((collider) => {
+      quaternion.setFromAxisAngle(UP, collider.rotationY);
+      scale.set(collider.halfLength * 2, 1, 1);
+      matrix.compose(collider.center, quaternion, scale);
+      matrices.push(matrix.clone());
+      colliders.push(collider);
+    });
   }
 
-  return barrierMeshes;
+  if (definition.id === "beach") {
+    const shoulderMaterial = material.clone();
+    shoulderMaterial.color.setHex(0xe0c66f);
+    shoulderMaterial.side = THREE.DoubleSide;
+    const barrierMaterial = material.clone();
+    barrierMaterial.side = THREE.DoubleSide;
+    const shoulderWidth = offset;
+
+    [-1, 1].forEach((side) => {
+      if (shoulderWidth > 0) {
+        const shoulder = new THREE.Mesh(
+          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth),
+          shoulderMaterial
+        );
+        shoulder.name = `${definition.name}:BarrierShoulder:${side}`;
+        shoulder.receiveShadow = true;
+        group.add(shoulder);
+      }
+
+      const barrier = new THREE.Mesh(
+        createBarrierRibbonGeometry(edgeSamples, side, offset, height, thickness),
+        barrierMaterial
+      );
+      barrier.name = `${definition.name}:BarrierRibbon:${side}`;
+      barrier.receiveShadow = true;
+      group.add(barrier);
+    });
+    return colliders;
+  }
+
+  const barriers = new THREE.InstancedMesh(geometry, material, matrices.length);
+  barriers.name = `${definition.name}:Barriers`;
+  barriers.castShadow = definition.id !== "vegas";
+  barriers.receiveShadow = true;
+  matrices.forEach((barrierMatrix, index) => barriers.setMatrixAt(index, barrierMatrix));
+  barriers.instanceMatrix.needsUpdate = true;
+  group.add(barriers);
+
+  return colliders;
 }
 
 function createCheckpoints(curve, definition) {
@@ -380,7 +517,7 @@ function createCheckpoints(curve, definition) {
   });
 }
 
-function addStartLine(group, checkpoint, materials) {
+function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
   const startLine = new THREE.Group();
   startLine.name = "StartFinishLine";
   startLine.position.copy(checkpoint.position);
@@ -404,6 +541,46 @@ function addStartLine(group, checkpoint, materials) {
 
   group.add(startLine);
 
+  // Add starting grid slots/boxes behind the finish line.
+  // Sample the curve at each slot distance so slots follow the track curvature.
+  const startT = 0; // checkpoint is always at t=0
+  const totalLength = curve.getLength();
+  const gridDistances = [4.8, 8.8, 12.8, 16.8];
+  const gridSides = [1, -1, 1, -1];
+
+  gridDistances.forEach((dist, idx) => {
+    // Walk backwards along the curve by 'dist' meters
+    const backT = ((startT - dist / totalLength) + 1) % 1;
+    const slotPoint = curve.getPointAt(backT);
+    const slotTangent = curve.getTangentAt(backT).setY(0).normalize();
+    const slotNormal = new THREE.Vector3(-slotTangent.z, 0, slotTangent.x);
+    const side = gridSides[idx];
+    const sideOffset = side * roadHalfWidth * 0.44;
+
+    const slotPos = slotPoint.clone().addScaledVector(slotNormal, sideOffset);
+    slotPos.y = ROAD_Y + 0.051;
+
+    const slotGroup = new THREE.Group();
+    slotGroup.name = `StartGridSlot:${idx}`;
+    slotGroup.position.copy(slotPos);
+    slotGroup.rotation.y = getHeading(slotTangent);
+
+    const bracketMaterial = materials.startWhite;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.08), bracketMaterial);
+    line.receiveShadow = true;
+    slotGroup.add(line);
+
+    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
+    sideLeft.position.set(-0.8, 0, 0.2);
+    sideLeft.receiveShadow = true;
+    const sideRight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
+    sideRight.position.set(0.8, 0, 0.2);
+    sideRight.receiveShadow = true;
+
+    slotGroup.add(sideLeft, sideRight);
+    group.add(slotGroup);
+  });
+
   const checkpointMarker = new THREE.Group();
   checkpointMarker.name = "StartFinishCheckpointGate";
   checkpointMarker.position.copy(checkpoint.position);
@@ -426,7 +603,7 @@ function addStartGantry(group, checkpoint, materials) {
   const postHeight = 4.2;
   const postGeometry = new THREE.CylinderGeometry(0.24, 0.32, postHeight, 8);
   const topGeometry = new THREE.BoxGeometry(span, 0.58, 0.48);
-  const signGeometry = new THREE.BoxGeometry(4.7, 1.28, 0.16);
+  const signGeometry = new THREE.BoxGeometry(4.7, 1.28, 0.08);
   const leftPost = new THREE.Mesh(postGeometry, materials.startGantry);
   const rightPost = new THREE.Mesh(postGeometry, materials.startGantry);
   const top = new THREE.Mesh(topGeometry, materials.startGantry);
@@ -435,7 +612,9 @@ function addStartGantry(group, checkpoint, materials) {
   leftPost.position.set(-span * 0.5, postHeight * 0.5, 0);
   rightPost.position.set(span * 0.5, postHeight * 0.5, 0);
   top.position.set(0, postHeight, 0);
-  sign.position.set(0, postHeight - 0.02, 0.32);
+  
+  // Shift sign to the grid-facing side (z = -0.28) and rotate by PI so it faces the player
+  sign.position.set(0, postHeight - 0.02, -0.28);
   sign.rotation.y = Math.PI;
 
   [leftPost, rightPost, top, sign].forEach((mesh) => {
@@ -444,6 +623,38 @@ function addStartGantry(group, checkpoint, materials) {
   });
 
   gantry.add(leftPost, rightPost, top, sign);
+
+  // Add dynamic F1 starting light lamps under the gantry crossbar facing the starting grid
+  const lightsGroup = new THREE.Group();
+  lightsGroup.name = "GantryStartLights";
+  lightsGroup.position.set(0, postHeight - 0.44, -0.25);
+
+  const lampGeom = new THREE.SphereGeometry(0.16, 12, 12);
+  const backboard = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.48, 0.08), materials.startGantry);
+  backboard.castShadow = true;
+  backboard.receiveShadow = true;
+  lightsGroup.add(backboard);
+
+  const lamps = [];
+  for (let i = 0; i < 3; i++) {
+    const lampMat = new THREE.MeshStandardMaterial({
+      color: 0x1f1f24,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
+      roughness: 0.22,
+      metalness: 0.1,
+      flatShading: true
+    });
+    const lamp = new THREE.Mesh(lampGeom, lampMat);
+    lamp.position.set((i - 1) * 0.46, 0, 0.05);
+    lamp.castShadow = true;
+    lamp.receiveShadow = true;
+    lightsGroup.add(lamp);
+    lamps.push(lampMat);
+  }
+  lightsGroup.userData.lamps = lamps;
+  gantry.add(lightsGroup);
+
   group.add(gantry);
 }
 
@@ -528,7 +739,7 @@ function disposeObjectTree(group) {
   });
 }
 
-export function createSplineTrack(definition) {
+export function createSplineTrack(definition, propsBuilder = addTrackProps) {
   const group = new THREE.Group();
   group.name = `${definition.name} Track`;
 
@@ -546,28 +757,24 @@ export function createSplineTrack(definition) {
 
   group.add(ground, road);
 
-  if (definition.id === "vegas") {
-    addSegmentedNeonRoadEdges(group, roadData.edgeSamples, definition);
-  } else {
-    const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
-    leftEdge.name = `${definition.name}:LeftRoadEdge`;
-    leftEdge.receiveShadow = true;
+  const leftEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, -1), materials.roadEdge);
+  leftEdge.name = `${definition.name}:LeftRoadEdge`;
+  leftEdge.receiveShadow = true;
 
-    const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
-    rightEdge.name = `${definition.name}:RightRoadEdge`;
-    rightEdge.receiveShadow = true;
+  const rightEdge = new THREE.Mesh(createEdgeRibbonGeometry(roadData.edgeSamples, 1), materials.roadEdge);
+  rightEdge.name = `${definition.name}:RightRoadEdge`;
+  rightEdge.receiveShadow = true;
 
-    group.add(leftEdge, rightEdge);
-  }
+  group.add(leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
-  const barrierMeshes = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
+  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
   const checkpoints = createCheckpoints(curve, definition);
-  addStartLine(group, checkpoints[0], materials);
+  addStartLine(group, checkpoints[0], materials, curve, roadHalfWidth);
   addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
-  addTrackProps(group, curve, definition);
+  propsBuilder(group, curve, definition);
 
   group.userData.trackInfo = {
     id: definition.id,
@@ -578,7 +785,7 @@ export function createSplineTrack(definition) {
     centerline,
     checkpoints,
     boostPads,
-    barrierColliders: barrierMeshes.map((mesh) => mesh.userData.collider),
+    barrierColliders,
     minimapBounds: getMinimapBounds(centerline, roadHalfWidth + 8),
     lightingMode: definition.lightingMode,
     skyboxTheme: definition.skyboxTheme,
