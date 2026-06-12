@@ -5,6 +5,7 @@ import {
   VEHICLE_OPTIONS,
   getRaceSetupLabels
 } from "../config/raceOptions.js";
+import { AudioManager } from "../systems/AudioManager.js";
 import logoUrl from "../assets/ui/kart-racing-logo.png";
 import kartImageUrl from "../assets/ui/vehicles/kart.png";
 import porscheImageUrl from "../assets/ui/vehicles/porsche.png";
@@ -54,6 +55,7 @@ const VEHICLE_IMAGES = {
 export function createSetupMenu({ onStart }) {
   const setup = { ...DEFAULT_RACE_SETUP };
   let currentStepIndex = 0;
+  const menuAudio = new AudioManager({ masterVolume: 0.12 });
 
   const menu = document.createElement("section");
   menu.className = "setup-menu";
@@ -115,6 +117,7 @@ export function createSetupMenu({ onStart }) {
     const actionButton = event.target.closest("[data-carousel-action]");
 
     if (actionButton) {
+      menuAudio.playUiSelect();
       moveSelection(Number(actionButton.dataset.carouselAction));
       return;
     }
@@ -126,21 +129,25 @@ export function createSetupMenu({ onStart }) {
     }
 
     setup[SETUP_STEPS[currentStepIndex].key] = optionButton.dataset.optionId;
+    menuAudio.playUiSelect();
     render();
   });
 
   backButton.addEventListener("click", () => {
+    menuAudio.playUiSelect();
     currentStepIndex = Math.max(0, currentStepIndex - 1);
     render();
   });
 
   nextButton.addEventListener("click", () => {
     if (currentStepIndex < SETUP_STEPS.length - 1) {
+      menuAudio.playUiConfirm();
       currentStepIndex += 1;
       render();
       return;
     }
 
+    menuAudio.playUiConfirm();
     menu.hidden = true;
     onStart?.({ ...setup });
   });
@@ -165,6 +172,9 @@ export function createSetupMenu({ onStart }) {
     },
     hide: () => {
       menu.hidden = true;
+    },
+    dispose: () => {
+      menuAudio.dispose();
     }
   };
 }

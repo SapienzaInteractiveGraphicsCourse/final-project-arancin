@@ -31,6 +31,10 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.porscheHeadlightBeams = [];
     this.frontLightMaterials = [];
     this.rearLightMaterials = [];
+    this.exhaustPopGroup = null;
+    this.exhaustPopFlames = [];
+    this.exhaustPopLight = null;
+    this.exhaustPopTimer = 0;
     this.loadPromise = Promise.resolve(null);
 
     if (typeof window !== "undefined") {
@@ -75,6 +79,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.applyImportedMaterials(model);
     this.collectWheelNodes(model);
     this.createHeadlightEffects();
+    this.createExhaustPopEffect();
     this.setHeadlights(this.headlightsEnabled);
   }
 
@@ -206,6 +211,54 @@ export class PorscheVehicle extends PlaceholderVehicle {
     });
   }
 
+  createExhaustPopEffect() {
+    const flameMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff8a1f,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const coreMaterial = new THREE.MeshBasicMaterial({
+      color: 0xfff0a3,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const flameGeometry = new THREE.ConeGeometry(0.12, 0.42, 18);
+    const coreGeometry = new THREE.ConeGeometry(0.06, 0.28, 16);
+    const exhaustPositions = [
+      [-0.28, 0.26, -2.05],
+      [0.28, 0.26, -2.05]
+    ];
+
+    this.exhaustPopGroup = new THREE.Group();
+    this.exhaustPopGroup.name = "PorscheExhaustPopEffect";
+    this.exhaustPopGroup.visible = false;
+
+    exhaustPositions.forEach(([x, y, z], index) => {
+      const flame = new THREE.Mesh(flameGeometry, flameMaterial.clone());
+      const core = new THREE.Mesh(coreGeometry, coreMaterial.clone());
+      const flameGroup = new THREE.Group();
+
+      flame.name = `PorscheExhaustPopFlame:${index}`;
+      core.name = `PorscheExhaustPopCore:${index}`;
+      flame.rotation.x = -Math.PI / 2;
+      core.rotation.x = -Math.PI / 2;
+      flame.position.z = -0.18;
+      core.position.z = -0.14;
+      flameGroup.position.set(x, y, z);
+      flameGroup.scale.setScalar(0.01);
+      flameGroup.add(flame, core);
+      this.exhaustPopGroup.add(flameGroup);
+      this.exhaustPopFlames.push(flameGroup);
+    });
+
+    this.exhaustPopLight = new THREE.PointLight(0xff8a1f, 0, 1.6, 2);
+    this.exhaustPopLight.position.set(0, 0.28, -2.18);
+    this.exhaustPopGroup.add(this.exhaustPopLight);
+    this.modelPivot.add(this.exhaustPopGroup);
+  }
+
   update(deltaTime, state = {}) {
     if (!this.importedModel) {
       super.update(deltaTime, state);
@@ -220,6 +273,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.updateSteeringVisuals(steering);
     this.modelPivot.rotation.z = -steering * speedRatio * 0.08;
     this.modelPivot.rotation.x = Math.abs(steering) * speedRatio * 0.02;
+    this.updateExhaustPop(deltaTime);
   }
 
   updateWheelRotation(distanceTravelled) {
@@ -260,5 +314,45 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.rearLightMaterials.forEach((material) => {
       material.emissiveIntensity = this.headlightsEnabled ? 0.9 : 0;
     });
+  }
+
+  triggerExhaustPop() {
+    if (!this.exhaustPopGroup) {
+      return;
+    }
+
+    this.exhaustPopTimer = 0.18;
+    this.exhaustPopGroup.visible = true;
+    this.exhaustPopFlames.forEach((flameGroup) => {
+      flameGroup.rotation.z = (Math.random() - 0.5) * 0.16;
+      flameGroup.scale.setScalar(0.85 + Math.random() * 0.3);
+    });
+  }
+
+  updateExhaustPop(deltaTime) {
+    if (!this.exhaustPopGroup || this.exhaustPopTimer <= 0) {
+      if (this.exhaustPopGroup) {
+        this.exhaustPopGroup.visible = false;
+      }
+      return;
+    }
+
+    this.exhaustPopTimer = Math.max(0, this.exhaustPopTimer - deltaTime);
+    const progress = this.exhaustPopTimer / 0.18;
+    const opacity = Math.min(1, progress * 1.6);
+    const scale = 0.35 + progress * 0.85;
+
+    this.exhaustPopFlames.forEach((flameGroup) => {
+      flameGroup.scale.setScalar(scale);
+      flameGroup.children.forEach((child) => {
+        child.material.opacity = child.name.includes("Core") ? opacity * 0.9 : opacity * 0.72;
+      });
+    });
+
+    if (this.exhaustPopLight) {
+      this.exhaustPopLight.intensity = opacity * 1.4;
+    }
+
+    this.exhaustPopGroup.visible = this.exhaustPopTimer > 0;
   }
 }

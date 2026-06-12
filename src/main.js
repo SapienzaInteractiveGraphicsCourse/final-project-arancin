@@ -34,4 +34,5 @@ function returnToSetup() {
 
 window.addEventListener("beforeunload", () => {
   sceneApp?.dispose();
+  setupMenu.dispose();
 });
