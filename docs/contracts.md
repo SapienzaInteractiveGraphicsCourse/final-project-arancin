@@ -668,10 +668,14 @@ audioManager.disable()
 audioManager.toggle() -> Promise<boolean>
 audioManager.setMasterVolume(volume)
 audioManager.update(deltaTime, vehicleState, inputState) -> { enginePop }
+audioManager.playUiSelect()
+audioManager.playUiConfirm()
 audioManager.playCountdown(step)
 audioManager.playCheckpoint()
+audioManager.playLapComplete({ bestLap })
 audioManager.playCollision()
 audioManager.playBoost()
+audioManager.playFinish()
 audioManager.dispose()
 ```
 

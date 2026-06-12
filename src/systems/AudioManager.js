@@ -161,8 +161,46 @@ export class AudioManager {
   }
 
   playCountdown(step = 0) {
+    if (step <= 0) {
+      this.playRaceStart();
+      return;
+    }
+
     const frequency = step <= 1 ? 660 : 520;
     this.playTone({ frequency, duration: 0.09, gain: 0.1, type: "square" });
+  }
+
+  playUiSelect() {
+    void this.playWithContext(() => {
+      this.playTone({
+        frequency: 620,
+        duration: 0.045,
+        gain: 0.035,
+        type: "triangle",
+        allowDisabled: true
+      });
+    });
+  }
+
+  playUiConfirm() {
+    void this.playWithContext(() => {
+      this.playTone({
+        frequency: 760,
+        duration: 0.055,
+        gain: 0.045,
+        type: "triangle",
+        allowDisabled: true
+      });
+      window.setTimeout(() => {
+        this.playTone({
+          frequency: 1040,
+          duration: 0.06,
+          gain: 0.035,
+          type: "sine",
+          allowDisabled: true
+        });
+      }, 52);
+    });
   }
 
   playCheckpoint() {
@@ -170,6 +208,18 @@ export class AudioManager {
     window.setTimeout(() => {
       this.playTone({ frequency: 980, duration: 0.07, gain: 0.07, type: "triangle" });
     }, 70);
+  }
+
+  playLapComplete({ bestLap = false } = {}) {
+    this.playTone({ frequency: bestLap ? 820 : 680, duration: 0.08, gain: 0.1, type: "triangle" });
+    window.setTimeout(() => {
+      this.playTone({ frequency: bestLap ? 1120 : 880, duration: 0.08, gain: 0.08, type: "triangle" });
+    }, 75);
+    if (bestLap) {
+      window.setTimeout(() => {
+        this.playTone({ frequency: 1320, duration: 0.07, gain: 0.06, type: "sine" });
+      }, 145);
+    }
   }
 
   playCollision() {
@@ -207,6 +257,53 @@ export class AudioManager {
     oscillator.stop(time + 0.26);
   }
 
+  playRaceStart() {
+    void this.playWithContext(() => {
+      if (!this.context || !this.masterGain) {
+        return;
+      }
+
+      const time = this.context.currentTime;
+      const oscillator = this.context.createOscillator();
+      const harmonic = this.context.createOscillator();
+      const filter = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+
+      oscillator.type = "sawtooth";
+      harmonic.type = "triangle";
+      oscillator.frequency.setValueAtTime(180, time);
+      oscillator.frequency.exponentialRampToValueAtTime(720, time + 0.34);
+      harmonic.frequency.setValueAtTime(360, time);
+      harmonic.frequency.exponentialRampToValueAtTime(1440, time + 0.34);
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(460, time);
+      filter.frequency.exponentialRampToValueAtTime(1500, time + 0.34);
+      filter.Q.value = 0.95;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(0.13, time + 0.04);
+      gain.gain.setValueAtTime(0.13, time + 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.42);
+      oscillator.connect(filter);
+      harmonic.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      oscillator.start(time);
+      harmonic.start(time);
+      oscillator.stop(time + 0.44);
+      harmonic.stop(time + 0.44);
+    });
+  }
+
+  playFinish() {
+    this.playTone({ frequency: 660, duration: 0.08, gain: 0.1, type: "triangle" });
+    window.setTimeout(() => {
+      this.playTone({ frequency: 880, duration: 0.08, gain: 0.085, type: "triangle" });
+    }, 85);
+    window.setTimeout(() => {
+      this.playTone({ frequency: 1180, duration: 0.12, gain: 0.075, type: "sine" });
+    }, 170);
+  }
+
   dispose() {
     this.disposed = true;
     this.disable();
@@ -240,6 +337,29 @@ export class AudioManager {
     this.masterGain.connect(this.context.destination);
 
     return this.context;
+  }
+
+  async playWithContext(callback) {
+    if (this.disposed) {
+      return false;
+    }
+
+    const context = this.ensureContext();
+
+    if (!context) {
+      return false;
+    }
+
+    try {
+      if (context.state === "suspended") {
+        await context.resume();
+      }
+
+      callback();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   startEngineLoop() {
@@ -409,8 +529,8 @@ export class AudioManager {
     source.stop(time + duration + 0.01);
   }
 
-  playTone({ frequency, duration, gain, type = "sine" }) {
-    if (!this.enabled || !this.context || !this.masterGain) {
+  playTone({ frequency, duration, gain, type = "sine", allowDisabled = false }) {
+    if ((!this.enabled && !allowDisabled) || !this.context || !this.masterGain) {
       return;
     }
 
