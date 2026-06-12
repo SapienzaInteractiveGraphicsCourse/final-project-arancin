@@ -95,7 +95,8 @@ export class AiVehicleController {
       heading: this.heading,
       progress: this.progress,
       lap: this.lap,
-      speed: this.speed
+      speed: this.speed,
+      hasCrossedStartLine: this.hasCrossedStartLine
     };
   }
 
