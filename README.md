@@ -24,6 +24,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] `feature/tracks`: 3 piste principali.
 - [x] `feature/race-systems`: countdown, giri, checkpoint, time trial, finish screen, AI base e contromano.
 - [ ] `feature/hud-minimap`: HUD e minimappa.
+- [ ] `fix/performance-polish`: alleggerimento, loading veicoli, UI polish e ghost time trial.
 - [ ] `docs/project-report`: relazione/manuale finale.
 
 ## 1. Project Skeleton
@@ -472,3 +473,15 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [ ] AI e collisioni.
 - [ ] Limitazioni note.
 - [ ] Screenshot finali.
+
+## 13. Performance, Polish E Ghost
+
+- [ ] Documentare `docs/performance-polish.md`.
+- [ ] Alleggerire mappe pesanti senza cambiare gameplay.
+- [ ] Eliminare flash del placeholder su Porsche/Silvia.
+- [ ] Indagare caricamento e tempo minimo overlay dei veicoli importati.
+- [x] Migliorare leggibilita HUD, tempi e testi runtime.
+- [x] Unificare HUD sinistra/destra in un pannello runtime piu pulito.
+- [x] Alzare menu setup riducendo margine verticale senza ridurre il logo.
+- [x] Correggere avanzamento checkpoint iniziale sul traguardo.
+- [ ] Aggiungere ghost del best lap in time trial.

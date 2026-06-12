@@ -316,6 +316,9 @@ Regole:
 - `RaceManager` non deve dipendere direttamente da mesh o DOM;
 - deve funzionare anche con `trackInfo.checkpoints = []`;
 - un giro completo si chiude sulla start/finish line dopo aver attraversato i checkpoint intermedi;
+- la start/finish line resta nel conteggio totale dei checkpoint della pista;
+- alla partenza la start/finish line non deve essere consumata come primo checkpoint appena il veicolo passa sul traguardo;
+- l'HUD puo mostrare il checkpoint come rapporto dinamico `current/total`, usando `checkpointCount` dalla pista;
 - `race` abilita logica futura per AI;
 - in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
