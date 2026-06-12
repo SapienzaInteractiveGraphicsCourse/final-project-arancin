@@ -97,7 +97,13 @@ function formatCheckpoint(raceState) {
     return "Checkpoint --";
   }
 
-  return `Checkpoint ${raceState.currentCheckpoint + 1}/${raceState.checkpointCount}`;
+  const checkpointCount = raceState.checkpointCount;
+  const checkpointIndex = raceState.currentCheckpoint === 0
+    ? checkpointCount
+    : Math.min(raceState.currentCheckpoint, checkpointCount);
+  const displayIndex = raceState.phase === "running" ? checkpointIndex : 0;
+
+  return `Checkpoint ${displayIndex}/${checkpointCount}`;
 }
 
 function formatSurface(surfaceType) {

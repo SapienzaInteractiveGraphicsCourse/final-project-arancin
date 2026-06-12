@@ -55,7 +55,8 @@ export function startScenePreview(container, setup, options = {}) {
   const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
   const audioManager = new AudioManager({
-    vehicleId: setup.vehicleId
+    vehicleId: setup.vehicleId,
+    trackId: setup.trackId
   });
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
@@ -126,6 +127,7 @@ export function startScenePreview(container, setup, options = {}) {
   let lastAudioBestLapTime = savedBestLapTime;
   let lastAudioFinished = false;
   let lastAudioBoostActive = false;
+  let lastAudioRacePosition = raceManager.getState().position;
   let lastAudioRacePhase = raceManager.getState().phase;
 
   applyTrackSceneTheme(scene, track.trackInfo);
@@ -218,6 +220,7 @@ export function startScenePreview(container, setup, options = {}) {
     lastAudioBestLapTime = raceState.bestLapTime;
     lastAudioFinished = raceState.finished;
     lastAudioBoostActive = false;
+    lastAudioRacePosition = raceState.position;
     lastAudioRacePhase = raceState.phase;
   }
 
@@ -429,6 +432,18 @@ export function startScenePreview(container, setup, options = {}) {
       audioManager.playCollision();
     }
 
+    if (
+      raceState.phase === RACE_PHASES.RUNNING
+      && raceState.participantCount > 1
+      && raceState.position !== lastAudioRacePosition
+    ) {
+      if (raceState.position < lastAudioRacePosition) {
+        audioManager.playCrowdCheer();
+      } else {
+        audioManager.playCrowdDisappointment();
+      }
+    }
+
     if (raceState.lapTimes.length > lastAudioLapCount) {
       const bestLap = raceState.bestLapTime !== lastAudioBestLapTime;
       if (!raceState.finished) {
@@ -437,15 +452,24 @@ export function startScenePreview(container, setup, options = {}) {
       lastAudioLapCount = raceState.lapTimes.length;
       lastAudioBestLapTime = raceState.bestLapTime;
     } else if (raceState.currentCheckpoint !== lastAudioCheckpoint && raceState.phase === RACE_PHASES.RUNNING) {
-      audioManager.playCheckpoint();
+      const crossedInitialStart = lastAudioCheckpoint === 0 && raceState.currentCheckpoint === 1;
+      if (!crossedInitialStart) {
+        audioManager.playCheckpoint();
+      }
     }
 
     if (raceState.finished && !lastAudioFinished) {
       audioManager.playFinish();
+      if (raceState.participantCount > 1 && raceState.position === 1) {
+        audioManager.playCrowdCheer();
+      } else if (raceState.participantCount > 1 && raceState.position === raceState.participantCount) {
+        audioManager.playCrowdDisappointment();
+      }
     }
 
     lastAudioCheckpoint = raceState.currentCheckpoint;
     lastAudioFinished = raceState.finished;
+    lastAudioRacePosition = raceState.position;
     lastAudioRacePhase = raceState.phase;
   }
 
@@ -620,7 +644,10 @@ function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) 
 
   const playerProgress = findClosestProgress(centerline, playerState.position.x, playerState.position.z);
   const playerScore = getRaceProgressScore(raceState.currentLap, playerProgress, raceState.totalLaps);
-  const aiScore = getRaceProgressScore(aiState.lap, aiState.progress, raceState.totalLaps);
+  const aiProgress = !aiState.hasCrossedStartLine && aiState.progress > 0.5
+    ? aiState.progress - 1
+    : aiState.progress;
+  const aiScore = getRaceProgressScore(aiState.lap, aiProgress, raceState.totalLaps);
   const playerPosition = playerScore >= aiScore ? 1 : 2;
 
   raceManager.setPlayerPosition(playerPosition, 2);

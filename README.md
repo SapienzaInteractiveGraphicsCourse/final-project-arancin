@@ -411,14 +411,14 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 ## 9. Audio
 
-- [ ] Web Audio API.
-- [ ] Motore continuo non invasivo.
-- [ ] Volume master basso.
-- [ ] Audio abilitato solo dopo gesto utente.
-- [ ] Suono checkpoint.
-- [ ] Suono countdown.
-- [ ] Suono collisione.
-- [ ] Suono boost.
+- [x] Web Audio API.
+- [x] Motore continuo non invasivo.
+- [x] Volume master basso.
+- [x] Audio abilitato solo dopo gesto utente.
+- [x] Suono checkpoint.
+- [x] Suono countdown.
+- [x] Suono collisione.
+- [x] Suono boost.
 - [ ] Toggle audio.
 
 ## 10. Ambiente E Animazioni

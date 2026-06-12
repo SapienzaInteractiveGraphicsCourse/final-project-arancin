@@ -38,6 +38,9 @@ This register tracks assets that are not authored procedurally by the team.
 | Kart deceleration sample | `src/assets/audio/kart-decelerate.wav` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
 | Porsche engine sample | `src/assets/audio/porsche-engine.mp3` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
 | Nissan Silvia engine sample | `src/assets/audio/silvia-engine.mp3` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+| Crowd cheering loop | `src/assets/audio/crowd-cheering-main.mp3` | Integrated as low-volume crowd ambience for Vegas Neon and Monaco Formula 1; source/license to verify |
+| Crowd final cheering | `src/assets/audio/crowd-final-cheering.mp3` | Integrated as crowd overlay for overtake and first-place finish events; source/license to verify |
+| Crowd disappointment | `src/assets/audio/crowd-disappointment.mp3` | Integrated as crowd overlay for being overtaken and last-place finish events; source/license to verify |
 
 ## Follow-up Checks
 

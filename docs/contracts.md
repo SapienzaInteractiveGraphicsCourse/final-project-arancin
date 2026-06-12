@@ -662,7 +662,7 @@ File: `src/systems/AudioManager.js`
 Firma:
 
 ```js
-const audioManager = new AudioManager({ masterVolume, vehicleId });
+const audioManager = new AudioManager({ masterVolume, vehicleId, trackId });
 audioManager.enable() -> Promise<boolean>
 audioManager.disable()
 audioManager.toggle() -> Promise<boolean>
@@ -676,6 +676,8 @@ audioManager.playLapComplete({ bestLap })
 audioManager.playCollision()
 audioManager.playBoost()
 audioManager.playFinish()
+audioManager.playCrowdCheer()
+audioManager.playCrowdDisappointment()
 audioManager.dispose()
 ```
 
@@ -683,6 +685,7 @@ Regole:
 
 - usa Web Audio API;
 - usa un motore procedurale morbido per veicolo, con oscillatori, filtro e rumore leggero;
+- usa ambience discreta per pista, avviata insieme all'audio dopo gesto utente;
 - crea o riprende `AudioContext` solo dopo gesto utente;
 - mantiene volume master basso di default;
 - `update()` puo usare `vehicleState.speed`, `speedRatio` e input tenuti per modulare motore, filtro e volume;

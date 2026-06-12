@@ -1,3 +1,7 @@
+import crowdCheeringMainUrl from "../assets/audio/crowd-cheering-main.mp3";
+import crowdDisappointmentUrl from "../assets/audio/crowd-disappointment.mp3";
+import crowdFinalCheeringUrl from "../assets/audio/crowd-final-cheering.mp3";
+
 const DEFAULT_MASTER_VOLUME = 0.18;
 const COLLISION_COOLDOWN_SECONDS = 0.22;
 
@@ -67,16 +71,57 @@ const ENGINE_PROFILES = {
   }
 };
 
+const AMBIENCE_PROFILES = {
+  vegas: {
+    mainCrowdUrl: crowdCheeringMainUrl,
+    mainCrowdGain: 0.042,
+    mainCrowdFilter: 1800,
+    eventGain: 0.16
+  },
+  beach: {
+    noiseGain: 0.014,
+    noiseFilter: 520,
+    noiseQ: 0.55,
+    noiseSmoothing: 0.965,
+    humFrequency: 0,
+    humGain: 0,
+    pulseFrequency: 0.085,
+    pulseDepth: 0.62,
+    eventGain: 0.11
+  },
+  monaco: {
+    mainCrowdUrl: crowdCheeringMainUrl,
+    mainCrowdGain: 0.035,
+    mainCrowdFilter: 1450,
+    eventGain: 0.14
+  }
+};
+
 export class AudioManager {
   constructor({
     masterVolume = DEFAULT_MASTER_VOLUME,
-    vehicleId = "kart"
+    vehicleId = "kart",
+    trackId = "vegas"
   } = {}) {
     this.masterVolume = clamp(masterVolume, 0, 1);
     this.engineProfile = ENGINE_PROFILES[vehicleId] ?? ENGINE_PROFILES.kart;
+    this.ambienceProfile = AMBIENCE_PROFILES[trackId] ?? null;
     this.enabled = false;
     this.context = null;
     this.masterGain = null;
+    this.ambienceGain = null;
+    this.ambienceNoiseSource = null;
+    this.ambienceNoiseFilter = null;
+    this.ambienceNoiseGain = null;
+    this.ambienceHumOscillator = null;
+    this.ambienceHumGain = null;
+    this.ambiencePulseOscillator = null;
+    this.ambiencePulseGain = null;
+    this.ambienceAccentTimer = 0;
+    this.sampleBuffers = new Map();
+    this.crowdSource = null;
+    this.crowdGain = null;
+    this.crowdFilter = null;
     this.engineOscillator = null;
     this.engineHarmonic = null;
     this.engineGain = null;
@@ -111,6 +156,7 @@ export class AudioManager {
       }
 
       this.startEngineLoop();
+      this.startAmbienceLoop();
       return true;
     } catch {
       this.enabled = false;
@@ -121,6 +167,7 @@ export class AudioManager {
   disable() {
     this.enabled = false;
     this.stopEngineLoop();
+    this.stopAmbienceLoop();
   }
 
   async toggle() {
@@ -143,6 +190,7 @@ export class AudioManager {
   update(deltaTime = 0, vehicleState = {}, inputState = {}) {
     this.collisionCooldown = Math.max(0, this.collisionCooldown - Math.max(0, deltaTime));
     this.popCooldown = Math.max(0, this.popCooldown - Math.max(0, deltaTime));
+    this.updateAmbienceAccents(deltaTime);
 
     if (!this.enabled || !this.context || !this.engineGain || !this.engineOscillator) {
       return { enginePop: false };
@@ -304,6 +352,14 @@ export class AudioManager {
     }, 170);
   }
 
+  playCrowdCheer() {
+    void this.playCrowdSample(crowdFinalCheeringUrl);
+  }
+
+  playCrowdDisappointment() {
+    void this.playCrowdSample(crowdDisappointmentUrl);
+  }
+
   dispose() {
     this.disposed = true;
     this.disable();
@@ -362,6 +418,60 @@ export class AudioManager {
     }
   }
 
+  async loadSampleBuffer(url) {
+    if (!this.context || !url) {
+      return null;
+    }
+
+    if (this.sampleBuffers.has(url)) {
+      return this.sampleBuffers.get(url);
+    }
+
+    try {
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = await this.context.decodeAudioData(arrayBuffer);
+      this.sampleBuffers.set(url, buffer);
+      return buffer;
+    } catch {
+      this.sampleBuffers.set(url, null);
+      return null;
+    }
+  }
+
+  async playCrowdSample(url) {
+    const profile = this.ambienceProfile;
+
+    if (!this.enabled || !this.context || !this.masterGain || !profile?.eventGain) {
+      return;
+    }
+
+    const buffer = await this.loadSampleBuffer(url);
+
+    if (!this.enabled || !this.context || !this.masterGain || !buffer) {
+      return;
+    }
+
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+    const time = this.context.currentTime;
+
+    source.buffer = buffer;
+    filter.type = "lowpass";
+    filter.frequency.value = (profile.mainCrowdFilter ?? 1250) + 900;
+    filter.Q.value = 0.35;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(profile.eventGain, time + 0.08);
+    gain.gain.setValueAtTime(profile.eventGain, time + Math.min(1.2, buffer.duration * 0.65));
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.min(buffer.duration, 2.4));
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    source.start(time);
+    source.stop(time + Math.min(buffer.duration, 2.5));
+  }
+
   startEngineLoop() {
     if (!this.enabled || !this.context || this.engineOscillator || !this.masterGain) {
       return;
@@ -408,6 +518,62 @@ export class AudioManager {
     this.engineNoiseSource.start();
   }
 
+  startAmbienceLoop() {
+    if (!this.enabled || !this.context || !this.ambienceProfile || this.ambienceNoiseSource || !this.masterGain) {
+      return;
+    }
+
+    const profile = this.ambienceProfile;
+
+    if (profile.mainCrowdUrl) {
+      void this.startCrowdLoop(profile);
+      return;
+    }
+
+    const time = this.context.currentTime;
+
+    this.ambienceGain = this.context.createGain();
+    this.ambienceNoiseSource = this.context.createBufferSource();
+    this.ambienceNoiseFilter = this.context.createBiquadFilter();
+    this.ambienceNoiseGain = this.context.createGain();
+    this.ambiencePulseOscillator = this.context.createOscillator();
+    this.ambiencePulseGain = this.context.createGain();
+
+    this.ambienceGain.gain.setValueAtTime(0.0001, time);
+    this.ambienceGain.gain.exponentialRampToValueAtTime(1, time + 0.8);
+    this.ambienceNoiseSource.buffer = createAmbienceNoiseBuffer(this.context, profile.noiseSmoothing);
+    this.ambienceNoiseSource.loop = true;
+    this.ambienceNoiseFilter.type = profile.noiseFilterType ?? "bandpass";
+    this.ambienceNoiseFilter.frequency.value = profile.noiseFilter;
+    this.ambienceNoiseFilter.Q.value = profile.noiseQ;
+    this.ambienceNoiseGain.gain.value = profile.noiseGain;
+    this.ambiencePulseOscillator.type = "sine";
+    this.ambiencePulseOscillator.frequency.value = profile.pulseFrequency;
+    this.ambiencePulseGain.gain.value = profile.noiseGain * profile.pulseDepth;
+
+    this.ambienceNoiseSource.connect(this.ambienceNoiseFilter);
+    this.ambienceNoiseFilter.connect(this.ambienceNoiseGain);
+    this.ambiencePulseOscillator.connect(this.ambiencePulseGain);
+    this.ambiencePulseGain.connect(this.ambienceNoiseGain.gain);
+    this.ambienceNoiseGain.connect(this.ambienceGain);
+
+    if (profile.humFrequency > 0 && profile.humGain > 0) {
+      this.ambienceHumOscillator = this.context.createOscillator();
+      this.ambienceHumGain = this.context.createGain();
+      this.ambienceHumOscillator.type = "sine";
+      this.ambienceHumOscillator.frequency.value = profile.humFrequency;
+      this.ambienceHumGain.gain.value = profile.humGain;
+      this.ambienceHumOscillator.connect(this.ambienceHumGain);
+      this.ambienceHumGain.connect(this.ambienceGain);
+      this.ambienceHumOscillator.start();
+    }
+
+    this.ambienceGain.connect(this.masterGain);
+    this.ambienceNoiseSource.start();
+    this.ambiencePulseOscillator.start();
+    this.scheduleNextAmbienceAccent();
+  }
+
   stopEngineLoop() {
     if (!this.context) {
       this.clearEngineNodes();
@@ -431,6 +597,30 @@ export class AudioManager {
     this.clearEngineNodes();
   }
 
+  stopAmbienceLoop() {
+    if (!this.context) {
+      this.clearAmbienceNodes();
+      return;
+    }
+
+    const time = this.context.currentTime;
+    const stopTime = time + 0.12;
+
+    this.ambienceGain?.gain.setTargetAtTime(0.0001, time, 0.04);
+    this.crowdGain?.gain.setTargetAtTime(0.0001, time, 0.04);
+
+    try {
+      this.ambienceNoiseSource?.stop(stopTime);
+      this.ambienceHumOscillator?.stop(stopTime);
+      this.ambiencePulseOscillator?.stop(stopTime);
+      this.crowdSource?.stop(stopTime);
+    } catch {
+      // Source nodes can only be stopped once.
+    }
+
+    this.clearAmbienceNodes();
+  }
+
   clearEngineNodes() {
     this.engineOscillator = null;
     this.engineHarmonic = null;
@@ -440,6 +630,45 @@ export class AudioManager {
     this.engineNoiseSource = null;
     this.engineNoiseGain = null;
     this.engineNoiseFilter = null;
+  }
+
+  clearAmbienceNodes() {
+    this.ambienceGain = null;
+    this.ambienceNoiseSource = null;
+    this.ambienceNoiseFilter = null;
+    this.ambienceNoiseGain = null;
+    this.ambienceHumOscillator = null;
+    this.ambienceHumGain = null;
+    this.ambiencePulseOscillator = null;
+    this.ambiencePulseGain = null;
+    this.crowdSource = null;
+    this.crowdGain = null;
+    this.crowdFilter = null;
+  }
+
+  async startCrowdLoop(profile) {
+    const buffer = await this.loadSampleBuffer(profile.mainCrowdUrl);
+
+    if (!this.enabled || !this.context || !this.masterGain || this.crowdSource || !buffer) {
+      return;
+    }
+
+    const time = this.context.currentTime;
+
+    this.crowdSource = this.context.createBufferSource();
+    this.crowdGain = this.context.createGain();
+    this.crowdFilter = this.context.createBiquadFilter();
+    this.crowdSource.buffer = buffer;
+    this.crowdSource.loop = true;
+    this.crowdFilter.type = "lowpass";
+    this.crowdFilter.frequency.value = profile.mainCrowdFilter;
+    this.crowdFilter.Q.value = 0.4;
+    this.crowdGain.gain.setValueAtTime(0.0001, time);
+    this.crowdGain.gain.exponentialRampToValueAtTime(profile.mainCrowdGain, time + 0.9);
+    this.crowdSource.connect(this.crowdFilter);
+    this.crowdFilter.connect(this.crowdGain);
+    this.crowdGain.connect(this.masterGain);
+    this.crowdSource.start(time);
   }
 
   updateProceduralEngine(time, speed, speedRatio, inputState) {
@@ -471,6 +700,66 @@ export class AudioManager {
     );
     this.engineNoiseFilter.frequency.setTargetAtTime(targetNoiseFilter, time, response * 1.1);
     this.engineNoiseGain.gain.setTargetAtTime(targetNoiseGain, time, response * 1.3);
+  }
+
+  updateAmbienceAccents(deltaTime) {
+    const accent = this.ambienceProfile?.crowdAccent;
+
+    if (!this.enabled || !this.context || !accent) {
+      return;
+    }
+
+    this.ambienceAccentTimer -= Math.max(0, deltaTime);
+
+    if (this.ambienceAccentTimer > 0) {
+      return;
+    }
+
+    this.playCrowdAccent(accent);
+    this.scheduleNextAmbienceAccent();
+  }
+
+  scheduleNextAmbienceAccent() {
+    const accent = this.ambienceProfile?.crowdAccent;
+
+    this.ambienceAccentTimer = accent
+      ? accent.intervalMin + Math.random() * accent.intervalRange
+      : 0;
+  }
+
+  playCrowdAccent(accent) {
+    if (!this.context || !this.masterGain) {
+      return;
+    }
+
+    const duration = 0.22 + Math.random() * 0.18;
+    const frameCount = Math.max(1, Math.floor(this.context.sampleRate * duration));
+    const buffer = this.context.createBuffer(1, frameCount, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let index = 0; index < frameCount; index += 1) {
+      const fadeIn = Math.min(1, index / (frameCount * 0.18));
+      const fadeOut = 1 - index / frameCount;
+      data[index] = (Math.random() * 2 - 1) * fadeIn * fadeOut * 0.65;
+    }
+
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const time = this.context.currentTime;
+
+    source.buffer = buffer;
+    filter.type = "bandpass";
+    filter.frequency.value = accent.filter;
+    filter.Q.value = 0.4;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(accent.gain, time + 0.035);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    source.start(time);
+    source.stop(time + duration + 0.02);
   }
 
   updateEnginePops(time, speedRatio, inputState) {
@@ -591,6 +880,22 @@ function createNoiseBuffer(context) {
     const next = Math.random() * 2 - 1;
     previous = previous * 0.88 + next * 0.12;
     data[index] = previous * 0.22;
+  }
+
+  return buffer;
+}
+
+function createAmbienceNoiseBuffer(context, smoothing = 0.82) {
+  const frameCount = context.sampleRate * 4;
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  let previous = 0;
+  const normalizedSmoothing = clamp(smoothing, 0, 0.995);
+
+  for (let index = 0; index < frameCount; index += 1) {
+    const next = Math.random() * 2 - 1;
+    previous = previous * normalizedSmoothing + next * (1 - normalizedSmoothing);
+    data[index] = previous * 0.32;
   }
 
   return buffer;
