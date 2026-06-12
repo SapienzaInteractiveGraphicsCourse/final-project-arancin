@@ -1,6 +1,8 @@
 import crowdCheeringMainUrl from "../assets/audio/crowd-cheering-main.mp3";
 import crowdDisappointmentUrl from "../assets/audio/crowd-disappointment.mp3";
 import crowdFinalCheeringUrl from "../assets/audio/crowd-final-cheering.mp3";
+import collisionImpactUrl from "../assets/audio/collision-impact.mp3";
+import tropicalBeachMainUrl from "../assets/audio/tropicalbeach-main.wav";
 
 const DEFAULT_MASTER_VOLUME = 0.18;
 const DEFAULT_GAME_VOLUME = 1;
@@ -81,14 +83,9 @@ const AMBIENCE_PROFILES = {
     eventGain: 0.16
   },
   beach: {
-    noiseGain: 0.014,
-    noiseFilter: 520,
-    noiseQ: 0.55,
-    noiseSmoothing: 0.965,
-    humFrequency: 0,
-    humGain: 0,
-    pulseFrequency: 0.085,
-    pulseDepth: 0.62,
+    mainCrowdUrl: tropicalBeachMainUrl,
+    mainCrowdGain: 0.018,
+    mainCrowdFilter: 2600,
     eventGain: 0.11
   },
   monaco: {
@@ -143,6 +140,7 @@ export class AudioManager {
     this.collisionCooldown = 0;
     this.popCooldown = 0;
     this.wasAccelerating = false;
+    this.engineAudible = true;
     this.disposed = false;
   }
 
@@ -209,6 +207,20 @@ export class AudioManager {
   setAmbienceVolume(volume) {
     this.ambienceVolume = clamp(volume, 0, 1);
     this.updateOutputGains();
+  }
+
+  setEngineAudible(audible) {
+    this.engineAudible = Boolean(audible);
+
+    if (!this.context) {
+      return;
+    }
+
+    const time = this.context.currentTime;
+    if (!this.engineAudible) {
+      this.engineGain?.gain.setTargetAtTime(0.0001, time, 0.06);
+      this.engineNoiseGain?.gain.setTargetAtTime(0.0001, time, 0.06);
+    }
   }
 
   getSettings() {
@@ -309,7 +321,7 @@ export class AudioManager {
     }
 
     this.collisionCooldown = COLLISION_COOLDOWN_SECONDS;
-    this.playNoiseBurst({ duration: 0.12, gain: 0.1 });
+    void this.playCollisionSample();
   }
 
   playBoost() {
@@ -523,6 +535,39 @@ export class AudioManager {
     gain.connect(this.ambienceBusGain);
     source.start(time);
     source.stop(time + Math.min(buffer.duration, 2.5));
+  }
+
+  async playCollisionSample() {
+    if (!this.enabled || !this.context || !this.masterGain) {
+      return;
+    }
+
+    const buffer = await this.loadSampleBuffer(collisionImpactUrl);
+
+    if (!this.enabled || !this.context || !this.masterGain || !buffer) {
+      this.playNoiseBurst({ duration: 0.16, gain: 0.18 });
+      return;
+    }
+
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const time = this.context.currentTime;
+    const duration = Math.min(buffer.duration, 0.7);
+
+    source.buffer = buffer;
+    source.playbackRate.value = 0.88;
+    filter.type = "bandpass";
+    filter.frequency.value = 430;
+    filter.Q.value = 0.7;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.2, time + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.gameGain);
+    source.start(time);
+    source.stop(time + duration + 0.02);
   }
 
   startEngineLoop() {
@@ -740,12 +785,15 @@ export class AudioManager {
       : profile.idleGain * 0.42;
     const targetFilter = profile.filterBase + pitchLoad * profile.filterRange;
     const targetNoiseFilter = profile.noiseFilterBase + pitchLoad * profile.noiseFilterRange;
-    const targetNoiseGain = profile.noiseGain * (accelerating ? 1 : moving ? 0.45 : 0.18);
+    const targetNoiseGain = this.engineAudible
+      ? profile.noiseGain * (accelerating ? 1 : moving ? 0.45 : 0.18)
+      : 0.0001;
+    const targetEngineGain = this.engineAudible ? targetGain : 0.0001;
 
     this.engineOscillator.frequency.setTargetAtTime(targetFrequency, time, response);
     this.engineHarmonic.frequency.setTargetAtTime(targetFrequency * profile.harmonicRatio, time, response);
     this.engineFilter.frequency.setTargetAtTime(targetFilter, time, response * 1.1);
-    this.engineGain.gain.setTargetAtTime(targetGain, time, response * 1.2);
+    this.engineGain.gain.setTargetAtTime(targetEngineGain, time, response * 1.2);
     this.engineHarmonicGain.gain.setTargetAtTime(
       profile.harmonicGain * (0.55 + pitchLoad * 0.45),
       time,
