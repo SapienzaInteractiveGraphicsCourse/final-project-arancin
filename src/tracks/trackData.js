@@ -140,20 +140,39 @@ export const TRACK_DEFINITIONS = {
     id: TRACK_IDS.MONACO,
     name: "Monaco Formula 1",
     themeId: "monaco-formula-1",
-    curveType: "centripetal",
-    tension: 0.08,
-    roadWidth: 7.8,
-    segments: 112,
-    groundSize: 140,
+    curveType: "catmullrom",
+    tension: 0.32,
+    roadWidth: 11.0,
+    segments: 200,
+    groundSize: 300,
     barrierOffset: 0.5,
     barrierHeight: 0.78,
     barrierThickness: 0.5,
-    checkpointTs: [0, 0.26, 0.52, 0.78],
-    boostTs: [0.16, 0.62],
+    checkpointTs: [0, 0.2, 0.4, 0.6, 0.8],
+    boostTs: [0.3, 0.65],
     spawnOffsetMeters: -3.6,
     lightingMode: "day",
     skyboxTheme: "monaco",
     particleProfile: "urban",
+    scene: {
+      background: 0x90caf9,
+      fog: 0xe3f2fd,
+      fogType: "linear",
+      fogNear: 140,
+      fogFar: 380,
+      ambientColor: 0xfffaf0,
+      ambientIntensity: 0.9,
+      moonColor: 0xfffde7,
+      moonIntensity: 2.2,
+      moonPosition: [80, 120, 50],
+      shadowBounds: 160,
+      shadowFar: 280,
+      skyGradient: {
+        horizon: 0xe3f2fd,
+        mid: 0x90caf9,
+        zenith: 0x1565c0
+      }
+    },
     palette: {
       ground: 0xaab5b9,
       road: 0x2f363a,
@@ -164,19 +183,48 @@ export const TRACK_DEFINITIONS = {
       boost: 0xffd23a,
       marina: 0x3f9ec8
     },
+    // ── Layout Monaco – versione con curve extra ──
+    //
+    // Sezioni originali:  A Start · B Sainte-Dévote · C Casino · D Hairpin
+    //                     E Risalita · F Rascasse · G Raccordo
+    // Curve aggiunte:    B2 Massenet · C2 Mirabeau · D2 Portier · E2 Jink
+    //
+    // Punto finale x=-22 → separazione ≥ 18m dal rettilineo (x=0) – no overlap.
     controlPoints: [
-      [-18, 0, -34],
-      [20, 0, -34],
-      [20, 0, -18],
-      [34, 0, -12],
-      [34, 0, 10],
-      [18, 0, 16],
-      [12, 0, 34],
-      [-22, 0, 34],
-      [-34, 0, 16],
-      [-18, 0, 6],
-      [-34, 0, -10],
-      [-30, 0, -26]
+      // A ── RETTILINEO PARTENZA ──
+      [  0, 0,  60],   // t=0  START LINE
+      [  0, 0,  30],
+      [  0, 0,   0],
+      // B ── SAINTE-DÉVOTE: curva destra ──
+      [ 22, 0, -12],
+      [ 55, 0, -18],
+      // B2 ── MASSENET: leggera piega sinistra poi destra (jink) ──
+      [ 70, 0, -30],
+      [ 80, 0, -44],
+      // C ── CASINO: arco destro ampio ──
+      [ 96, 0, -62],
+      [104, 0, -82],
+      // C2 ── MIRABEAU: curva destra stretta prima del tornante ──
+      [106, 0, -100],
+      [ 98, 0, -116],
+      // D ── TORNANTE (hairpin): apice ──
+      [ 80, 0, -134],
+      [ 54, 0, -124],
+      // D2 ── PORTIER: delicata curva destra in uscita dal tornante ──
+      [ 38, 0, -108],
+      [ 20, 0, -90],
+      // E ── RISALITA: arco sinistro ──
+      [ -8, 0, -68],
+      [-22, 0, -48],
+      // E2 ── JINK: leggero cambio direzione sulla risalita ──
+      [-32, 0, -28],
+      [-44, 0, -14],
+      // F ── RASCASSE: tornante sinistro ampio ──
+      [-64, 0,  -2],
+      [-72, 0,  34],
+      [-54, 0,  58],
+      // G ── RACCORDO FINALE (x=-22, 18m a sinistra del rettilineo) ──
+      [-22, 0,  76]
     ]
   }
 };
