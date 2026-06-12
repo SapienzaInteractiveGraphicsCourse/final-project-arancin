@@ -266,7 +266,7 @@ function getCurveSide(edgeSamples, index) {
 }
 
 function addApexCurbs(group, edgeSamples, definition, materials) {
-  if (definition.id !== "monaco") {
+  if (definition.id === "monaco") {
     return;
   }
 
