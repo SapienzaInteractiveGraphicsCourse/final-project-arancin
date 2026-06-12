@@ -3,6 +3,8 @@ import crowdDisappointmentUrl from "../assets/audio/crowd-disappointment.mp3";
 import crowdFinalCheeringUrl from "../assets/audio/crowd-final-cheering.mp3";
 
 const DEFAULT_MASTER_VOLUME = 0.18;
+const DEFAULT_GAME_VOLUME = 1;
+const DEFAULT_AMBIENCE_VOLUME = 1;
 const COLLISION_COOLDOWN_SECONDS = 0.22;
 
 const ENGINE_PROFILES = {
@@ -100,15 +102,22 @@ const AMBIENCE_PROFILES = {
 export class AudioManager {
   constructor({
     masterVolume = DEFAULT_MASTER_VOLUME,
+    gameVolume = DEFAULT_GAME_VOLUME,
+    ambienceVolume = DEFAULT_AMBIENCE_VOLUME,
     vehicleId = "kart",
     trackId = "vegas"
   } = {}) {
     this.masterVolume = clamp(masterVolume, 0, 1);
+    this.gameVolume = clamp(gameVolume, 0, 1);
+    this.ambienceVolume = clamp(ambienceVolume, 0, 1);
+    this.muted = false;
     this.engineProfile = ENGINE_PROFILES[vehicleId] ?? ENGINE_PROFILES.kart;
     this.ambienceProfile = AMBIENCE_PROFILES[trackId] ?? null;
     this.enabled = false;
     this.context = null;
     this.masterGain = null;
+    this.gameGain = null;
+    this.ambienceBusGain = null;
     this.ambienceGain = null;
     this.ambienceNoiseSource = null;
     this.ambienceNoiseFilter = null;
@@ -183,8 +192,32 @@ export class AudioManager {
     this.masterVolume = clamp(volume, 0, 1);
 
     if (this.masterGain && this.context) {
-      this.masterGain.gain.setTargetAtTime(this.masterVolume, this.context.currentTime, 0.04);
+      this.updateOutputGains();
     }
+  }
+
+  setMuted(muted) {
+    this.muted = Boolean(muted);
+    this.updateOutputGains();
+  }
+
+  setGameVolume(volume) {
+    this.gameVolume = clamp(volume, 0, 1);
+    this.updateOutputGains();
+  }
+
+  setAmbienceVolume(volume) {
+    this.ambienceVolume = clamp(volume, 0, 1);
+    this.updateOutputGains();
+  }
+
+  getSettings() {
+    return {
+      muted: this.muted,
+      masterVolume: this.masterVolume,
+      gameVolume: this.gameVolume,
+      ambienceVolume: this.ambienceVolume
+    };
   }
 
   update(deltaTime = 0, vehicleState = {}, inputState = {}) {
@@ -300,7 +333,7 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.24);
     oscillator.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.ambienceBusGain);
     oscillator.start(time);
     oscillator.stop(time + 0.26);
   }
@@ -334,7 +367,7 @@ export class AudioManager {
       oscillator.connect(filter);
       harmonic.connect(filter);
       filter.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.gameGain);
       oscillator.start(time);
       harmonic.start(time);
       oscillator.stop(time + 0.44);
@@ -370,6 +403,8 @@ export class AudioManager {
 
     this.context = null;
     this.masterGain = null;
+    this.gameGain = null;
+    this.ambienceBusGain = null;
   }
 
   ensureContext() {
@@ -389,10 +424,28 @@ export class AudioManager {
 
     this.context = new AudioContextConstructor();
     this.masterGain = this.context.createGain();
-    this.masterGain.gain.value = this.masterVolume;
+    this.gameGain = this.context.createGain();
+    this.ambienceBusGain = this.context.createGain();
+    this.masterGain.gain.value = this.muted ? 0 : this.masterVolume;
+    this.gameGain.gain.value = this.gameVolume;
+    this.ambienceBusGain.gain.value = this.ambienceVolume;
+    this.gameGain.connect(this.masterGain);
+    this.ambienceBusGain.connect(this.masterGain);
     this.masterGain.connect(this.context.destination);
 
     return this.context;
+  }
+
+  updateOutputGains() {
+    if (!this.context) {
+      return;
+    }
+
+    const time = this.context.currentTime;
+
+    this.masterGain?.gain.setTargetAtTime(this.muted ? 0 : this.masterVolume, time, 0.04);
+    this.gameGain?.gain.setTargetAtTime(this.gameVolume, time, 0.04);
+    this.ambienceBusGain?.gain.setTargetAtTime(this.ambienceVolume, time, 0.04);
   }
 
   async playWithContext(callback) {
@@ -467,7 +520,7 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.min(buffer.duration, 2.4));
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.ambienceBusGain);
     source.start(time);
     source.stop(time + Math.min(buffer.duration, 2.5));
   }
@@ -510,8 +563,8 @@ export class AudioManager {
     this.engineNoiseSource.connect(this.engineNoiseFilter);
     this.engineNoiseFilter.connect(this.engineNoiseGain);
     this.engineFilter.connect(this.engineGain);
-    this.engineGain.connect(this.masterGain);
-    this.engineNoiseGain.connect(this.masterGain);
+    this.engineGain.connect(this.gameGain);
+    this.engineNoiseGain.connect(this.gameGain);
 
     this.engineOscillator.start();
     this.engineHarmonic.start();
@@ -568,7 +621,7 @@ export class AudioManager {
       this.ambienceHumOscillator.start();
     }
 
-    this.ambienceGain.connect(this.masterGain);
+    this.ambienceGain.connect(this.ambienceBusGain);
     this.ambienceNoiseSource.start();
     this.ambiencePulseOscillator.start();
     this.scheduleNextAmbienceAccent();
@@ -667,7 +720,7 @@ export class AudioManager {
     this.crowdGain.gain.exponentialRampToValueAtTime(profile.mainCrowdGain, time + 0.9);
     this.crowdSource.connect(this.crowdFilter);
     this.crowdFilter.connect(this.crowdGain);
-    this.crowdGain.connect(this.masterGain);
+    this.crowdGain.connect(this.ambienceBusGain);
     this.crowdSource.start(time);
   }
 
@@ -757,7 +810,7 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.gameGain);
     source.start(time);
     source.stop(time + duration + 0.02);
   }
@@ -813,7 +866,7 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.gameGain);
     source.start(time);
     source.stop(time + duration + 0.01);
   }
@@ -833,7 +886,7 @@ export class AudioManager {
     toneGain.gain.exponentialRampToValueAtTime(gain, time + 0.012);
     toneGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     oscillator.connect(toneGain);
-    toneGain.connect(this.masterGain);
+    toneGain.connect(this.gameGain);
     oscillator.start(time);
     oscillator.stop(time + duration + 0.02);
   }
@@ -864,7 +917,7 @@ export class AudioManager {
     noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     source.connect(filter);
     filter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    noiseGain.connect(this.gameGain);
     source.start(time);
     source.stop(time + duration);
   }

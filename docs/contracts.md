@@ -667,6 +667,10 @@ audioManager.enable() -> Promise<boolean>
 audioManager.disable()
 audioManager.toggle() -> Promise<boolean>
 audioManager.setMasterVolume(volume)
+audioManager.setMuted(muted)
+audioManager.setGameVolume(volume)
+audioManager.setAmbienceVolume(volume)
+audioManager.getSettings()
 audioManager.update(deltaTime, vehicleState, inputState) -> { enginePop }
 audioManager.playUiSelect()
 audioManager.playUiConfirm()
@@ -686,6 +690,7 @@ Regole:
 - usa Web Audio API;
 - usa un motore procedurale morbido per veicolo, con oscillatori, filtro e rumore leggero;
 - usa ambience discreta per pista, avviata insieme all'audio dopo gesto utente;
+- separa volume game e volume ambience tramite gain dedicati;
 - crea o riprende `AudioContext` solo dopo gesto utente;
 - mantiene volume master basso di default;
 - `update()` puo usare `vehicleState.speed`, `speedRatio` e input tenuti per modulare motore, filtro e volume;

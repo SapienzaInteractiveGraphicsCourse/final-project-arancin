@@ -40,6 +40,12 @@ const VEHICLE_DISPLAY_NAMES = {
   porsche: "Porsche",
   silvia: "Silvia"
 };
+const AUDIO_SETTINGS_KEY = "kart-racing-audio-settings";
+const DEFAULT_AUDIO_SETTINGS = {
+  muted: false,
+  gameVolume: 1,
+  ambienceVolume: 1
+};
 
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
@@ -54,10 +60,14 @@ export function startScenePreview(container, setup, options = {}) {
   vehicle.setBodyColor(selectedBodyColor);
   const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
+  const audioSettings = readAudioSettings(window.localStorage);
   const audioManager = new AudioManager({
     vehicleId: setup.vehicleId,
-    trackId: setup.trackId
+    trackId: setup.trackId,
+    gameVolume: audioSettings.gameVolume,
+    ambienceVolume: audioSettings.ambienceVolume
   });
+  audioManager.setMuted(audioSettings.muted);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const trackInteraction = new TrackInteractionSystem();
@@ -113,7 +123,12 @@ export function startScenePreview(container, setup, options = {}) {
   });
   const pauseMenu = createPauseMenu({
     onResume: resumeGame,
-    onExitToSetup: options.onExitToSetup
+    onExitToSetup: options.onExitToSetup,
+    audioManager,
+    trackId: setup.trackId,
+    onAudioSettingsChange: (settings) => {
+      writeAudioSettings(window.localStorage, settings);
+    }
   });
   let animationFrameId = 0;
   let paused = false;
@@ -620,6 +635,34 @@ function wait(milliseconds) {
   });
 }
 
+function readAudioSettings(storage) {
+  try {
+    const parsed = JSON.parse(storage.getItem(AUDIO_SETTINGS_KEY) ?? "{}");
+
+    return {
+      muted: Boolean(parsed.muted),
+      gameVolume: normalizeVolume(parsed.gameVolume, DEFAULT_AUDIO_SETTINGS.gameVolume),
+      ambienceVolume: normalizeVolume(parsed.ambienceVolume, DEFAULT_AUDIO_SETTINGS.ambienceVolume)
+    };
+  } catch {
+    return { ...DEFAULT_AUDIO_SETTINGS };
+  }
+}
+
+function writeAudioSettings(storage, settings) {
+  storage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify({
+    muted: Boolean(settings.muted),
+    gameVolume: normalizeVolume(settings.gameVolume, DEFAULT_AUDIO_SETTINGS.gameVolume),
+    ambienceVolume: normalizeVolume(settings.ambienceVolume, DEFAULT_AUDIO_SETTINGS.ambienceVolume)
+  }));
+}
+
+function normalizeVolume(value, fallback) {
+  const normalized = Number(value);
+
+  return Number.isFinite(normalized) ? Math.min(1, Math.max(0, normalized)) : fallback;
+}
+
 function createMinimapPanel() {
   const panel = document.createElement("aside");
   panel.className = "race-minimap-panel";
@@ -903,11 +946,13 @@ function formatLapRows(lapTimes, bestLapTime) {
     .join("");
 }
 
-function createPauseMenu({ onResume, onExitToSetup }) {
+function createPauseMenu({ onResume, onExitToSetup, audioManager, trackId, onAudioSettingsChange }) {
   const element = document.createElement("section");
   element.className = "pause-menu";
+  element.dataset.trackTheme = normalizePauseTheme(trackId);
   element.hidden = true;
   element.setAttribute("aria-label", "Pause menu");
+  const audioSettings = audioManager.getSettings();
   element.innerHTML = `
     <div class="pause-panel">
       <p class="pause-eyebrow">Paused</p>
@@ -915,6 +960,20 @@ function createPauseMenu({ onResume, onExitToSetup }) {
       <div class="pause-actions">
         <button class="pause-button" type="button" data-action="resume">Resume</button>
         <button class="pause-button pause-button-secondary" type="button" data-action="setup">Main Menu</button>
+      </div>
+      <div class="pause-audio-panel" aria-label="Audio settings">
+        <label class="pause-audio-toggle">
+          <input type="checkbox" data-audio-muted ${audioSettings.muted ? "" : "checked"}>
+          <span>Audio</span>
+        </label>
+        <label class="pause-audio-control">
+          <span>Game</span>
+          <input type="range" min="0" max="100" value="${Math.round(audioSettings.gameVolume * 100)}" data-audio-volume="game">
+        </label>
+        <label class="pause-audio-control">
+          <span>Ambience</span>
+          <input type="range" min="0" max="100" value="${Math.round(audioSettings.ambienceVolume * 100)}" data-audio-volume="ambience">
+        </label>
       </div>
     </div>
   `;
@@ -934,12 +993,40 @@ function createPauseMenu({ onResume, onExitToSetup }) {
     onExitToSetup?.();
   });
 
+  element.addEventListener("input", (event) => {
+    const target = event.target;
+
+    if (target.matches("[data-audio-muted]")) {
+      audioManager.setMuted(!target.checked);
+      onAudioSettingsChange?.(audioManager.getSettings());
+      return;
+    }
+
+    if (target.matches("[data-audio-volume]")) {
+      const value = Number(target.value) / 100;
+      if (target.dataset.audioVolume === "game") {
+        audioManager.setGameVolume(value);
+      } else {
+        audioManager.setAmbienceVolume(value);
+      }
+      onAudioSettingsChange?.(audioManager.getSettings());
+    }
+  });
+
   return {
     element,
     setPaused(paused) {
       element.hidden = !paused;
     }
   };
+}
+
+function normalizePauseTheme(trackId) {
+  if (trackId === "vegas" || trackId === "beach" || trackId === "monaco") {
+    return trackId;
+  }
+
+  return "default";
 }
 
 function createRaceOverlay() {

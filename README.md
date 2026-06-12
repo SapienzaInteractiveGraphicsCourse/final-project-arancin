@@ -419,7 +419,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Suono countdown.
 - [x] Suono collisione.
 - [x] Suono boost.
-- [ ] Toggle audio.
+- [x] Toggle audio.
 
 ## 10. Ambiente E Animazioni
 
