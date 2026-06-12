@@ -29,6 +29,16 @@ This register tracks assets that are not authored procedurally by the team.
 | Main Menu Logo | Raster PNG edited from team-provided artwork | Integrated in setup menu as transparent-background UI logo |
 | Main Menu Vehicle Thumbnails | Browser-rendered PNGs from project vehicle models | Integrated in progressive setup menu vehicle step |
 
+## Audio Samples
+
+| Asset | Local path | Current status |
+| --- | --- | --- |
+| Kart engine sample | `src/assets/audio/kart-engine.mp3` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+| Kart acceleration sample | `src/assets/audio/kart-accelerate.wav` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+| Kart deceleration sample | `src/assets/audio/kart-decelerate.wav` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+| Porsche engine sample | `src/assets/audio/porsche-engine.mp3` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+| Nissan Silvia engine sample | `src/assets/audio/silvia-engine.mp3` | Reference sample for tuning only; current runtime uses procedural Web Audio engine |
+
 ## Follow-up Checks
 
 - Validate model scale, orientation, origin, wheel nodes, and light placement before gameplay integration.

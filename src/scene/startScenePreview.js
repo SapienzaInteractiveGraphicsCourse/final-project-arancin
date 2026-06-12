@@ -10,6 +10,7 @@ import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { AudioManager } from "../systems/AudioManager.js";
 import { CameraController } from "../systems/CameraController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
@@ -53,6 +54,9 @@ export function startScenePreview(container, setup, options = {}) {
   vehicle.setBodyColor(selectedBodyColor);
   const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
+  const audioManager = new AudioManager({
+    vehicleId: setup.vehicleId
+  });
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const trackInteraction = new TrackInteractionSystem();
@@ -93,6 +97,7 @@ export function startScenePreview(container, setup, options = {}) {
     onConfirm: () => {
       raceArmed = true;
       colorPicker.hide();
+      void audioManager.enable();
       raceManager.startCountdown();
     }
   });
@@ -221,6 +226,7 @@ export function startScenePreview(container, setup, options = {}) {
         trackName: track.trackInfo.name
       });
       minimap.update({ playerState: state });
+      audioManager.update(deltaTime, state);
       return;
     }
 
@@ -237,6 +243,7 @@ export function startScenePreview(container, setup, options = {}) {
     const currentVehicleState = controller.getState();
     const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
+    const heldInputState = canDrive ? inputManager.getHeldState() : {};
     const opponentStates = aiController ? [aiController.getState()] : [];
     const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, {
       deltaTime,
@@ -248,10 +255,14 @@ export function startScenePreview(container, setup, options = {}) {
 
     const state = updatedRaceState.finished
       ? controller.getState()
-      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, environmentState);
+      : controller.update(deltaTime, heldInputState, environmentState);
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
+    const audioEvents = audioManager.update(deltaTime, state, heldInputState);
+    if (audioEvents?.enginePop) {
+      vehicle.triggerExhaustPop?.();
+    }
     updateCameraFollow(cameraController, track.trackInfo, state);
 
     // Auto-enable headlights for night circuits (Vegas)
@@ -389,6 +400,7 @@ export function startScenePreview(container, setup, options = {}) {
       window.removeEventListener("resize", resize);
       timer.dispose();
       inputManager.dispose();
+      audioManager.dispose();
       controller.dispose();
       cameraController.dispose();
       renderer.dispose();

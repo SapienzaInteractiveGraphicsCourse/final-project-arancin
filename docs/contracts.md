@@ -655,6 +655,37 @@ Regole:
 - camera shake e solo feedback visivo e non deve influenzare fisica/input.
 - la modalita `top` non applica camera shake per restare leggibile in debug.
 
+## Audio Manager
+
+File: `src/systems/AudioManager.js`
+
+Firma:
+
+```js
+const audioManager = new AudioManager({ masterVolume, vehicleId });
+audioManager.enable() -> Promise<boolean>
+audioManager.disable()
+audioManager.toggle() -> Promise<boolean>
+audioManager.setMasterVolume(volume)
+audioManager.update(deltaTime, vehicleState, inputState) -> { enginePop }
+audioManager.playCountdown(step)
+audioManager.playCheckpoint()
+audioManager.playCollision()
+audioManager.playBoost()
+audioManager.dispose()
+```
+
+Regole:
+
+- usa Web Audio API;
+- usa un motore procedurale morbido per veicolo, con oscillatori, filtro e rumore leggero;
+- crea o riprende `AudioContext` solo dopo gesto utente;
+- mantiene volume master basso di default;
+- `update()` puo usare `vehicleState.speed`, `speedRatio` e input tenuti per modulare motore, filtro e volume;
+- `update()` puo restituire eventi audio/visivi brevi, per esempio `enginePop`, se un profilo veicolo li supporta;
+- i metodi evento devono essere brevi, non invasivi e sicuri se l'audio non e' ancora abilitato;
+- `dispose()` deve fermare oscillatori, chiudere il context e poter essere chiamato durante uscita scena.
+
 ## Branch Responsibilities
 
 - `feature/procedural-kart`: evolve `src/vehicles/vehicleFactory.js` e aggiunge classi veicolo.
