@@ -4,22 +4,17 @@ const HUD_GROUPS = [
     fields: [
       { id: "speed", className: "race-hud-speed" },
       { id: "totalTime", className: "race-hud-time" },
-      { id: "surface", className: "race-hud-chip race-hud-surface" }
+      { id: "position", className: "race-hud-place" },
+      { id: "lap", className: "race-hud-chip race-hud-lap" },
+      { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
+      { id: "surface", className: "race-hud-chip race-hud-surface" },
+      { id: "gap", className: "race-hud-chip race-hud-gap" }
     ]
   },
   {
     className: "race-hud-track",
     fields: [
       { id: "track", className: "race-hud-track-name" }
-    ]
-  },
-  {
-    className: "race-hud-position",
-    fields: [
-      { id: "position", className: "race-hud-place" },
-      { id: "lap", className: "race-hud-chip race-hud-lap" },
-      { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
-      { id: "gap", className: "race-hud-chip race-hud-gap" }
     ]
   }
 ];
@@ -53,19 +48,30 @@ export function createRaceHud() {
     element,
     update({ raceState, vehicleState, wrongWayState, trackId, trackName } = {}) {
       element.dataset.trackTheme = normalizeTrackTheme(trackId);
-      values.get("speed").textContent = formatSpeed(vehicleState?.speed);
-      values.get("lap").textContent = formatLap(raceState);
-      values.get("totalTime").textContent = formatRaceTime(raceState?.totalTime);
-      values.get("checkpoint").textContent = formatCheckpoint(raceState);
-      values.get("track").textContent = trackName ?? "--";
-      values.get("surface").textContent = formatSurface(vehicleState?.surfaceType);
-      values.get("position").textContent = formatPosition(raceState);
-      values.get("gap").textContent = formatGap(raceState);
+      setField(values, "speed", formatSpeed(vehicleState?.speed));
+      setField(values, "lap", formatLap(raceState));
+      setField(values, "totalTime", formatRaceTime(raceState?.totalTime));
+      setField(values, "checkpoint", formatCheckpoint(raceState));
+      setField(values, "track", trackName ?? "--");
+      setField(values, "surface", formatSurface(vehicleState?.surfaceType));
+      setField(values, "position", formatPosition(raceState));
+      setField(values, "gap", formatGap(raceState));
     },
     remove() {
       element.remove();
     }
   };
+}
+
+function setField(values, id, text) {
+  const element = values.get(id);
+
+  if (!element) {
+    return;
+  }
+
+  element.textContent = text;
+  element.hidden = text.length === 0;
 }
 
 function normalizeTrackTheme(trackId) {
@@ -97,13 +103,11 @@ function formatCheckpoint(raceState) {
     return "Checkpoint --";
   }
 
-  const checkpointCount = raceState.checkpointCount;
-  const checkpointIndex = raceState.currentCheckpoint === 0
-    ? checkpointCount
-    : Math.min(raceState.currentCheckpoint, checkpointCount);
-  const displayIndex = raceState.phase === "running" ? checkpointIndex : 0;
+  const checkpointNumber = raceState.currentCheckpoint === 0
+    ? raceState.checkpointCount
+    : raceState.currentCheckpoint;
 
-  return `Checkpoint ${displayIndex}/${checkpointCount}`;
+  return `Checkpoint ${checkpointNumber}/${raceState.checkpointCount}`;
 }
 
 function formatSurface(surfaceType) {
@@ -120,10 +124,10 @@ function formatPosition(raceState) {
   }
 
   if (raceState.mode === "race") {
-    return `${formatOrdinal(raceState.position)} / ${raceState.participantCount}`;
+    return `Pos ${raceState.position}/${raceState.participantCount}`;
   }
 
-  return "1st / 1";
+  return "Solo";
 }
 
 function formatGap(raceState) {
@@ -135,7 +139,7 @@ function formatGap(raceState) {
     return `BEST ${formatRaceTime(raceState.bestLapTime)}`;
   }
 
-  return "--";
+  return "";
 }
 
 function formatRaceTime(value) {
@@ -148,27 +152,4 @@ function formatRaceTime(value) {
   const centiseconds = Math.floor((value % 1) * 100);
 
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
-}
-
-function formatOrdinal(value) {
-  if (!Number.isFinite(value)) {
-    return "--";
-  }
-
-  const remainder = value % 100;
-
-  if (remainder >= 11 && remainder <= 13) {
-    return `${value}th`;
-  }
-
-  switch (value % 10) {
-    case 1:
-      return `${value}st`;
-    case 2:
-      return `${value}nd`;
-    case 3:
-      return `${value}rd`;
-    default:
-      return `${value}th`;
-  }
 }
