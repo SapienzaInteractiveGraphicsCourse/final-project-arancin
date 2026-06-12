@@ -304,7 +304,6 @@ export function startScenePreview(container, setup, options = {}) {
     if (audioEvents?.enginePop) {
       vehicle.triggerExhaustPop?.();
     }
-    updateCameraFollow(cameraController, track.trackInfo, state);
 
     // Auto-enable headlights for night circuits (Vegas)
     if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
@@ -698,10 +697,6 @@ function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) 
 
 function getRaceProgressScore(lap, progress, totalLaps) {
   return Math.min(totalLaps, Math.max(1, lap) - 1 + Math.max(0, Math.min(1, progress)));
-}
-
-function updateCameraFollow(cameraController, trackInfo, vehicleState) {
-  cameraController.updateFollowCamera(vehicleState, trackInfo);
 }
 
 function applyAiVehicleTransform(vehicle, aiState) {
