@@ -20,6 +20,7 @@ export class SilviaVehicle extends PlaceholderVehicle {
 
     this.importedModel = null;
     this.placeholderObjects = [...this.group.children];
+    this.setPlaceholderVisible(false);
     this.modelPivot = new THREE.Group();
     this.modelPivot.name = "SilviaModelPivot";
     this.group.add(this.modelPivot);
@@ -58,14 +59,18 @@ export class SilviaVehicle extends PlaceholderVehicle {
       this.setupImportedModel(model);
       this.importedModel = model;
       this.modelPivot.add(model);
-      this.placeholderObjects.forEach((object) => {
-        object.visible = false;
-      });
       return model;
     } catch (error) {
       console.error("Silvia model failed to load:", error);
+      this.setPlaceholderVisible(true);
       return null;
     }
+  }
+
+  setPlaceholderVisible(visible) {
+    this.placeholderObjects.forEach((object) => {
+      object.visible = visible;
+    });
   }
 
   setupImportedModel(model) {

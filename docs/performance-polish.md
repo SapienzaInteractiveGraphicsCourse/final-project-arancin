@@ -51,6 +51,13 @@ Interventi candidati:
 - usare un loading overlay breve e non artificiosamente lungo;
 - mantenere il fallback placeholder solo se il modello fallisce.
 
+Decisione implementata:
+
+- Porsche e Silvia costruiscono ancora il placeholder come fallback tecnico;
+- il placeholder viene nascosto subito nel costruttore;
+- se il modello importato fallisce, il placeholder viene riattivato;
+- il caricamento normale non mostra piu il veicolo provvisorio.
+
 Verifica:
 
 - selezionare Porsche e Silvia;

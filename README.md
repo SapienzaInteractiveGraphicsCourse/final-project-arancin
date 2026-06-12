@@ -478,7 +478,7 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 - [ ] Documentare `docs/performance-polish.md`.
 - [ ] Alleggerire mappe pesanti senza cambiare gameplay.
-- [ ] Eliminare flash del placeholder su Porsche/Silvia.
+- [x] Eliminare flash del placeholder su Porsche/Silvia.
 - [ ] Indagare caricamento e tempo minimo overlay dei veicoli importati.
 - [x] Migliorare leggibilita HUD, tempi e testi runtime.
 - [x] Unificare HUD sinistra/destra in un pannello runtime piu pulito.

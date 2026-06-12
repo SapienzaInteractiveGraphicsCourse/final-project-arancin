@@ -20,6 +20,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
 
     this.importedModel = null;
     this.placeholderObjects = [...this.group.children];
+    this.setPlaceholderVisible(false);
     this.modelPivot = new THREE.Group();
     this.modelPivot.name = "PorscheModelPivot";
     this.group.add(this.modelPivot);
@@ -64,14 +65,18 @@ export class PorscheVehicle extends PlaceholderVehicle {
       this.setupImportedModel(model);
       this.importedModel = model;
       this.modelPivot.add(model);
-      this.placeholderObjects.forEach((object) => {
-        object.visible = false;
-      });
       return model;
     } catch (error) {
       console.error("Porsche model failed to load:", error);
+      this.setPlaceholderVisible(true);
       return null;
     }
+  }
+
+  setPlaceholderVisible(visible) {
+    this.placeholderObjects.forEach((object) => {
+      object.visible = visible;
+    });
   }
 
   setupImportedModel(model) {
