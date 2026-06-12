@@ -434,6 +434,48 @@ trackId:vehicleId:mode:laps
 
 `ensureBestLapInRecords()` serve a migrare i best lap salvati prima dello storico lap persistente.
 
+## Ghost Lap Records
+
+File: `src/systems/ghostLapRecords.js`
+
+Contratto:
+
+```js
+getRaceGhostKey(recordKey) -> string
+readGhostLap(storage, key) -> GhostLap | null
+writeGhostLap(storage, key, ghostLap) -> GhostLap | null
+createGhostLapRecorder({ enabled, sampleRate }) -> GhostLapRecorder
+sampleGhostLap(ghostLap, lapTime) -> GhostSample | null
+```
+
+Chiave ghost:
+
+```text
+trackId:vehicleId:mode:ghost
+```
+
+`GhostLap`:
+
+```js
+{
+  version,
+  trackId,
+  vehicleId,
+  lapTime,
+  sampleRate,
+  createdAt,
+  samples: [{ t, x, y, z, heading, speed }]
+}
+```
+
+Regole:
+
+- usato solo in `time-trial`;
+- non entra in collisioni, AI, checkpoint o posizione gara;
+- salva solo campioni numerici serializzabili in localStorage;
+- ignora dati corrotti o versioni non compatibili;
+- il ghost visuale interpola i campioni sul `lapTime` corrente.
+
 ## Wrong Way Detector
 
 File: `src/systems/WrongWayDetector.js`

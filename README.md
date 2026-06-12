@@ -486,4 +486,8 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] Unificare HUD sinistra/destra in un pannello runtime piu pulito.
 - [x] Alzare menu setup riducendo margine verticale senza ridurre il logo.
 - [x] Correggere avanzamento checkpoint iniziale sul traguardo.
-- [ ] Aggiungere ghost del best lap in time trial.
+- [x] Aggiungere ghost del best lap in time trial.
+  - [x] Storage/versioning dati ghost.
+  - [x] Recorder campioni giro valido.
+  - [x] Rendering veicolo ghost semi-trasparente.
+  - [x] Interpolazione ghost sul tempo giro corrente.
