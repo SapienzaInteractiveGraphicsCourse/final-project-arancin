@@ -69,8 +69,12 @@ Azioni one-shot:
 
 - `C`: cambio camera;
 - `L`: luci;
-- `R`: restart.
+- `R`: restart;
 - `Escape`: pausa/menu runtime.
+- `F1`: toggle diagnostico minimap;
+- `F2`: toggle diagnostico ombre;
+- `F3`: toggle diagnostico props decorativi;
+- `F4`: toggle diagnostico pannello renderer info.
 
 Regole:
 
@@ -575,7 +579,7 @@ Firma:
 ```js
 createRaceHud() -> {
   element,
-  update({ raceState, vehicleState, wrongWayState, trackId, trackName }),
+  update({ raceState, vehicleState, wrongWayState, trackId, trackName, performanceState }),
   remove()
 }
 ```
@@ -591,6 +595,7 @@ track
 surface
 position
 gap
+fps
 ```
 
 Regole:
@@ -598,6 +603,7 @@ Regole:
 - il componente crea il DOM una sola volta;
 - `update()` aggiorna solo i valori testuali dei campi;
 - deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
+- `performanceState.fps` e opzionale e serve solo come diagnostica di playtest;
 - il warning contromano e gli stati di partenza devono usare overlay dedicati, non chip persistenti nell'HUD.
 
 ## Minimap System

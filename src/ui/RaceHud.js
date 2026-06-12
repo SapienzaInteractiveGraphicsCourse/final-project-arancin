@@ -7,6 +7,7 @@ const HUD_GROUPS = [
       { id: "position", className: "race-hud-place" },
       { id: "lap", className: "race-hud-chip race-hud-lap" },
       { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
+      { id: "fps", className: "race-hud-chip race-hud-fps" },
       { id: "surface", className: "race-hud-chip race-hud-surface" },
       { id: "gap", className: "race-hud-chip race-hud-gap" }
     ]
@@ -46,7 +47,7 @@ export function createRaceHud() {
 
   return {
     element,
-    update({ raceState, vehicleState, wrongWayState, trackId, trackName } = {}) {
+    update({ raceState, vehicleState, wrongWayState, trackId, trackName, performanceState } = {}) {
       element.dataset.trackTheme = normalizeTrackTheme(trackId);
       setField(values, "speed", formatSpeed(vehicleState?.speed));
       setField(values, "lap", formatLap(raceState));
@@ -56,6 +57,7 @@ export function createRaceHud() {
       setField(values, "surface", formatSurface(vehicleState?.surfaceType));
       setField(values, "position", formatPosition(raceState));
       setField(values, "gap", formatGap(raceState));
+      setField(values, "fps", formatFps(performanceState));
     },
     remove() {
       element.remove();
@@ -140,6 +142,16 @@ function formatGap(raceState) {
   }
 
   return "";
+}
+
+function formatFps(performanceState) {
+  const fps = performanceState?.fps;
+
+  if (!Number.isFinite(fps)) {
+    return "FPS --";
+  }
+
+  return `FPS ${Math.round(fps)}`;
 }
 
 function formatRaceTime(value) {

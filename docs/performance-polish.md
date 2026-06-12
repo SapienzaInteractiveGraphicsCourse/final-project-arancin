@@ -22,15 +22,28 @@ Scopo: alleggerire il gioco senza cambiare gameplay.
 
 Interventi candidati:
 
+- mostrare FPS in HUD per confrontare le piste durante il playtest;
 - ridurre il pixel ratio massimo del renderer se la scena e pesante;
 - rendere configurabili shadow map e antialias;
 - ridurre update o animazioni non essenziali lontane dal player;
 - controllare props e materiali delle mappe che generano troppi draw call;
 - evitare traversal o allocazioni inutili nel frame loop.
 
+Interventi completati:
+
+- aggiunto indicatore FPS nel pannello HUD, campionato ogni mezzo secondo per evitare numeri instabili;
+- rimosso l'update duplicato del detector contromano nel frame loop.
+- aggiunti toggle diagnostici runtime:
+  - `F1`: minimap on/off;
+  - `F2`: shadow map/luci con ombre on/off;
+  - `F3`: props decorativi della pista on/off;
+  - `F4`: pannello debug con FPS, draw calls, triangoli, geometrie e texture.
+
 Verifica:
 
-- provare Vegas Neon, Beach e Monaco;
+- provare Vegas Neon e Tropical Beach, segnando FPS medio e microscatti percepiti;
+- ripetere lo stesso tratto con `F1`, `F2` e `F3` per capire quale gruppo incide di piu;
+- usare `F4` per confrontare draw calls e triangoli tra piste;
 - controllare che non peggiori troppo la qualita visiva;
 - verificare assenza errori console.
 
@@ -178,4 +191,5 @@ Verifica:
 - [ ] Modalita:
 - [ ] Problema osservato:
 - [ ] Console errors:
-- [ ] FPS/percezione:
+- [ ] FPS HUD:
+- [ ] Percezione scatti:

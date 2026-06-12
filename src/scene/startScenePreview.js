@@ -89,6 +89,8 @@ export function startScenePreview(container, setup, options = {}) {
   });
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
+  const frameRateMonitor = createFrameRateMonitor();
+  const debugStatsPanel = createDebugStatsPanel();
   const wrongWayOverlay = createWrongWayOverlay();
   const loadingOverlay = createVehicleLoadingOverlay({
     ...setup,
@@ -136,6 +138,12 @@ export function startScenePreview(container, setup, options = {}) {
   let disposed = false;
   let renderedFinishSignature = "";
   let totalElapsedTime = 0;
+  const debugOptions = {
+    minimap: true,
+    shadows: renderer.shadowMap.enabled,
+    props: true,
+    stats: false
+  };
   let lastAudioCountdownStep = null;
   let lastAudioCheckpoint = 0;
   let lastAudioLapCount = 0;
@@ -162,6 +170,7 @@ export function startScenePreview(container, setup, options = {}) {
   // Cache references to animating props and start lights to avoid costly traversals in the frame loop
   const animatingProps = [];
   const gantryStartLights = [];
+  const decorativePropGroups = [];
 
   track.group.traverse((child) => {
     if (child.userData.spin || child.userData.float) {
@@ -169,6 +178,9 @@ export function startScenePreview(container, setup, options = {}) {
     }
     if (child.name === "GantryStartLights" && child.userData.lamps) {
       gantryStartLights.push(...child.userData.lamps);
+    }
+    if (isDecorativePropsGroup(child)) {
+      decorativePropGroups.push(child);
     }
   });
 
@@ -179,6 +191,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   container.appendChild(raceOverlay);
   container.appendChild(raceHud.element);
+  container.appendChild(debugStatsPanel.element);
   container.appendChild(wrongWayOverlay);
   container.appendChild(minimapPanel);
   container.appendChild(loadingOverlay.element);
@@ -250,6 +263,31 @@ export function startScenePreview(container, setup, options = {}) {
       cameraController.nextMode();
     }
 
+    if (actions.toggleMinimap) {
+      debugOptions.minimap = !debugOptions.minimap;
+      minimapPanel.hidden = !debugOptions.minimap;
+    }
+
+    if (actions.toggleShadows) {
+      debugOptions.shadows = !debugOptions.shadows;
+      renderer.shadowMap.enabled = debugOptions.shadows;
+      if (lights.sun) {
+        lights.sun.castShadow = debugOptions.shadows;
+      }
+    }
+
+    if (actions.toggleProps) {
+      debugOptions.props = !debugOptions.props;
+      decorativePropGroups.forEach((group) => {
+        group.visible = debugOptions.props;
+      });
+    }
+
+    if (actions.toggleDebugStats) {
+      debugOptions.stats = !debugOptions.stats;
+      debugStatsPanel.setVisible(debugOptions.stats);
+    }
+
     if (paused) {
       return;
     }
@@ -264,9 +302,16 @@ export function startScenePreview(container, setup, options = {}) {
         vehicleState: state,
         wrongWayState: wrongWayDetector.getState(),
         trackId: track.trackInfo.id,
-        trackName: track.trackInfo.name
+        trackName: track.trackInfo.name,
+        performanceState: frameRateMonitor.getState()
       });
-      minimap.update({ playerState: state });
+      updateMinimapIfEnabled(state);
+      debugStatsPanel.update({
+        visible: debugOptions.stats,
+        performanceState: frameRateMonitor.getState(),
+        rendererInfo: renderer.info,
+        options: debugOptions
+      });
       audioManager.update(deltaTime, state);
       return;
     }
@@ -395,11 +440,15 @@ export function startScenePreview(container, setup, options = {}) {
       vehicleState: state,
       wrongWayState,
       trackId: track.trackInfo.id,
-      trackName: track.trackInfo.name
+      trackName: track.trackInfo.name,
+      performanceState: frameRateMonitor.getState()
     });
-    minimap.update({
-      playerState: state,
-      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    updateMinimapIfEnabled(state, aiState);
+    debugStatsPanel.update({
+      visible: debugOptions.stats,
+      performanceState: frameRateMonitor.getState(),
+      rendererInfo: renderer.info,
+      options: debugOptions
     });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
@@ -407,6 +456,17 @@ export function startScenePreview(container, setup, options = {}) {
       savedLapRecords,
       renderedFinishSignature
     );
+  }
+
+  function updateMinimapIfEnabled(playerState, aiState = null) {
+    if (!debugOptions.minimap) {
+      return;
+    }
+
+    minimap.update({
+      playerState,
+      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    });
   }
 
   function updateRaceAudioCues(raceState, environmentState) {
@@ -476,6 +536,7 @@ export function startScenePreview(container, setup, options = {}) {
   }
 
   function animate(timestamp) {
+    frameRateMonitor.update(timestamp);
     timer.update(timestamp);
     const deltaTime = Math.min(timer.getDelta(), 0.05);
 
@@ -502,6 +563,7 @@ export function startScenePreview(container, setup, options = {}) {
       renderer.domElement.remove();
       raceOverlay.remove();
       raceHud.remove();
+      debugStatsPanel.remove();
       wrongWayOverlay.remove();
       loadingOverlay.remove();
       minimapPanel.remove();
@@ -713,6 +775,104 @@ function getVisibleAiMinimapState(aiState, aiVehicle) {
     ...aiState,
     hasVisibleModel: aiVehicle.group.visible !== false
   };
+}
+
+function createFrameRateMonitor() {
+  const sampleWindowMs = 500;
+  let lastTimestamp = null;
+  let sampleElapsed = 0;
+  let sampleFrames = 0;
+  let displayedFps = null;
+  let smoothedFps = null;
+
+  return {
+    update(timestamp = 0) {
+      if (!Number.isFinite(timestamp)) {
+        return;
+      }
+
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp;
+        return;
+      }
+
+      const deltaMs = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      if (deltaMs <= 0) {
+        return;
+      }
+
+      const instantFps = 1000 / deltaMs;
+      smoothedFps = smoothedFps === null
+        ? instantFps
+        : smoothedFps * 0.86 + instantFps * 0.14;
+      sampleElapsed += deltaMs;
+      sampleFrames += 1;
+
+      if (sampleElapsed >= sampleWindowMs) {
+        displayedFps = sampleFrames * 1000 / sampleElapsed;
+        sampleElapsed = 0;
+        sampleFrames = 0;
+      }
+    },
+    getState() {
+      return {
+        fps: displayedFps ?? smoothedFps
+      };
+    }
+  };
+}
+
+function isDecorativePropsGroup(object) {
+  return typeof object?.name === "string" && object.name.endsWith("Props");
+}
+
+function createDebugStatsPanel() {
+  const element = document.createElement("aside");
+  element.className = "debug-stats-panel";
+  element.hidden = true;
+
+  return {
+    element,
+    setVisible(visible) {
+      element.hidden = !visible;
+    },
+    update({ visible, performanceState, rendererInfo, options } = {}) {
+      if (!visible) {
+        return;
+      }
+
+      const memory = rendererInfo?.memory ?? {};
+      const render = rendererInfo?.render ?? {};
+      element.innerHTML = `
+        <strong>Debug Performance</strong>
+        <span>F1 minimap: ${formatDebugToggle(options?.minimap)}</span>
+        <span>F2 shadows: ${formatDebugToggle(options?.shadows)}</span>
+        <span>F3 props: ${formatDebugToggle(options?.props)}</span>
+        <span>FPS: ${formatDebugNumber(performanceState?.fps)}</span>
+        <span>Draw calls: ${formatDebugNumber(render.calls)}</span>
+        <span>Triangles: ${formatDebugNumber(render.triangles)}</span>
+        <span>Geometries: ${formatDebugNumber(memory.geometries)}</span>
+        <span>Textures: ${formatDebugNumber(memory.textures)}</span>
+      `;
+    },
+    remove() {
+      element.remove();
+    }
+  };
+}
+
+function formatDebugToggle(enabled) {
+  return enabled ? "on" : "off";
+}
+
+function formatDebugNumber(value) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+
+  return Math.round(value).toLocaleString("en-US");
 }
 
 function createCheckpointHighlighter(trackInfo) {
