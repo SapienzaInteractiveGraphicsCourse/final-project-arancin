@@ -332,20 +332,10 @@ export function startScenePreview(container, setup, options = {}) {
       const phase = updatedRaceState.phase;
 
       if (phase === RACE_PHASES.COUNTDOWN) {
-        // Lamp 0 (left): red when countdown <= 3.0
-        // Lamp 1 (middle): red when countdown <= 2.0
-        // Lamp 2 (right): red when countdown <= 1.0
-        gantryStartLights[0].color.setHex(countdown <= 3.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[0].emissive.setHex(countdown <= 3.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[0].emissiveIntensity = countdown <= 3.0 ? 2.5 : 0;
-
-        gantryStartLights[1].color.setHex(countdown <= 2.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[1].emissive.setHex(countdown <= 2.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[1].emissiveIntensity = countdown <= 2.0 ? 2.5 : 0;
-
-        gantryStartLights[2].color.setHex(countdown <= 1.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[2].emissive.setHex(countdown <= 1.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[2].emissiveIntensity = countdown <= 1.0 ? 2.5 : 0;
+        const visualLeftToRightLamps = [...gantryStartLights].reverse();
+        setStartLampState(visualLeftToRightLamps[0], countdown <= 3.0, 0xff0000);
+        setStartLampState(visualLeftToRightLamps[1], countdown <= 2.0, 0xff0000);
+        setStartLampState(visualLeftToRightLamps[2], countdown <= 1.0, 0xff0000);
       } else if (phase === RACE_PHASES.RUNNING) {
         // All lamps turn Green!
         gantryStartLights.forEach((lampMat) => {
@@ -633,6 +623,16 @@ function wait(milliseconds) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, milliseconds);
   });
+}
+
+function setStartLampState(lampMaterial, active, activeColor) {
+  if (!lampMaterial) {
+    return;
+  }
+
+  lampMaterial.color.setHex(active ? activeColor : 0x1f1f24);
+  lampMaterial.emissive.setHex(active ? activeColor : 0x000000);
+  lampMaterial.emissiveIntensity = active ? 2.5 : 0;
 }
 
 function readAudioSettings(storage) {
