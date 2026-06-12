@@ -366,8 +366,6 @@ export function startScenePreview(container, setup, options = {}) {
       }
     }
 
-    updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
-
     let aiState = null;
 
     if (aiVehicle && aiController) {
