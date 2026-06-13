@@ -41,6 +41,8 @@ This register tracks assets that are not authored procedurally by the team.
 | Crowd cheering loop | `src/assets/audio/crowd-cheering-main.mp3` | Integrated as low-volume crowd ambience for Vegas Neon and Monaco Formula 1; source/license to verify |
 | Crowd final cheering | `src/assets/audio/crowd-final-cheering.mp3` | Integrated as crowd overlay for overtake and first-place finish events; source/license to verify |
 | Crowd disappointment | `src/assets/audio/crowd-disappointment.mp3` | Integrated as crowd overlay for being overtaken and last-place finish events; source/license to verify |
+| Tropical Beach ambience | `src/assets/audio/tropicalbeach-main.wav` | Integrated as low-volume beach ambience loop for Tropical Beach; source/license to verify |
+| Collision impact | `src/assets/audio/collision-impact.mp3` | Integrated as collision one-shot with procedural fallback; source/license to verify |
 
 ## Follow-up Checks
 

@@ -141,7 +141,8 @@ export function startScenePreview(container, setup, options = {}) {
   const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
-    onExitToSetup: options.onExitToSetup
+    onExitToSetup: options.onExitToSetup,
+    trackId: setup.trackId
   });
   const pauseMenu = createPauseMenu({
     onResume: resumeGame,
@@ -248,6 +249,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   function setPaused(nextPaused) {
     paused = nextPaused;
+    audioManager.setEngineAudible(!paused && !raceManager.getState().finished);
     pauseMenu.setPaused(paused);
   }
 
@@ -263,6 +265,7 @@ export function startScenePreview(container, setup, options = {}) {
     wrongWayDetector.reset();
     ghostRecorder.reset();
     raceManager.startCountdown();
+    audioManager.setEngineAudible(true);
     resetAudioEventState();
     pendingGhostLap = null;
     renderedFinishSignature = "";
@@ -595,6 +598,7 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     if (raceState.finished && !lastAudioFinished) {
+      audioManager.setEngineAudible(false);
       audioManager.playFinish();
       if (raceState.participantCount > 1 && raceState.position === 1) {
         audioManager.playCrowdCheer();
@@ -1067,9 +1071,10 @@ function updateWrongWayOverlay(overlay, wrongWayState) {
   overlay.hidden = !wrongWayState.warning;
 }
 
-function createFinishScreen({ onRestart, onExitToSetup }) {
+function createFinishScreen({ onRestart, onExitToSetup, trackId }) {
   const element = document.createElement("section");
   element.className = "finish-screen";
+  element.dataset.trackTheme = normalizePauseTheme(trackId);
   element.hidden = true;
   element.setAttribute("aria-label", "Race results");
 
