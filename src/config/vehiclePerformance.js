@@ -19,8 +19,8 @@ export const VEHICLE_PERFORMANCE = {
     rollingFriction: 1.6,
     idleFriction: 2.6,
     handbrakeFriction: 8.4,
-    turnRate: 2.45,
-    steeringReturn: 8.5,
+    turnRate: 2.75,
+    steeringReturn: 8.8,
     steeringResponsiveness: 10
   },
   kart: {

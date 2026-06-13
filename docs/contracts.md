@@ -318,6 +318,9 @@ Regole:
 - `RaceManager` non deve dipendere direttamente da mesh o DOM;
 - deve funzionare anche con `trackInfo.checkpoints = []`;
 - un giro completo si chiude sulla start/finish line dopo aver attraversato i checkpoint intermedi;
+- la start/finish line resta nel conteggio totale dei checkpoint della pista;
+- alla partenza la start/finish line non deve essere consumata come primo checkpoint appena il veicolo passa sul traguardo;
+- l'HUD puo mostrare il checkpoint come rapporto dinamico `current/total`, usando `checkpointCount` dalla pista;
 - `race` abilita logica futura per AI;
 - in `race`, `aiEnabled` indica che la scena puo creare un opponent quando centerline e veicoli finali sono disponibili;
 - `time-trial` non deve richiedere AI;
@@ -656,6 +659,49 @@ Regole:
 - la scena resta responsabile di chiamare `update()`, `nextMode()` e `resize()`;
 - camera shake e solo feedback visivo e non deve influenzare fisica/input.
 - la modalita `top` non applica camera shake per restare leggibile in debug.
+
+## Audio Manager
+
+File: `src/systems/AudioManager.js`
+
+Firma:
+
+```js
+const audioManager = new AudioManager({ masterVolume, vehicleId, trackId });
+audioManager.enable() -> Promise<boolean>
+audioManager.disable()
+audioManager.toggle() -> Promise<boolean>
+audioManager.setMasterVolume(volume)
+audioManager.setMuted(muted)
+audioManager.setGameVolume(volume)
+audioManager.setAmbienceVolume(volume)
+audioManager.getSettings()
+audioManager.update(deltaTime, vehicleState, inputState) -> { enginePop }
+audioManager.playUiSelect()
+audioManager.playUiConfirm()
+audioManager.playCountdown(step)
+audioManager.playCheckpoint()
+audioManager.playLapComplete({ bestLap })
+audioManager.playCollision()
+audioManager.playBoost()
+audioManager.playFinish()
+audioManager.playCrowdCheer()
+audioManager.playCrowdDisappointment()
+audioManager.dispose()
+```
+
+Regole:
+
+- usa Web Audio API;
+- usa un motore procedurale morbido per veicolo, con oscillatori, filtro e rumore leggero;
+- usa ambience discreta per pista, avviata insieme all'audio dopo gesto utente;
+- separa volume game e volume ambience tramite gain dedicati;
+- crea o riprende `AudioContext` solo dopo gesto utente;
+- mantiene volume master basso di default;
+- `update()` puo usare `vehicleState.speed`, `speedRatio` e input tenuti per modulare motore, filtro e volume;
+- `update()` puo restituire eventi audio/visivi brevi, per esempio `enginePop`, se un profilo veicolo li supporta;
+- i metodi evento devono essere brevi, non invasivi e sicuri se l'audio non e' ancora abilitato;
+- `dispose()` deve fermare oscillatori, chiudere il context e poter essere chiamato durante uscita scena.
 
 ## Branch Responsibilities
 

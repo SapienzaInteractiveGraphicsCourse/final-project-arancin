@@ -70,6 +70,7 @@ export class RaceManager {
     const safeDeltaTime = Math.max(0, deltaTime);
     const checkpoints = getOrderedCheckpoints(trackInfo);
     this.checkpointCount = checkpoints.length;
+    this.skipStartFinishAsFirstCheckpoint(checkpoints);
 
     if (this.phase === RACE_PHASES.COUNTDOWN) {
       this.updateCountdown(safeDeltaTime);
@@ -185,6 +186,17 @@ export class RaceManager {
     }
 
     this.currentLap += 1;
+  }
+
+  skipStartFinishAsFirstCheckpoint(checkpoints) {
+    if (
+      checkpoints.length > 1 &&
+      this.currentCheckpoint === 0 &&
+      checkpoints[0]?.isStartFinish &&
+      !this.lapHasPassedSectors
+    ) {
+      this.currentCheckpoint = getNextCheckpointIndex(0, checkpoints.length);
+    }
   }
 }
 

@@ -10,6 +10,7 @@ import { createTrackById } from "../tracks/trackFactory.js";
 import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
+import { AudioManager } from "../systems/AudioManager.js";
 import { CameraController } from "../systems/CameraController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
@@ -39,6 +40,12 @@ const VEHICLE_DISPLAY_NAMES = {
   porsche: "Porsche",
   silvia: "Silvia"
 };
+const AUDIO_SETTINGS_KEY = "kart-racing-audio-settings";
+const DEFAULT_AUDIO_SETTINGS = {
+  muted: false,
+  gameVolume: 1,
+  ambienceVolume: 1
+};
 
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
@@ -53,6 +60,14 @@ export function startScenePreview(container, setup, options = {}) {
   vehicle.setBodyColor(selectedBodyColor);
   const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
   const inputManager = new InputManager(window);
+  const audioSettings = readAudioSettings(window.localStorage);
+  const audioManager = new AudioManager({
+    vehicleId: setup.vehicleId,
+    trackId: setup.trackId,
+    gameVolume: audioSettings.gameVolume,
+    ambienceVolume: audioSettings.ambienceVolume
+  });
+  audioManager.setMuted(audioSettings.muted);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const trackInteraction = new TrackInteractionSystem();
@@ -89,22 +104,32 @@ export function startScenePreview(container, setup, options = {}) {
       selectedBodyColor = color;
       setup.bodyColor = color;
       vehicle.setBodyColor(color);
+      audioManager.playUiSelect();
     },
     onConfirm: () => {
       raceArmed = true;
       colorPicker.hide();
+      audioManager.playUiConfirm();
+      void audioManager.enable();
       raceManager.startCountdown();
+      resetAudioEventState();
     }
   });
   colorPicker.element.hidden = true;
   const checkpointHighlighter = createCheckpointHighlighter(track.trackInfo);
   const finishScreen = createFinishScreen({
     onRestart: resetRace,
-    onExitToSetup: options.onExitToSetup
+    onExitToSetup: options.onExitToSetup,
+    trackId: setup.trackId
   });
   const pauseMenu = createPauseMenu({
     onResume: resumeGame,
-    onExitToSetup: options.onExitToSetup
+    onExitToSetup: options.onExitToSetup,
+    audioManager,
+    trackId: setup.trackId,
+    onAudioSettingsChange: (settings) => {
+      writeAudioSettings(window.localStorage, settings);
+    }
   });
   let animationFrameId = 0;
   let paused = false;
@@ -112,6 +137,14 @@ export function startScenePreview(container, setup, options = {}) {
   let disposed = false;
   let renderedFinishSignature = "";
   let totalElapsedTime = 0;
+  let lastAudioCountdownStep = null;
+  let lastAudioCheckpoint = 0;
+  let lastAudioLapCount = 0;
+  let lastAudioBestLapTime = savedBestLapTime;
+  let lastAudioFinished = false;
+  let lastAudioBoostActive = false;
+  let lastAudioRacePosition = raceManager.getState().position;
+  let lastAudioRacePhase = raceManager.getState().phase;
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
@@ -174,6 +207,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   function setPaused(nextPaused) {
     paused = nextPaused;
+    audioManager.setEngineAudible(!paused && !raceManager.getState().finished);
     pauseMenu.setPaused(paused);
   }
 
@@ -188,9 +222,24 @@ export function startScenePreview(container, setup, options = {}) {
     raceManager.reset();
     wrongWayDetector.reset();
     raceManager.startCountdown();
+    audioManager.setEngineAudible(true);
+    resetAudioEventState();
     renderedFinishSignature = "";
     finishScreen.setVisible(false);
     totalElapsedTime = 0;
+  }
+
+  function resetAudioEventState() {
+    const raceState = raceManager.getState();
+
+    lastAudioCountdownStep = null;
+    lastAudioCheckpoint = raceState.currentCheckpoint;
+    lastAudioLapCount = raceState.lapTimes.length;
+    lastAudioBestLapTime = raceState.bestLapTime;
+    lastAudioFinished = raceState.finished;
+    lastAudioBoostActive = false;
+    lastAudioRacePosition = raceState.position;
+    lastAudioRacePhase = raceState.phase;
   }
 
   function update(deltaTime) {
@@ -221,6 +270,7 @@ export function startScenePreview(container, setup, options = {}) {
         trackName: track.trackInfo.name
       });
       minimap.update({ playerState: state });
+      audioManager.update(deltaTime, state);
       return;
     }
 
@@ -237,6 +287,7 @@ export function startScenePreview(container, setup, options = {}) {
     const currentVehicleState = controller.getState();
     const updatedRaceState = raceManager.update(deltaTime, currentVehicleState, track.trackInfo);
     const canDrive = updatedRaceState.phase === RACE_PHASES.RUNNING;
+    const heldInputState = canDrive ? inputManager.getHeldState() : {};
     const opponentStates = aiController ? [aiController.getState()] : [];
     const environmentState = trackInteraction.update(currentVehicleState, track.trackInfo, {
       deltaTime,
@@ -248,10 +299,15 @@ export function startScenePreview(container, setup, options = {}) {
 
     const state = updatedRaceState.finished
       ? controller.getState()
-      : controller.update(deltaTime, canDrive ? inputManager.getHeldState() : {}, environmentState);
+      : controller.update(deltaTime, heldInputState, environmentState);
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
+    const audioEvents = audioManager.update(deltaTime, state, heldInputState);
+    if (audioEvents?.enginePop) {
+      vehicle.triggerExhaustPop?.();
+    }
+    updateCameraFollow(cameraController, track.trackInfo, state);
 
     // Auto-enable headlights for night circuits (Vegas)
     if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
@@ -279,20 +335,10 @@ export function startScenePreview(container, setup, options = {}) {
       const phase = updatedRaceState.phase;
 
       if (phase === RACE_PHASES.COUNTDOWN) {
-        // Lamp 0 (left): red when countdown <= 3.0
-        // Lamp 1 (middle): red when countdown <= 2.0
-        // Lamp 2 (right): red when countdown <= 1.0
-        gantryStartLights[0].color.setHex(countdown <= 3.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[0].emissive.setHex(countdown <= 3.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[0].emissiveIntensity = countdown <= 3.0 ? 2.5 : 0;
-
-        gantryStartLights[1].color.setHex(countdown <= 2.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[1].emissive.setHex(countdown <= 2.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[1].emissiveIntensity = countdown <= 2.0 ? 2.5 : 0;
-
-        gantryStartLights[2].color.setHex(countdown <= 1.0 ? 0xff0000 : 0x1f1f24);
-        gantryStartLights[2].emissive.setHex(countdown <= 1.0 ? 0xff0000 : 0x000000);
-        gantryStartLights[2].emissiveIntensity = countdown <= 1.0 ? 2.5 : 0;
+        const visualLeftToRightLamps = [...gantryStartLights].reverse();
+        setStartLampState(visualLeftToRightLamps[0], countdown <= 3.0, 0xff0000);
+        setStartLampState(visualLeftToRightLamps[1], countdown <= 2.0, 0xff0000);
+        setStartLampState(visualLeftToRightLamps[2], countdown <= 1.0, 0xff0000);
       } else if (phase === RACE_PHASES.RUNNING) {
         // All lamps turn Green!
         gantryStartLights.forEach((lampMat) => {
@@ -338,6 +384,7 @@ export function startScenePreview(container, setup, options = {}) {
 
     updatePlayerRacePosition(raceManager, state, aiState, track.trackInfo);
     const raceState = raceManager.getState();
+    updateRaceAudioCues(raceState, environmentState);
 
     if (environmentState.impact) {
       cameraController.applyShake(environmentState.impact.type === "opponent" ? 0.45 : 1);
@@ -368,6 +415,73 @@ export function startScenePreview(container, setup, options = {}) {
     );
   }
 
+  function updateRaceAudioCues(raceState, environmentState) {
+    if (raceState.phase === RACE_PHASES.COUNTDOWN) {
+      const countdownStep = Math.ceil(raceState.countdown);
+
+      if (countdownStep >= 1 && countdownStep <= 3 && countdownStep !== lastAudioCountdownStep) {
+        audioManager.playCountdown(countdownStep);
+        lastAudioCountdownStep = countdownStep;
+      }
+    }
+
+    if (lastAudioRacePhase === RACE_PHASES.COUNTDOWN && raceState.phase === RACE_PHASES.RUNNING) {
+      audioManager.playCountdown(0);
+      lastAudioCountdownStep = 0;
+    }
+
+    const boostActive = environmentState.boostFactor > 1;
+    if (boostActive && !lastAudioBoostActive) {
+      audioManager.playBoost();
+    }
+    lastAudioBoostActive = boostActive;
+
+    if (environmentState.impact) {
+      audioManager.playCollision();
+    }
+
+    if (
+      raceState.phase === RACE_PHASES.RUNNING
+      && raceState.participantCount > 1
+      && raceState.position !== lastAudioRacePosition
+    ) {
+      if (raceState.position < lastAudioRacePosition) {
+        audioManager.playCrowdCheer();
+      } else {
+        audioManager.playCrowdDisappointment();
+      }
+    }
+
+    if (raceState.lapTimes.length > lastAudioLapCount) {
+      const bestLap = raceState.bestLapTime !== lastAudioBestLapTime;
+      if (!raceState.finished) {
+        audioManager.playLapComplete({ bestLap });
+      }
+      lastAudioLapCount = raceState.lapTimes.length;
+      lastAudioBestLapTime = raceState.bestLapTime;
+    } else if (raceState.currentCheckpoint !== lastAudioCheckpoint && raceState.phase === RACE_PHASES.RUNNING) {
+      const crossedInitialStart = lastAudioCheckpoint === 0 && raceState.currentCheckpoint === 1;
+      if (!crossedInitialStart) {
+        audioManager.playCheckpoint();
+      }
+    }
+
+    if (raceState.finished && !lastAudioFinished) {
+      audioManager.setEngineAudible(false);
+      audioManager.playFinish();
+      if (raceState.participantCount > 1 && raceState.position === 1) {
+        audioManager.playCrowdCheer();
+      } else if (raceState.participantCount > 1 && raceState.position === raceState.participantCount) {
+        audioManager.playCrowdDisappointment();
+      }
+    }
+
+    lastAudioCheckpoint = raceState.currentCheckpoint;
+    lastAudioFinished = raceState.finished;
+    lastAudioRacePosition = raceState.position;
+    lastAudioRacePhase = raceState.phase;
+  }
+
   function animate(timestamp) {
     timer.update(timestamp);
     const deltaTime = Math.min(timer.getDelta(), 0.05);
@@ -388,6 +502,7 @@ export function startScenePreview(container, setup, options = {}) {
       window.removeEventListener("resize", resize);
       timer.dispose();
       inputManager.dispose();
+      audioManager.dispose();
       controller.dispose();
       cameraController.dispose();
       renderer.dispose();
@@ -514,6 +629,44 @@ function wait(milliseconds) {
   });
 }
 
+function setStartLampState(lampMaterial, active, activeColor) {
+  if (!lampMaterial) {
+    return;
+  }
+
+  lampMaterial.color.setHex(active ? activeColor : 0x1f1f24);
+  lampMaterial.emissive.setHex(active ? activeColor : 0x000000);
+  lampMaterial.emissiveIntensity = active ? 2.5 : 0;
+}
+
+function readAudioSettings(storage) {
+  try {
+    const parsed = JSON.parse(storage.getItem(AUDIO_SETTINGS_KEY) ?? "{}");
+
+    return {
+      muted: Boolean(parsed.muted),
+      gameVolume: normalizeVolume(parsed.gameVolume, DEFAULT_AUDIO_SETTINGS.gameVolume),
+      ambienceVolume: normalizeVolume(parsed.ambienceVolume, DEFAULT_AUDIO_SETTINGS.ambienceVolume)
+    };
+  } catch {
+    return { ...DEFAULT_AUDIO_SETTINGS };
+  }
+}
+
+function writeAudioSettings(storage, settings) {
+  storage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify({
+    muted: Boolean(settings.muted),
+    gameVolume: normalizeVolume(settings.gameVolume, DEFAULT_AUDIO_SETTINGS.gameVolume),
+    ambienceVolume: normalizeVolume(settings.ambienceVolume, DEFAULT_AUDIO_SETTINGS.ambienceVolume)
+  }));
+}
+
+function normalizeVolume(value, fallback) {
+  const normalized = Number(value);
+
+  return Number.isFinite(normalized) ? Math.min(1, Math.max(0, normalized)) : fallback;
+}
+
 function createMinimapPanel() {
   const panel = document.createElement("aside");
   panel.className = "race-minimap-panel";
@@ -538,7 +691,10 @@ function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) 
 
   const playerProgress = findClosestProgress(centerline, playerState.position.x, playerState.position.z);
   const playerScore = getRaceProgressScore(raceState.currentLap, playerProgress, raceState.totalLaps);
-  const aiScore = getRaceProgressScore(aiState.lap, aiState.progress, raceState.totalLaps);
+  const aiProgress = !aiState.hasCrossedStartLine && aiState.progress > 0.5
+    ? aiState.progress - 1
+    : aiState.progress;
+  const aiScore = getRaceProgressScore(aiState.lap, aiProgress, raceState.totalLaps);
   const playerPosition = playerScore >= aiScore ? 1 : 2;
 
   raceManager.setPlayerPosition(playerPosition, 2);
@@ -546,6 +702,10 @@ function updatePlayerRacePosition(raceManager, playerState, aiState, trackInfo) 
 
 function getRaceProgressScore(lap, progress, totalLaps) {
   return Math.min(totalLaps, Math.max(1, lap) - 1 + Math.max(0, Math.min(1, progress)));
+}
+
+function updateCameraFollow(cameraController, trackInfo, vehicleState) {
+  cameraController.updateFollowCamera(vehicleState, trackInfo);
 }
 
 function applyAiVehicleTransform(vehicle, aiState) {
@@ -639,9 +799,10 @@ function updateWrongWayOverlay(overlay, wrongWayState) {
   overlay.hidden = !wrongWayState.warning;
 }
 
-function createFinishScreen({ onRestart, onExitToSetup }) {
+function createFinishScreen({ onRestart, onExitToSetup, trackId }) {
   const element = document.createElement("section");
   element.className = "finish-screen";
+  element.dataset.trackTheme = normalizePauseTheme(trackId);
   element.hidden = true;
   element.setAttribute("aria-label", "Race results");
 
@@ -790,11 +951,13 @@ function formatLapRows(lapTimes, bestLapTime) {
     .join("");
 }
 
-function createPauseMenu({ onResume, onExitToSetup }) {
+function createPauseMenu({ onResume, onExitToSetup, audioManager, trackId, onAudioSettingsChange }) {
   const element = document.createElement("section");
   element.className = "pause-menu";
+  element.dataset.trackTheme = normalizePauseTheme(trackId);
   element.hidden = true;
   element.setAttribute("aria-label", "Pause menu");
+  const audioSettings = audioManager.getSettings();
   element.innerHTML = `
     <div class="pause-panel">
       <p class="pause-eyebrow">Paused</p>
@@ -802,6 +965,20 @@ function createPauseMenu({ onResume, onExitToSetup }) {
       <div class="pause-actions">
         <button class="pause-button" type="button" data-action="resume">Resume</button>
         <button class="pause-button pause-button-secondary" type="button" data-action="setup">Main Menu</button>
+      </div>
+      <div class="pause-audio-panel" aria-label="Audio settings">
+        <label class="pause-audio-toggle">
+          <input type="checkbox" data-audio-muted ${audioSettings.muted ? "" : "checked"}>
+          <span>Audio</span>
+        </label>
+        <label class="pause-audio-control">
+          <span>Game</span>
+          <input type="range" min="0" max="100" value="${Math.round(audioSettings.gameVolume * 100)}" data-audio-volume="game">
+        </label>
+        <label class="pause-audio-control">
+          <span>Ambience</span>
+          <input type="range" min="0" max="100" value="${Math.round(audioSettings.ambienceVolume * 100)}" data-audio-volume="ambience">
+        </label>
       </div>
     </div>
   `;
@@ -821,12 +998,40 @@ function createPauseMenu({ onResume, onExitToSetup }) {
     onExitToSetup?.();
   });
 
+  element.addEventListener("input", (event) => {
+    const target = event.target;
+
+    if (target.matches("[data-audio-muted]")) {
+      audioManager.setMuted(!target.checked);
+      onAudioSettingsChange?.(audioManager.getSettings());
+      return;
+    }
+
+    if (target.matches("[data-audio-volume]")) {
+      const value = Number(target.value) / 100;
+      if (target.dataset.audioVolume === "game") {
+        audioManager.setGameVolume(value);
+      } else {
+        audioManager.setAmbienceVolume(value);
+      }
+      onAudioSettingsChange?.(audioManager.getSettings());
+    }
+  });
+
   return {
     element,
     setPaused(paused) {
       element.hidden = !paused;
     }
   };
+}
+
+function normalizePauseTheme(trackId) {
+  if (trackId === "vegas" || trackId === "beach" || trackId === "monaco") {
+    return trackId;
+  }
+
+  return "default";
 }
 
 function createRaceOverlay() {
