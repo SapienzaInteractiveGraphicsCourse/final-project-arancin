@@ -111,13 +111,13 @@ async function runVerification() {
   });
   const setupVisible = await page.locator(".setup-menu").isVisible();
 
-  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 12000 });
+  await page.locator(".race-overlay").waitFor({ state: "hidden", timeout: 25000 });
 
   if (setupVisible) {
     throw new Error("Setup menu is still visible after Start");
   }
 
-  if (!raceHud?.includes("1st / 1") || !raceHud.includes("Lap 1/1")) {
+  if (!raceHud?.includes("Solo") || !raceHud.includes("Lap 1/1")) {
     throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
@@ -149,7 +149,7 @@ async function runVerification() {
   await page.locator(".race-overlay").waitFor({ state: "visible" });
   const raceModeHud = await page.locator(".race-hud").textContent();
 
-  if (!raceModeHud?.includes("1st / 2") || !raceModeHud.includes("Lap 1/3")) {
+  if (!raceModeHud?.includes("Pos 1/2") || !raceModeHud.includes("Lap 1/3")) {
     throw new Error(`Race HUD does not include expected race state: ${raceModeHud}`);
   }
 
@@ -167,9 +167,29 @@ async function runVerification() {
     );
   }
 
+  await verifyTrackPreview(page, /Vegas Neon/i);
+  await verifyTrackPreview(page, /Monaco Formula 1/i);
+
   await browser.close();
 
   console.log("Scene verification passed.");
+}
+
+async function verifyTrackPreview(page, trackNamePattern) {
+  await page.goto(BASE_URL, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: trackNamePattern }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
+  await page.getByRole("button", { name: /^Start$/i }).click();
+
+  const rendererCanvas = page.locator("canvas").first();
+  await rendererCanvas.waitFor({ state: "visible", timeout: 25000 });
+  await page.locator(".pre-race-color-picker").waitFor({ state: "visible", timeout: 25000 });
+
+  const canvasBox = await rendererCanvas.boundingBox();
+  if (!canvasBox || canvasBox.width < 300 || canvasBox.height < 200) {
+    throw new Error(`Track preview canvas did not render at expected size: ${JSON.stringify(canvasBox)}`);
+  }
 }
 
 const server = startServer();

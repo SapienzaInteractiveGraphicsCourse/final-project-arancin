@@ -1,0 +1,2078 @@
+import * as THREE from "three";
+import { createFlatStandardMaterial } from "../trackMaterials.js";
+import {
+  buildVegasBillboards,
+  colorToHexStr,
+  createBillboardMaterial,
+  getCachedVegasCanvasTexture,
+  getCachedWelcomeToVegasTexture,
+  isNearGrandstand
+} from "./vegas/billboards.js";
+import { addDecorativePointLight } from "./vegas/lights.js";
+import { addVegasF1Venue } from "./vegas/venue.js";
+import {
+  clampPropPosition,
+  getHeading,
+  getRightVector,
+  getSafeRoadsidePosition,
+  isNearAnyProgress,
+  markShadow,
+  optimizeStaticDecorativeProps,
+  pseudoRandom
+} from "./shared.js";
+
+const windowMaterialCache = new Map();
+function getCachedWindowMaterial(color, lit) {
+  const key = `${color}_${lit}`;
+  if (!windowMaterialCache.has(key)) {
+    windowMaterialCache.set(key, createWindowMaterial(color, lit));
+  }
+  return windowMaterialCache.get(key);
+}
+
+const windowGeometryCache = new Map();
+function getCachedWindowGeometry(w, h, d) {
+  const key = `${w.toFixed(2)}_${h.toFixed(2)}_${d.toFixed(2)}`;
+  if (!windowGeometryCache.has(key)) {
+    windowGeometryCache.set(key, new THREE.BoxGeometry(w, h, d));
+  }
+  return windowGeometryCache.get(key);
+}
+
+function createWindowMaterial(color, lit) {
+  return createFlatStandardMaterial({
+    color: lit ? color : 0x050509,
+    emissive: lit ? color : 0x000000,
+    emissiveIntensity: lit ? 5.2 : 0,
+    roughness: lit ? 0.22 : 0.7,
+    metalness: lit ? 0.04 : 0.02
+  });
+}
+
+function addWindowGrid(group, block, neonColors, seed, face) {
+  const isFront = face === "front";
+  const columns = Math.max(3, Math.floor((isFront ? block.width : block.depth) / 1.6));
+  const rows = Math.max(6, Math.floor(block.height / 2.2));
+
+  const windowWidth = isFront ? Math.min(0.5, block.width / (columns * 2.2)) : 0.08;
+  const windowDepth = isFront ? 0.08 : Math.min(0.5, block.depth / (columns * 2.2));
+  const windowHeight = Math.min(0.45, block.height / (rows * 2.8));
+
+  const xStep = block.width / (columns + 1);
+  const zStep = block.depth / (columns + 1);
+  const yStep = block.height / (rows + 1);
+
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
+  const darkMaterial = getCachedWindowMaterial(0x070811, false);
+  const geometry = getCachedWindowGeometry(windowWidth, windowHeight, windowDepth);
+
+  const litMatricesByColor = colorsList.map(() => []);
+  const darkMatrices = [];
+  const matrix = new THREE.Matrix4();
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (isFront ? 0 : 17));
+      const lit = noise > 0.35;
+      const position = new THREE.Vector3();
+
+      if (isFront) {
+        position.set(
+          block.x + (column + 1) * xStep - block.width * 0.5,
+          block.y - block.height * 0.5 + (row + 1) * yStep,
+          block.z + block.depth * 0.5 + 0.028
+        );
+      } else {
+        position.set(
+          block.x + block.width * 0.5 + 0.028,
+          block.y - block.height * 0.5 + (row + 1) * yStep,
+          block.z + (column + 1) * zStep - block.depth * 0.5
+        );
+      }
+
+      matrix.makeTranslation(position.x, position.y, position.z);
+      if (lit) {
+        const colorIndex = Math.floor(pseudoRandom(seed + row * 13.3 + column * 7.7) * colorsList.length);
+        litMatricesByColor[colorIndex].push(matrix.clone());
+      } else {
+        darkMatrices.push(matrix.clone());
+      }
+    }
+  }
+
+  colorsList.forEach((color, colorIndex) => {
+    const matrices = litMatricesByColor[colorIndex];
+    if (matrices.length === 0) {
+      return;
+    }
+    const litMaterial = getCachedWindowMaterial(color, true);
+    const windows = new THREE.InstancedMesh(geometry, litMaterial, matrices.length);
+    windows.name = `LitWindows_${colorIndex}`;
+    windows.receiveShadow = true;
+    matrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
+    windows.instanceMatrix.needsUpdate = true;
+    group.add(windows);
+  });
+
+  if (darkMatrices.length > 0) {
+    const windows = new THREE.InstancedMesh(geometry, darkMaterial, darkMatrices.length);
+    windows.name = "DarkWindows";
+    windows.receiveShadow = true;
+    darkMatrices.forEach((windowMatrix, index) => windows.setMatrixAt(index, windowMatrix));
+    windows.instanceMatrix.needsUpdate = true;
+    group.add(windows);
+  }
+}
+
+function addVerticalEdgeHighlights(group, block, material) {
+  const thickness = 0.22;
+  const edgeGeometry = new THREE.BoxGeometry(thickness, block.height * 1.01, thickness);
+  const x = block.width * 0.5 + thickness * 0.45;
+  const z = block.depth * 0.5 + thickness * 0.45;
+  const corners = [
+    [-x, -z],
+    [x, -z],
+    [-x, z],
+    [x, z]
+  ];
+
+  corners.forEach(([cornerX, cornerZ]) => {
+    const edge = new THREE.Mesh(edgeGeometry, material);
+    edge.position.set(block.x + cornerX, block.y, block.z + cornerZ);
+    edge.castShadow = true;
+    edge.receiveShadow = true;
+    group.add(edge);
+  });
+}
+
+function addNeonFacadeStrips(group, block, neonColors, seed) {
+  const stripCount = 2 + Math.floor(pseudoRandom(seed + 12.7) * 3);
+  const geometry = new THREE.BoxGeometry(0.12, block.height * 0.86, 0.09);
+
+  for (let index = 0; index < stripCount; index += 1) {
+    const color = neonColors[(seed + index) % neonColors.length];
+    const material = createFlatStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 5,
+      roughness: 0.16,
+      metalness: 0.04
+    });
+    const strip = new THREE.Mesh(geometry, material);
+    const xAlpha = (index + 1) / (stripCount + 1);
+    strip.position.set(
+      block.x + xAlpha * block.width - block.width * 0.5,
+      block.y,
+      block.z + block.depth * 0.5 + 0.08
+    );
+    strip.receiveShadow = true;
+    group.add(strip);
+  }
+}
+
+function addRoofDetail(group, topY, width, depth, neonColor, variant) {
+  const material = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 3.2,
+    roughness: 0.18,
+    metalness: 0.06
+  });
+
+  if (variant % 2 === 0) {
+    const antenna = markShadow(
+      new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 1.7, 6), material)
+    );
+    antenna.position.y = topY + 0.85;
+    group.add(antenna);
+
+    const beacon = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.26), material));
+    beacon.position.y = topY + 1.78;
+    group.add(beacon);
+    return;
+  }
+
+  const ring = markShadow(
+    new THREE.Mesh(
+      new THREE.TorusGeometry(Math.min(width, depth) * 0.36, 0.045, 6, 24),
+      material
+    )
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = topY + 0.12;
+  group.add(ring);
+}
+
+function addRoofBillboard(group, block, neonColors, seed) {
+  const topY = block.y + block.height * 0.5;
+  const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
+
+  // Size scales with the top block (blocks[2] crown)
+  const billboardWidth = Math.max(3.0, block.width * 1.25);
+  const billboardHeight = billboardWidth * 0.5;
+  const billboardDepth = 0.28;
+  const poleHeight = Math.max(1.0, billboardHeight * 0.35);
+
+  const billboardGroup = new THREE.Group();
+  billboardGroup.position.set(block.x, topY, block.z);
+
+  const neonColor = colorsList[seed % colorsList.length];
+  const neonColorHex = colorToHexStr(neonColor);
+
+  // 1. Support poles
+  const poleMaterial = createBillboardMaterial({ color: 0x1a1a24, roughness: 0.68, metalness: 0.2 });
+  const leftPole = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, poleHeight, 6), poleMaterial));
+  leftPole.position.set(-billboardWidth * 0.28, poleHeight * 0.5, 0);
+  const rightPole = leftPole.clone();
+  rightPole.position.x = billboardWidth * 0.28;
+  billboardGroup.add(leftPole, rightPole);
+
+  // 2. Billboard backing & frame
+  const frameMaterial = createBillboardMaterial({ color: 0x0a0a0f, roughness: 0.5, metalness: 0.1 });
+  const backing = markShadow(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(billboardWidth, billboardHeight, billboardDepth),
+      frameMaterial
+    )
+  );
+  backing.position.y = poleHeight + billboardHeight * 0.5;
+  billboardGroup.add(backing);
+
+  // 3. Neon glowing borders
+  const borderMaterial = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 4.8,
+    roughness: 0.15
+  });
+
+  const borderThickness = 0.08;
+  const topBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  topBorder.position.set(0, poleHeight + billboardHeight + borderThickness * 0.5, 0);
+
+  const bottomBorder = new THREE.Mesh(
+    new THREE.BoxGeometry(billboardWidth + 0.16, borderThickness, billboardDepth + 0.04),
+    borderMaterial
+  );
+  bottomBorder.position.set(0, poleHeight - borderThickness * 0.5, 0);
+  billboardGroup.add(topBorder, bottomBorder);
+
+  // 4. Advertising Titles
+  const vegasTitles = [
+    { title: "JACKPOT", subtitle: "SPIN & WIN" },
+    { title: "CASINO", subtitle: "PLAY NOW" },
+    { title: "777 SLOTS", subtitle: "$1,000,000" },
+    { title: "LAS VEGAS", subtitle: "WELCOME" },
+    { title: "ARANCIN GP", subtitle: "RACING TONIGHT" },
+    { title: "NEON CLUB", subtitle: "OPEN 24H" },
+    { title: "SAPIENZA", subtitle: "GRAPHICS LAB" },
+    { title: "HIGH ROLLER", subtitle: "POKER ROOM" },
+    { title: "HOTEL NEON", subtitle: "VACANCY" },
+    { title: "VIP LOUNGE", subtitle: "FREE DRINKS" }
+  ];
+  const ad = vegasTitles[seed % vegasTitles.length];
+
+  // 5. Canvas Text Texture with black background
+  const textTexture = getCachedVegasCanvasTexture(512, 256, ad.title, ad.subtitle, neonColorHex, "#ffffff");
+  const textMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: textTexture,
+    emissive: 0xffffff,
+    emissiveMap: textTexture,
+    emissiveIntensity: 1.8,
+    roughness: 0.25,
+    metalness: 0.08,
+    flatShading: true
+  });
+
+  const textPlaneFront = new THREE.Mesh(
+    new THREE.PlaneGeometry(billboardWidth - 0.2, billboardHeight - 0.2),
+    textMaterial
+  );
+  textPlaneFront.position.set(0, poleHeight + billboardHeight * 0.5, billboardDepth * 0.5 + 0.01);
+
+  const textPlaneBack = textPlaneFront.clone();
+  textPlaneBack.rotation.y = Math.PI;
+  textPlaneBack.position.z = -(billboardDepth * 0.5 + 0.01);
+
+  billboardGroup.add(textPlaneFront, textPlaneBack);
+
+  group.add(billboardGroup);
+}
+
+function addSkyLaser(group, topY, neonColor, variant) {
+  const material = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 2.8,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0.55
+  });
+  material.depthWrite = false;
+
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.1, 180, 8, 1, true), material);
+  beam.name = `VegasSkyLaser:${variant}`;
+  beam.position.set(0, topY + 90, 0);
+  beam.rotation.x = (variant % 2 === 0 ? 1 : -1) * 0.08;
+  beam.rotation.z = (variant % 3 - 1) * 0.06;
+  group.add(beam);
+}
+
+function addMegaScreen(group, block, color, side, variant) {
+  const screenMaterial = createFlatStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 5.4,
+    roughness: 0.14,
+    metalness: 0.04
+  });
+  const frameMaterial = createFlatStandardMaterial({
+    color: 0x080912,
+    roughness: 0.36,
+    metalness: 0.26
+  });
+  const frame = new THREE.Group();
+  const screenWidth = side === "front" ? block.width * 0.52 : 0.12;
+  const screenDepth = side === "front" ? 0.12 : block.depth * 0.52;
+  const screenHeight = Math.min(block.height * 0.26, 7.5);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(screenWidth, screenHeight, screenDepth), screenMaterial);
+  const backing = markShadow(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(screenWidth + 0.18, screenHeight + 0.18, screenDepth + 0.04),
+      frameMaterial
+    )
+  );
+
+  if (side === "front") {
+    frame.position.set(block.x, block.y + block.height * 0.1, block.z + block.depth * 0.5 + 0.08);
+  } else {
+    frame.position.set(block.x + block.width * 0.5 + 0.08, block.y + block.height * 0.08, block.z);
+  }
+
+  panel.receiveShadow = true;
+  backing.position.z = side === "front" ? -0.025 : 0;
+  panel.position.z = side === "front" ? 0.035 : 0;
+
+  if (side !== "front") {
+    backing.position.x = -0.025;
+    panel.position.x = 0.035;
+  }
+
+  frame.add(backing, panel);
+
+  const stripeMaterial = createFlatStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 2.2,
+    roughness: 0.2
+  });
+  const stripeCount = 2 + (variant % 3);
+
+  for (let index = 0; index < stripeCount; index += 1) {
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        side === "front" ? screenWidth * 0.62 : 0.035,
+        0.06,
+        side === "front" ? 0.035 : screenDepth * 0.62
+      ),
+      stripeMaterial
+    );
+    stripe.position.set(
+      side === "front" ? 0 : 0.065,
+      (index - (stripeCount - 1) * 0.5) * 0.22,
+      side === "front" ? 0.075 : 0
+    );
+    frame.add(stripe);
+  }
+
+  group.add(frame);
+}
+
+function createVegasBuilding({ position, rotationY, height, width, depth, color, neonColor, neonColors, index }) {
+  const group = new THREE.Group();
+  group.position.copy(position);
+  group.rotation.y = rotationY;
+  group.name = `VegasSteppedSkyscraper:${index}`;
+
+  const bodyMaterial = createFlatStandardMaterial({
+    color,
+    roughness: 0.65,
+    metalness: 0.25,
+    emissive: 0x020204,
+    emissiveIntensity: 0.2
+  });
+
+  const edgeMaterial = createFlatStandardMaterial({
+    color: neonColor,
+    emissive: neonColor,
+    emissiveIntensity: 5.2,
+    roughness: 0.2,
+    metalness: 0.08
+  });
+
+  const baseHeight = height * 0.2;
+  const towerHeight = height * 0.62;
+  const crownHeight = height * 0.18;
+  const blocks = [
+    {
+      x: 0,
+      y: baseHeight * 0.5,
+      z: 0,
+      width,
+      height: baseHeight,
+      depth
+    },
+    {
+      x: (index % 3 - 1) * width * 0.08,
+      y: baseHeight + towerHeight * 0.5,
+      z: index % 2 === 0 ? depth * 0.05 : -depth * 0.04,
+      width: width * 0.88,
+      height: towerHeight,
+      depth: depth * 0.9
+    },
+    {
+      x: (index % 2 === 0 ? -1 : 1) * width * 0.08,
+      y: baseHeight + towerHeight + crownHeight * 0.5,
+      z: 0,
+      width: width * 0.58,
+      height: crownHeight,
+      depth: depth * 0.62
+    }
+  ];
+
+  blocks.forEach((block, blockIndex) => {
+    const mesh = markShadow(
+      new THREE.Mesh(new THREE.BoxGeometry(block.width, block.height, block.depth), bodyMaterial)
+    );
+    mesh.position.set(block.x, block.y, block.z);
+    group.add(mesh);
+
+    // Add window grids to tower (block 1) and crown (block 2) on both front and side
+    if (blockIndex === 1 || blockIndex === 2) {
+      addWindowGrid(group, block, neonColors, index * 31 + blockIndex * 7, "front");
+      addWindowGrid(group, block, neonColors, index * 43 + blockIndex * 11, "side");
+    }
+  });
+
+  // Outline both the tower and the crown with glowing vertical corner LEDs
+  addVerticalEdgeHighlights(group, blocks[1], edgeMaterial);
+  addVerticalEdgeHighlights(group, blocks[2], edgeMaterial);
+
+  // Alternate between roof billboard (50%) and traditional roof details (antennas/rings)
+  if (index % 2 === 0) {
+    addRoofBillboard(group, blocks[2], neonColors, index);
+  } else {
+    addRoofDetail(group, height * 1.04, width, depth, neonColor, index);
+  }
+
+  if ([0, 12, 28, 44].includes(index)) {
+    addSkyLaser(group, height * 1.06, neonColors[(index + 1) % neonColors.length], index);
+  }
+
+  return group;
+}
+
+function generateCitySkyline(curve, group, definition) {
+  const colors = definition.palette.neon;
+  const bodyColors = [0x050508, 0x07070b, 0x090812, 0x08050c];
+  const sampleCount = 20;
+
+  for (let index = 0; index < sampleCount; index += 1) {
+    // Alternate left and right side of the track
+    const side = index % 2 === 0 ? 1 : -1;
+
+    // Spaced out progress with a small jitter to keep it natural but prevent overlap
+    const progressJitter = (pseudoRandom(index + 13.7) * 0.4 - 0.2) / sampleCount;
+    const progress = ((index + 0.5) / sampleCount + progressJitter + 1.0) % 1.0;
+
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+
+    const buildingIndex = index;
+
+    // Wider, taller, and more proportioned buildings
+    const height = 32 + pseudoRandom(buildingIndex + 4.2) * 33;
+    const width = 8 + pseudoRandom(buildingIndex + 8.6) * 4;
+    const depth = 8 + pseudoRandom(buildingIndex + 13.1) * 4;
+
+    // Position them further out so they are in the background and don't intersect other props
+    const skylineOffset = definition.roadWidth * 0.5 + 82 + pseudoRandom(buildingIndex + 21.5) * 32;
+    const heading = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+
+    // Dynamically calculate a safe position that is guaranteed not to overlap ANY part of the track
+    const position = getSafeRoadsidePosition(curve, progress, side, skylineOffset, definition.roadWidth * 0.5, 62);
+
+    const building = createVegasBuilding({
+      position,
+      rotationY: heading,
+      height,
+      width,
+      depth,
+      color: bodyColors[buildingIndex % bodyColors.length],
+      neonColor: colors[buildingIndex % colors.length],
+      neonColors: colors,
+      index: buildingIndex
+    });
+
+    group.add(building);
+  }
+}
+
+function addVegasTunnel(group, curve, definition, baseProgress, tunnelIndex, archCount = 18, progressStep = 0.008) {
+  const colors = definition.palette.neon;
+  const tunnel = new THREE.Group();
+  tunnel.name = `${definition.name}:NeonTunnel:${tunnelIndex}`;
+
+  for (let segment = 0; segment < archCount; segment += 1) {
+    const progress = (baseProgress + segment * progressStep) % 1;
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const color = colors[(segment + tunnelIndex) % colors.length];
+    const material = createFlatStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 3,
+      roughness: 0.2,
+      metalness: 0.06
+    });
+    const arch = new THREE.Group();
+    arch.position.copy(point);
+    arch.rotation.y = getHeading(tangent);
+
+    const span = definition.roadWidth + 3.2;
+    const height = 4.2;
+    const postWidth = 0.28;
+    const archDepth = 0.34;
+    const left = new THREE.Mesh(new THREE.BoxGeometry(postWidth, height, archDepth), material);
+    left.position.set(-span * 0.5, height * 0.5, 0);
+    const right = left.clone();
+    right.position.x = span * 0.5;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(span, postWidth, archDepth), material);
+    roof.position.set(0, height, 0);
+    left.castShadow = true;
+    left.receiveShadow = true;
+    right.castShadow = true;
+    right.receiveShadow = true;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    arch.add(left, right, roof);
+
+    if (segment % 4 === 0) {
+      addDecorativePointLight(arch, color, 1.25, 17, 1.7, new THREE.Vector3(0, 2.7, 0));
+    }
+
+    tunnel.add(arch);
+  }
+
+  group.add(tunnel);
+}
+
+function createNeonPalm({ position, rotationY, scale = 1, color = 0x48ff78 }) {
+  const palm = new THREE.Group();
+  palm.name = "VegasNeonPalm";
+  palm.position.copy(position);
+  palm.rotation.y = rotationY;
+  palm.scale.setScalar(scale);
+
+  const trunkMaterial = createFlatStandardMaterial({
+    color: 0x111018,
+    roughness: 0.54,
+    metalness: 0.12
+  });
+  const leafMaterial = createFlatStandardMaterial({
+    color: color === 0x32f6ff ? 0x061f26 : 0x092416,
+    emissive: color,
+    emissiveIntensity: 3.2,
+    roughness: 0.24,
+    side: THREE.DoubleSide
+  });
+  const edgeMaterial = createFlatStandardMaterial({
+    color: 0xff2bd6,
+    emissive: 0xff2bd6,
+    emissiveIntensity: 2.9,
+    roughness: 0.24
+  });
+  const trunkHeight = 6.4;
+  const trunk = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.24, trunkHeight, 7), trunkMaterial));
+  trunk.position.y = trunkHeight * 0.5;
+  trunk.rotation.z = 0.1;
+  palm.add(trunk);
+
+  for (let index = 0; index < 5; index += 1) {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.018, 4, 14), edgeMaterial);
+    band.position.y = 0.9 + index * 1.05;
+    band.rotation.x = Math.PI / 2;
+    palm.add(band);
+  }
+
+  for (let index = 0; index < 5; index += 1) {
+    const angle = (index / 5) * Math.PI * 2;
+    const leaf = markShadow(new THREE.Mesh(new THREE.PlaneGeometry(1.15, 4.4), leafMaterial));
+    leaf.position.set(Math.cos(angle) * 1.35, trunkHeight + 0.6, Math.sin(angle) * 1.35);
+    leaf.rotation.y = -angle;
+    leaf.rotation.x = Math.PI / 2.8;
+    leaf.rotation.z = (index % 2 === 0 ? 1 : -1) * 0.16;
+    palm.add(leaf);
+  }
+
+  return palm;
+}
+
+function addNeonPalms(group, curve, definition) {
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const colors = [0x48ff78, 0x32f6ff];
+  const progressPoints = [0.08, 0.13, 0.18, 0.24, 0.32, 0.39, 0.47, 0.57, 0.66, 0.73, 0.81, 0.88, 0.94];
+
+  progressPoints.forEach((progress, index) => {
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+
+    let side = index % 2 === 0 ? 1 : -1;
+    if (isNearGrandstand(progress, side, 0.05)) {
+      side = -side;
+    }
+
+    const basePosition = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 2.9));
+
+    for (let palmIndex = 0; palmIndex < 5; palmIndex += 1) {
+      const offset = tangent.clone().multiplyScalar((palmIndex - 2) * 1.55);
+      const position = basePosition.clone().add(offset).addScaledVector(normal, side * (palmIndex % 2) * 0.82);
+      clampPropPosition(curve, position, roadHalfWidth, 200, 6, 7);
+      const palm = createNeonPalm({
+        position,
+        rotationY: getHeading(tangent) + pseudoRandom(index + palmIndex) * 0.8,
+        scale: 1.15 + pseudoRandom(index * 3 + palmIndex) * 0.45,
+        color: colors[(index + palmIndex) % colors.length]
+      });
+      group.add(palm);
+    }
+  });
+}
+
+function createHologramDie({ position, rotationY, scale, color }) {
+  const die = new THREE.Group();
+  die.name = "VegasHologramDie";
+  die.position.copy(position);
+  die.rotation.set(0.18, rotationY, -0.08);
+  die.scale.setScalar(scale);
+  die.userData.spin = {
+    x: 0.18 + pseudoRandom(scale) * 0.12,
+    y: 0.32 + pseudoRandom(rotationY) * 0.18,
+    z: 0.1
+  };
+  die.userData.float = {
+    baseY: position.y,
+    amplitude: 1.8,
+    speed: 0.7 + pseudoRandom(rotationY + scale) * 0.25,
+    phase: rotationY
+  };
+
+  const material = createFlatStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 1.8,
+    roughness: 0.22,
+    transparent: true,
+    opacity: 0.38
+  });
+  const pipMaterial = createFlatStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 2.4,
+    roughness: 0.2
+  });
+  material.depthWrite = false;
+
+  const cube = markShadow(new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3, 1, 1, 1), material));
+  cube.position.y = 1.5;
+  die.add(cube);
+
+  const pipGeometry = new THREE.BoxGeometry(0.28, 0.28, 0.05);
+  [
+    [-0.65, 0.65],
+    [0, 0],
+    [0.65, -0.65],
+    [0.65, 0.65],
+    [-0.65, -0.65]
+  ].forEach(([x, y]) => {
+    const pip = new THREE.Mesh(pipGeometry, pipMaterial);
+    pip.position.set(x, 1.5 + y, 1.53);
+    die.add(pip);
+  });
+
+  return die;
+}
+
+function addCasinoDice(group, curve, definition) {
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const dice = [0.16, 0.34, 0.6, 0.82];
+
+  dice.forEach((progress, index) => {
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+    const side = index % 2 === 0 ? 1 : -1;
+    const position = point
+      .clone()
+      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 8.5 + index * 0.7));
+    position.y = 4.8 + index * 0.65;
+    clampPropPosition(curve, position, roadHalfWidth);
+
+    group.add(createHologramDie({
+      position,
+      rotationY: getHeading(tangent) + index * 0.4,
+      scale: 0.75 + pseudoRandom(index + 44) * 0.25,
+      color: [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78][index]
+    }));
+  });
+}
+
+function addLuxorPyramid(group, curve, definition) {
+  const pyramid = new THREE.Group();
+  pyramid.name = "VegasLuxorPyramid";
+  const progress = 0.24;
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const normal = getRightVector(tangent);
+
+  pyramid.position
+    .copy(point)
+    .addScaledVector(normal, -(definition.roadWidth * 0.5 + 72))
+    .addScaledVector(tangent, 18);
+  pyramid.rotation.y = getHeading(tangent) + Math.PI * 0.25;
+
+  const pyramidMaterial = createFlatStandardMaterial({
+    color: 0x161026,
+    emissive: 0x3a1758,
+    emissiveIntensity: 0.45,
+    roughness: 0.54,
+    metalness: 0.08
+  });
+  const beamMaterial = createFlatStandardMaterial({
+    color: 0xbfeaff,
+    emissive: 0xbfeaff,
+    emissiveIntensity: 4,
+    roughness: 0.18,
+    transparent: true,
+    opacity: 0.62
+  });
+  beamMaterial.depthWrite = false;
+
+  const body = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0, 28, 26, 4), pyramidMaterial));
+  body.position.y = 13;
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.52, 260, 8, 1, true), beamMaterial);
+  beam.position.y = 143;
+  pyramid.add(body, beam);
+  group.add(pyramid);
+}
+
+function createTextPanelTexture({
+  title,
+  subtitle = "",
+  background = "#07070b",
+  foreground = "#fff4c8",
+  accent = "#32f6ff",
+  width = 512,
+  height = 192
+}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 12;
+  ctx.strokeRect(12, 12, width - 24, height - 24);
+  ctx.strokeStyle = foreground;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(28, 28, width - 56, height - 56);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = foreground;
+  ctx.font = "bold 58px Arial Black, Arial, sans-serif";
+  ctx.fillText(title, width * 0.5, subtitle ? height * 0.43 : height * 0.5, width - 70);
+
+  if (subtitle) {
+    ctx.shadowBlur = 10;
+    ctx.font = "bold 26px Arial, sans-serif";
+    ctx.fillText(subtitle, width * 0.5, height * 0.74, width - 90);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createTextPanelMaterial({ title, subtitle, background, foreground, accent, emissiveIntensity = 1.15 }) {
+  const texture = createTextPanelTexture({ title, subtitle, background, foreground, accent });
+
+  return new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: texture,
+    emissive: 0xffffff,
+    emissiveMap: texture,
+    emissiveIntensity,
+    roughness: 0.22,
+    metalness: 0.03,
+    flatShading: true
+  });
+}
+
+function addFacadeTextSign(casino, { width, height, depth, title, subtitle, accentColor, foreground = "#fff4c8" }) {
+  const panelMaterial = createTextPanelMaterial({
+    title,
+    subtitle,
+    background: "#07070b",
+    foreground,
+    accent: `#${accentColor.toString(16).padStart(6, "0")}`
+  });
+  const frameMaterial = createFlatStandardMaterial({
+    color: 0x0b0d13,
+    roughness: 0.34,
+    metalness: 0.24
+  });
+  const sign = new THREE.Group();
+  const signWidth = Math.min(width * 0.84, 18);
+  const signHeight = Math.min(height * 0.2, 5.8);
+  const frame = markShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(signWidth + 0.5, signHeight + 0.35, 0.18),
+    frameMaterial
+  ));
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(signWidth, signHeight), panelMaterial);
+
+  frame.position.z = depth * 0.5 + 0.075;
+  panel.position.z = depth * 0.5 + 0.18;
+  panel.position.y = height * 0.72;
+  frame.position.y = panel.position.y;
+  sign.add(frame, panel);
+  casino.add(sign);
+}
+
+function createStripCasino({ position, rotationY, width, height, depth, screenColor, accentColor, index }) {
+  const casino = new THREE.Group();
+  casino.name = `VegasStripCasino:${index}`;
+  casino.position.copy(position);
+  casino.rotation.y = rotationY;
+  const signNames = [
+    ["CAESARS", "PALACE"],
+    ["BELLAGIO", "FOUNTAINS"],
+    ["VENETIAN", "RESORT"],
+    ["PARIS", "LAS VEGAS"],
+    ["MGM", "GRAND"],
+    ["WYNN", "LAS VEGAS"]
+  ];
+  const [title, subtitle] = signNames[index % signNames.length];
+
+  const bodyMaterial = createFlatStandardMaterial({
+    color: 0x06060a,
+    emissive: 0x050008,
+    emissiveIntensity: 0.08,
+    roughness: 0.5,
+    metalness: 0.1
+  });
+  const screenMaterial = createFlatStandardMaterial({
+    color: screenColor,
+    emissive: screenColor,
+    emissiveIntensity: 6.4,
+    roughness: 0.16,
+    metalness: 0.04
+  });
+  const accentMaterial = createFlatStandardMaterial({
+    color: accentColor,
+    emissive: accentColor,
+    emissiveIntensity: 5.6,
+    roughness: 0.18
+  });
+  const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMaterial));
+  const mainScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.72, height * 0.34, 0.12),
+    screenMaterial
+  );
+  const sideScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.42, height * 0.22, 0.12),
+    accentMaterial
+  );
+  const leftStrip = new THREE.Mesh(new THREE.BoxGeometry(0.16, height * 0.92, 0.14), accentMaterial);
+  const rightStrip = leftStrip.clone();
+
+  body.position.y = height * 0.5;
+  mainScreen.position.set(0, height * 0.58, depth * 0.5 + 0.08);
+  sideScreen.position.set(width * 0.18, height * 0.28, depth * 0.5 + 0.09);
+  leftStrip.position.set(-width * 0.46, height * 0.52, depth * 0.5 + 0.1);
+  rightStrip.position.set(width * 0.46, height * 0.52, depth * 0.5 + 0.1);
+
+  casino.add(body, mainScreen, sideScreen, leftStrip, rightStrip);
+  addFacadeTextSign(casino, {
+    width,
+    height,
+    depth,
+    title,
+    subtitle,
+    accentColor,
+    foreground: index % 3 === 0 ? "#ffe6a7" : "#ffffff"
+  });
+  return casino;
+}
+
+function addStripCasinoWalls(group, curve, definition) {
+  const colors = [0xffd23a, 0x32f6ff, 0xff2bd6, 0x48ff78];
+  const start = 0.07;
+  const end = 0.32;
+  const casinoCount = 10;
+  const reservedProgress = [0.1, 0.145, 0.18, 0.24];
+
+  for (let index = 0; index < casinoCount; index += 1) {
+    const progress = start + ((end - start) * index) / (casinoCount - 1);
+
+    if (isNearAnyProgress(progress, reservedProgress, 0.018)) {
+      continue;
+    }
+
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+
+    [-1, 1].forEach((side) => {
+      const casinoIndex = index * 2 + (side > 0 ? 1 : 0);
+      const width = 10 + pseudoRandom(casinoIndex + 1.3) * 8;
+      const height = 18 + pseudoRandom(casinoIndex + 7.2) * 32;
+      const depth = 8 + pseudoRandom(casinoIndex + 4.8) * 8;
+      const position = point
+        .clone()
+        .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 34))
+        .addScaledVector(tangent, pseudoRandom(casinoIndex + 9.4) * 3 - 1.5);
+
+      group.add(createStripCasino({
+        position,
+        rotationY: getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+        width,
+        height,
+        depth,
+        screenColor: colors[casinoIndex % colors.length],
+        accentColor: colors[(casinoIndex + 1) % colors.length],
+        index: casinoIndex
+      }));
+    });
+  }
+}
+
+function addDistributedCityBlocks(group, curve, definition) {
+  const colors = [0x32f6ff, 0xff2bd6, 0xffd23a, 0x48ff78];
+  const reservedProgress = [0.38, 0.48, 0.52, 0.66, 0.82, 0.92];
+  const progressPoints = [
+    0.36, 0.42, 0.49, 0.56, 0.63, 0.7, 0.77, 0.84, 0.91, 0.97
+  ];
+
+  progressPoints.forEach((progress, index) => {
+    if (isNearAnyProgress(progress, reservedProgress, 0.022)) {
+      return;
+    }
+
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+
+    [-1, 1].forEach((side) => {
+      if (pseudoRandom(index * 8 + side) < 0.22) {
+        return;
+      }
+
+      const blockIndex = index * 2 + (side > 0 ? 1 : 0);
+      const position = point
+        .clone()
+        .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 40 + pseudoRandom(blockIndex + 6) * 18))
+        .addScaledVector(tangent, pseudoRandom(blockIndex + 12) * 10 - 5);
+
+      group.add(createStripCasino({
+        position,
+        rotationY: getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+        width: 12 + pseudoRandom(blockIndex + 3) * 11,
+        height: 16 + pseudoRandom(blockIndex + 8) * 26,
+        depth: 8 + pseudoRandom(blockIndex + 14) * 9,
+        screenColor: colors[blockIndex % colors.length],
+        accentColor: colors[(blockIndex + 2) % colors.length],
+        index: 100 + blockIndex
+      }));
+    });
+  });
+}
+
+function addMsgSphere(group, curve, definition) {
+  const progress = 0.48;
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const normal = getRightVector(tangent);
+  const sphere = new THREE.Group();
+  sphere.name = "VegasMSGSphere";
+  sphere.position
+    .copy(point)
+    .addScaledVector(normal, definition.roadWidth * 0.5 + 58);
+
+  const sphereMaterial = createFlatStandardMaterial({
+    color: 0x2810ff,
+    emissive: 0x32f6ff,
+    emissiveIntensity: 2.8,
+    roughness: 0.2,
+    metalness: 0.04
+  });
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(28, 32, 18), sphereMaterial);
+  glass.position.y = 29;
+  glass.castShadow = true;
+  glass.receiveShadow = true;
+  sphere.add(glass);
+
+  const baseMaterial = createFlatStandardMaterial({
+    color: 0x11131c,
+    emissive: 0x071226,
+    emissiveIntensity: 0.35,
+    roughness: 0.46,
+    metalness: 0.12
+  });
+  const base = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(24, 30, 3.2, 24), baseMaterial));
+  base.position.y = 1.6;
+  sphere.add(base);
+
+  [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78].forEach((color, index) => {
+    const ringMaterial = createFlatStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 4.4,
+      roughness: 0.18
+    });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(28.4, 0.18, 8, 80), ringMaterial);
+    ring.position.y = 29 + (index - 1.5) * 7.5;
+    ring.rotation.x = Math.PI / 2;
+    ring.rotation.z = index * 0.4;
+    sphere.add(ring);
+  });
+
+  [0x32f6ff, 0xff2bd6, 0xffffff].forEach((color, index) => {
+    const meridianMaterial = createFlatStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 2.4,
+      roughness: 0.18
+    });
+    const meridian = new THREE.Mesh(new THREE.TorusGeometry(28.75, 0.08, 6, 72), meridianMaterial);
+    meridian.position.y = 29;
+    meridian.rotation.y = Math.PI / 2;
+    meridian.rotation.x = index * 0.58;
+    sphere.add(meridian);
+  });
+
+  sphere.userData.spin = { x: 0, y: 0.08, z: 0 };
+  group.add(sphere);
+}
+
+function addParisEiffel(group, curve, definition) {
+  const progress = 0.145;
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const normal = getRightVector(tangent);
+  const tower = new THREE.Group();
+  tower.name = "VegasParisEiffelTower";
+  tower.position
+    .copy(point)
+    .addScaledVector(normal, -(definition.roadWidth * 0.5 + 54));
+  tower.rotation.y = getHeading(tangent);
+
+  const gold = 0xffd23a;
+  const material = createFlatStandardMaterial({
+    color: gold,
+    emissive: gold,
+    emissiveIntensity: 4.2,
+    roughness: 0.24,
+    metalness: 0.18
+  });
+  const wire = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 14, 64, 4, 5, false), material);
+  wire.name = "EiffelWireframeBody";
+  wire.position.y = 32;
+  wire.material.wireframe = true;
+  const deck1 = new THREE.Mesh(new THREE.BoxGeometry(26, 0.5, 26), material);
+  const deck2 = new THREE.Mesh(new THREE.BoxGeometry(14, 0.45, 14), material);
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 36, 6), material);
+  deck1.position.y = 18;
+  deck2.position.y = 38;
+  beacon.position.y = 78;
+  tower.add(wire, deck1, deck2, beacon);
+  group.add(tower);
+}
+
+function addBellagioFountains(group, curve, definition) {
+  const progress = 0.145;
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const normal = getRightVector(tangent);
+  const fountain = new THREE.Group();
+  fountain.name = "VegasBellagioFountains";
+  fountain.position
+    .copy(point)
+    .addScaledVector(normal, definition.roadWidth * 0.5 + 62);
+  fountain.rotation.y = getHeading(tangent);
+
+  const waterMaterial = createFlatStandardMaterial({
+    color: 0x071c3f,
+    emissive: 0x0b5bb8,
+    emissiveIntensity: 0.75,
+    roughness: 0.38,
+    metalness: 0.08
+  });
+  const jetMaterial = createFlatStandardMaterial({
+    color: 0xcceeff,
+    emissive: 0xcceeff,
+    emissiveIntensity: 2.7,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0.62
+  });
+  jetMaterial.depthWrite = false;
+
+  const water = new THREE.Mesh(new THREE.BoxGeometry(46, 0.08, 82), waterMaterial);
+  water.position.y = 0.06;
+  fountain.add(water);
+
+  const hotelMaterial = createFlatStandardMaterial({
+    color: 0xd8c38f,
+    emissive: 0x4d3113,
+    emissiveIntensity: 0.22,
+    roughness: 0.54,
+    metalness: 0.04
+  });
+  const hotel = markShadow(new THREE.Mesh(new THREE.BoxGeometry(58, 18, 7), hotelMaterial));
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(21, 4.8),
+    createTextPanelMaterial({
+      title: "BELLAGIO",
+      subtitle: "FOUNTAINS",
+      background: "#16100a",
+      foreground: "#fff0bd",
+      accent: "#ffd23a",
+      emissiveIntensity: 1.05
+    })
+  );
+  hotel.position.set(0, 9, -45);
+  sign.position.set(0, 15.2, -41.42);
+  fountain.add(hotel, sign);
+
+  for (let index = 0; index < 16; index += 1) {
+    const height = 4 + Math.sin(index * 0.8) * 2.2 + pseudoRandom(index + 4) * 2.6;
+    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, height, 8), jetMaterial);
+    jet.position.set((index - 7.5) * 2.55, height * 0.5 + 0.08, Math.sin(index * 0.9) * 8);
+    fountain.add(jet);
+  }
+
+  group.add(fountain);
+}
+
+function addVegasLandmarks(group, curve, definition) {
+  addMsgSphere(group, curve, definition);
+  addParisEiffel(group, curve, definition);
+  addBellagioFountains(group, curve, definition);
+}
+
+function drawStar(ctx, centerX, centerY, outerRadius, innerRadius, points) {
+  ctx.beginPath();
+
+  for (let index = 0; index < points * 2; index += 1) {
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + (index * Math.PI) / points;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+
+  ctx.closePath();
+}
+
+function createVegasSignTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 768;
+  canvas.height = 384;
+  const ctx = canvas.getContext("2d");
+  const { width, height } = canvas;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fffdf2";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.translate(width * 0.5, height * 0.54);
+  ctx.strokeStyle = "#166bd1";
+  ctx.lineWidth = 20;
+  ctx.strokeRect(-315, -120, 630, 240);
+  ctx.strokeStyle = "#f5d45a";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(-292, -97, 584, 194);
+  ctx.restore();
+
+  drawStar(ctx, width * 0.5, 44, 38, 16, 8);
+  ctx.fillStyle = "#e5282f";
+  ctx.fill();
+  ctx.strokeStyle = "#ffef73";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(255, 50, 80, 0.55)";
+  ctx.shadowBlur = 12;
+
+  ctx.fillStyle = "#e1242c";
+  ctx.font = "bold 45px Arial, sans-serif";
+  ctx.fillText("WELCOME", width * 0.5, 92);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#111111";
+  ctx.font = "italic 30px Georgia, serif";
+  ctx.fillText("TO Fabulous", width * 0.5, 135);
+
+  ctx.shadowColor = "rgba(255, 0, 64, 0.65)";
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "#f0163d";
+  ctx.font = "bold 78px Arial Black, Arial, sans-serif";
+  ctx.fillText("LAS VEGAS", width * 0.5, 210);
+
+  ctx.shadowColor = "rgba(28, 94, 210, 0.65)";
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#1359c7";
+  ctx.font = "bold 34px Arial, sans-serif";
+  ctx.fillText("NEVADA", width * 0.5, 284);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#1359c7";
+  for (let index = 0; index < 11; index += 1) {
+    ctx.beginPath();
+    ctx.arc(234 + index * 30, 330, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createVegasSign(curve, definition) {
+  const progress = 0.045;
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const normal = getRightVector(tangent);
+  const heading = getHeading(tangent);
+  const sign = new THREE.Group();
+  sign.name = "VegasWelcomeCanvasSign";
+  sign.position
+    .copy(point)
+    .addScaledVector(normal, -(definition.roadWidth * 0.5 + 17));
+  sign.rotation.y = heading + Math.PI / 2;
+
+  const metalMaterial = createFlatStandardMaterial({
+    color: 0x9ca3af,
+    roughness: 0.34,
+    metalness: 0.72
+  });
+  const edgeMaterial = createFlatStandardMaterial({
+    color: 0x145ad6,
+    emissive: 0x145ad6,
+    emissiveIntensity: 2.4,
+    roughness: 0.22,
+    metalness: 0.1
+  });
+  const bulbMaterial = createFlatStandardMaterial({
+    color: 0xffd23a,
+    emissive: 0xffd23a,
+    emissiveIntensity: 3.4,
+    roughness: 0.18
+  });
+  const signTexture = createVegasSignTexture();
+  const signMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: signTexture,
+    emissive: 0xffffff,
+    emissiveMap: signTexture,
+    emissiveIntensity: 0.95,
+    roughness: 0.28,
+    metalness: 0.02,
+    flatShading: true
+  });
+
+  const postGeometry = new THREE.CylinderGeometry(0.14, 0.2, 5.8, 10);
+  const leftPost = markShadow(new THREE.Mesh(postGeometry, metalMaterial));
+  const rightPost = markShadow(new THREE.Mesh(postGeometry, metalMaterial));
+  const connector = markShadow(new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.16, 0.16), metalMaterial));
+  const frame = markShadow(new THREE.Mesh(new THREE.BoxGeometry(8.4, 4.45, 0.24), edgeMaterial));
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.9), signMaterial);
+  const crown = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), bulbMaterial);
+
+  leftPost.position.set(-4.0, 2.9, 0);
+  rightPost.position.set(4.0, 2.9, 0);
+  connector.position.set(0, 2.0, -0.04);
+  frame.position.set(0, 4.25, -0.08);
+  panel.position.set(0, 4.25, 0.06);
+  crown.position.set(0, 6.55, 0.1);
+  panel.castShadow = true;
+  panel.receiveShadow = true;
+
+  sign.add(leftPost, rightPost, connector, frame, panel, crown);
+
+  for (let index = 0; index < 9; index += 1) {
+    const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), bulbMaterial);
+    bulb.position.set((index / 8 - 0.5) * 7.7, 2.25, 0.12);
+    sign.add(bulb);
+  }
+
+  return sign;
+}
+
+function addVegasLightPosts(group, curve, definition) {
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const totalLength = curve.getLength();
+  const lampCount = Math.min(24, Math.max(1, Math.floor(totalLength / 25)));
+  const lampColor = 0xffe8a0;
+  const poleGeometry = new THREE.CylinderGeometry(0.25, 0.25, 9, 5);
+  const headGeometry = new THREE.BoxGeometry(2, 0.5, 1.5);
+  const poleMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1a1a2a,
+    flatShading: true,
+    roughness: 0.72,
+    metalness: 0.08
+  });
+  const lampMaterial = new THREE.MeshStandardMaterial({
+    color: lampColor,
+    emissive: lampColor,
+    emissiveIntensity: 0.9,
+    flatShading: true,
+    roughness: 0.28,
+    metalness: 0.02
+  });
+
+  for (let index = 0; index < lampCount; index += 1) {
+    const progress = ((index * 25) + 12.5) / totalLength;
+    const point = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const normal = getRightVector(tangent);
+    const side = index % 2 === 0 ? 1 : -1;
+    const base = point.clone().addScaledVector(normal, side * (roadHalfWidth + 2));
+    clampPropPosition(curve, base, roadHalfWidth);
+
+    const lamp = new THREE.Group();
+    lamp.name = `VegasStreetLamp:${index}`;
+    lamp.position.copy(base);
+    lamp.rotation.y = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+
+    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
+    pole.position.y = 4.5;
+    pole.rotation.z = side * -0.05;
+
+    const head = new THREE.Mesh(headGeometry, lampMaterial);
+    head.position.set(0, 9.2, 0);
+    head.receiveShadow = true;
+
+    const light = addDecorativePointLight(lamp, lampColor, 25, 20, 2, head.position);
+    if (light) {
+      light.name = `VegasStreetLampLight:${index}`;
+    }
+
+    lamp.add(pole, head);
+    group.add(lamp);
+  }
+}
+
+function getRoadsideTransform(curve, progress, side, offset, roadHalfWidth, minClearance = 20) {
+  const point = curve.getPointAt(progress);
+  const tangent = curve.getTangentAt(progress).setY(0).normalize();
+  const position = getSafeRoadsidePosition(curve, progress, side, offset, roadHalfWidth, minClearance);
+  const rotationY = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+
+  return { position, rotationY };
+}
+
+function createVegasMaterial({ color, emissive, emissiveIntensity = 0.6, roughness = 0.85, metalness = 0.05 }) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive: emissive ?? color,
+    emissiveIntensity,
+    roughness,
+    metalness,
+    flatShading: true
+  });
+}
+
+function addFacadeNeonSign(parent, { position, seed, color, lineCount = 4 }) {
+  const sign = new THREE.Group();
+  sign.name = `VegasFacadeNeonSign:${seed}`;
+  sign.position.copy(position);
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 1.1,
+    flatShading: true,
+    roughness: 0.22,
+    metalness: 0.03
+  });
+
+  for (let line = 0; line < lineCount; line += 1) {
+    const width = 8 + pseudoRandom(seed * 11 + line * 3.4) * 8;
+    const segment = new THREE.Mesh(new THREE.BoxGeometry(width, 1.5, 0.2), material);
+    segment.position.set(
+      (pseudoRandom(seed * 7 + line) - 0.5) * 1.8,
+      -line * 2.05,
+      0
+    );
+    sign.add(segment);
+  }
+
+  addDecorativePointLight(sign, color, 12, 15, 2, new THREE.Vector3(0, -lineCount, 2.2));
+  parent.add(sign);
+}
+
+function buildCaesarsPalace(group, curve, roadHalfWidth) {
+  const palace = new THREE.Group();
+  palace.name = "VegasSkyline:CaesarsPalace";
+  const transform = getRoadsideTransform(curve, 0.3, -1, roadHalfWidth + 145, roadHalfWidth, 70);
+  palace.position.copy(transform.position);
+  palace.rotation.y = transform.rotationY;
+  palace.scale.set(0.52, 0.52, 0.52);
+
+  const cream = createVegasMaterial({ color: 0xc8b89a });
+  const domeMaterial = createVegasMaterial({ color: 0xb8a882, roughness: 0.68 });
+  const goldTrim = createVegasMaterial({
+    color: 0xffd700,
+    emissive: 0xffd700,
+    emissiveIntensity: 0.8,
+    roughness: 0.32,
+    metalness: 0.1
+  });
+
+  const main = markShadow(new THREE.Mesh(new THREE.BoxGeometry(60, 45, 40), cream));
+  const leftWing = markShadow(new THREE.Mesh(new THREE.BoxGeometry(20, 35, 30), cream));
+  const rightWing = markShadow(new THREE.Mesh(new THREE.BoxGeometry(20, 35, 30), cream));
+  main.position.y = 22.5;
+  leftWing.position.set(-40, 17.5, 0);
+  rightWing.position.set(40, 17.5, 0);
+  palace.add(main, leftWing, rightWing);
+
+  for (let index = 0; index < 6; index += 1) {
+    const column = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 20, 6), cream));
+    column.position.set(-22 + index * 8.8, 10, 20.8);
+    palace.add(column);
+  }
+
+  const dome = markShadow(new THREE.Mesh(new THREE.SphereGeometry(8, 6, 4), domeMaterial));
+  dome.position.set(0, 48, 0);
+  dome.scale.y = 0.58;
+  palace.add(dome);
+
+  const cornice = new THREE.Mesh(new THREE.BoxGeometry(64, 0.7, 1.2), goldTrim);
+  cornice.position.set(0, 45.5, 20.9);
+  palace.add(cornice);
+  addFacadeNeonSign(palace, {
+    position: new THREE.Vector3(-18, 34, 21.6),
+    seed: 1,
+    color: 0xff2090,
+    lineCount: 4
+  });
+  addFacadeNeonSign(palace, {
+    position: new THREE.Vector3(18, 28, 21.6),
+    seed: 2,
+    color: 0xffe600,
+    lineCount: 3
+  });
+
+  group.add(palace);
+}
+
+function buildMgmGrand(group, curve, roadHalfWidth) {
+  const mgm = new THREE.Group();
+  mgm.name = "VegasSkyline:MGMGrand";
+  const transform = getRoadsideTransform(curve, 0.5, 1, roadHalfWidth + 110, roadHalfWidth, 45);
+  mgm.position.copy(transform.position);
+  mgm.rotation.y = transform.rotationY;
+  mgm.scale.set(0.5, 0.5, 0.5);
+
+  const towerMaterial = createVegasMaterial({ color: 0x1a3d1a });
+  const lionMaterial = createVegasMaterial({ color: 0xd4af37, roughness: 0.42, metalness: 0.16 });
+  const neonMaterial = createVegasMaterial({
+    color: 0x00ff44,
+    emissive: 0x00ff44,
+    emissiveIntensity: 0.8,
+    roughness: 0.2
+  });
+  const signMaterial = createVegasMaterial({
+    color: 0xffd700,
+    emissive: 0xffd700,
+    emissiveIntensity: 1,
+    roughness: 0.28,
+    metalness: 0.08
+  });
+
+  const podium = markShadow(new THREE.Mesh(new THREE.BoxGeometry(60, 8, 55), towerMaterial));
+  const tower = markShadow(new THREE.Mesh(new THREE.BoxGeometry(35, 120, 35), towerMaterial));
+  podium.position.y = 4;
+  tower.position.y = 68;
+  mgm.add(podium, tower);
+
+  const cornerPositions = [
+    [-17.9, 68, -17.9],
+    [17.9, 68, -17.9],
+    [-17.9, 68, 17.9],
+    [17.9, 68, 17.9]
+  ];
+  cornerPositions.forEach(([x, y, z]) => {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.4, 80, 0.4), neonMaterial);
+    strip.position.set(x, y, z);
+    mgm.add(strip);
+  });
+
+  const lionBody = markShadow(new THREE.Mesh(new THREE.BoxGeometry(4, 6, 4), lionMaterial));
+  const lionHead = markShadow(new THREE.Mesh(new THREE.SphereGeometry(5, 4, 3), lionMaterial));
+  lionBody.position.set(0, 7, 30);
+  lionHead.position.set(0, 13, 30);
+  mgm.add(lionBody, lionHead);
+
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 1), signMaterial);
+  sign.position.set(0, 131, 18.2);
+  mgm.add(sign);
+  addFacadeNeonSign(mgm, {
+    position: new THREE.Vector3(0, 96, 18.4),
+    seed: 3,
+    color: 0x00e5ff,
+    lineCount: 5
+  });
+  addFacadeNeonSign(mgm, {
+    position: new THREE.Vector3(0, 46, 18.4),
+    seed: 4,
+    color: 0xff2090,
+    lineCount: 3
+  });
+
+  group.add(mgm);
+}
+
+function buildBellagio(group, curve, roadHalfWidth) {
+  const bellagio = new THREE.Group();
+  bellagio.name = "VegasSkyline:Bellagio";
+  const transform = getRoadsideTransform(curve, 0.6, -1, roadHalfWidth + 175, roadHalfWidth, 90);
+  bellagio.position.copy(transform.position);
+  bellagio.rotation.y = transform.rotationY;
+  bellagio.scale.set(0.42, 0.42, 0.42);
+
+  const facadeMaterial = createVegasMaterial({ color: 0xe0d0b8 });
+  const glassMaterial = createVegasMaterial({ color: 0x1a3050, roughness: 0.42, metalness: 0.1 });
+  const waterMaterial = createVegasMaterial({ color: 0x0a4a6e, roughness: 0.4, metalness: 0.08 });
+  const jetMaterial = createVegasMaterial({
+    color: 0x88ddff,
+    emissive: 0x88ddff,
+    emissiveIntensity: 1.2,
+    roughness: 0.2
+  });
+  const warmStripMaterial = createVegasMaterial({
+    color: 0xffa040,
+    emissive: 0xffa040,
+    emissiveIntensity: 0.8,
+    roughness: 0.26
+  });
+
+  for (let index = 0; index < 5; index += 1) {
+    const block = markShadow(new THREE.Mesh(new THREE.BoxGeometry(18, 55, 15), facadeMaterial));
+    const offset = index - 2;
+    block.position.set(offset * 15, 27.5, Math.abs(offset) * 3);
+    block.rotation.y = -offset * 0.08;
+    bellagio.add(block);
+  }
+
+  const glassTower = markShadow(new THREE.Mesh(new THREE.BoxGeometry(25, 75, 22), glassMaterial));
+  glassTower.position.set(45, 37.5, 4);
+  bellagio.add(glassTower);
+
+  const fountain = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 0.3, 12), waterMaterial);
+  fountain.position.set(0, 0.15, 35);
+  fountain.rotation.y = Math.PI / 12;
+  bellagio.add(fountain);
+
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (index / 8) * Math.PI * 2;
+    const height = 6 + pseudoRandom(index + 30.4) * 8;
+    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.1, height, 4), jetMaterial);
+    jet.position.set(Math.cos(angle) * 11, height * 0.5 + 0.3, 35 + Math.sin(angle) * 11);
+    bellagio.add(jet);
+  }
+
+  const lightStrip = new THREE.Mesh(new THREE.BoxGeometry(82, 0.45, 1), warmStripMaterial);
+  lightStrip.position.set(0, 2.2, 8.2);
+  bellagio.add(lightStrip);
+  addFacadeNeonSign(bellagio, {
+    position: new THREE.Vector3(-22, 42, 15.2),
+    seed: 5,
+    color: 0xffe600,
+    lineCount: 4
+  });
+  addFacadeNeonSign(bellagio, {
+    position: new THREE.Vector3(45, 56, 15.4),
+    seed: 6,
+    color: 0x00e5ff,
+    lineCount: 5
+  });
+
+  group.add(bellagio);
+}
+
+function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
+  const signGroup = new THREE.Group();
+  signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
+
+  // progress=0.055 → midway between start (0) and first grandstand (0.1), right side of track.
+  // offset roadHalfWidth+18 = 23.25u clears absoluteMinClearance from the approach track segment.
+  // rotation +PI*0.5: front face points toward the road center so it's readable while driving.
+  const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
+  signGroup.position.copy(transform.position);
+  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5;
+
+  const welcomeTex = getCachedWelcomeToVegasTexture();
+  const welcomeMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: welcomeTex,
+    emissive: 0xffffff,
+    emissiveMap: welcomeTex,
+    emissiveIntensity: 1.5,
+    transparent: true,
+    alphaTest: 0.15,
+    side: THREE.DoubleSide,
+    roughness: 0.25,
+    metalness: 0.08
+  });
+
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), welcomeMat);
+  plane.position.y = 10; // rests on the ground, 20m tall
+  signGroup.add(plane);
+
+  // Spotlight to illuminate the sign at night
+  addDecorativePointLight(signGroup, 0xffffff, 8, 15, 1.5, new THREE.Vector3(0, 8, 3.5));
+
+  group.add(signGroup);
+}
+
+function buildEiffelTower(group, curve, roadHalfWidth) {
+  const tower = new THREE.Group();
+  tower.name = "VegasSkyline:EiffelTower";
+
+  // Position it at progress 0.11, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.11, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  tower.position.copy(transform.position);
+  tower.rotation.y = transform.rotationY;
+
+  const metalMaterial = createVegasMaterial({
+    color: 0x1f1d24,
+    roughness: 0.6,
+    metalness: 0.4
+  });
+
+  const goldNeonMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffb800,
+    emissive: 0xffb800,
+    emissiveIntensity: 1.5,
+    roughness: 0.2
+  });
+
+  // Base legs
+  const legGeo = new THREE.CylinderGeometry(0.8, 1.6, 20, 5);
+  const angles = [Math.PI / 4, 3 * Math.PI / 4, -Math.PI / 4, -3 * Math.PI / 4];
+  const legSpacing = 12;
+
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(legGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * legSpacing, 10, Math.sin(angle) * legSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.25;
+    leg.rotation.x = Math.sin(angle) * 0.25;
+    tower.add(leg);
+
+    // Glowing neon strips along the legs
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 20.2, 0.3), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.8;
+    neonStrip.position.z += Math.sin(angle) * 0.8;
+    tower.add(neonStrip);
+  });
+
+  // Platform 1
+  const plat1 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(20, 2.5, 20), metalMaterial));
+  plat1.position.y = 20;
+  tower.add(plat1);
+
+  // Platform 1 neon border
+  const plat1Neon = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.6, 20.4), goldNeonMaterial);
+  plat1Neon.position.y = 20;
+  tower.add(plat1Neon);
+
+  // Decorative arches under platform 1
+  const archMat = new THREE.MeshStandardMaterial({
+    color: 0xff4400,
+    emissive: 0xff4400,
+    emissiveIntensity: 0.8
+  });
+  for (let i = 0; i < 4; i++) {
+    const rot = (i * Math.PI) / 2;
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.4, 6, 16, Math.PI), archMat);
+    arch.position.set(0, 18.8, 0);
+    arch.rotation.y = rot;
+    arch.position.x += Math.cos(rot) * (legSpacing - 2);
+    arch.position.z += Math.sin(rot) * (legSpacing - 2);
+    arch.rotation.z = Math.PI;
+    tower.add(arch);
+  }
+
+  // Mid legs
+  const midLegGeo = new THREE.CylinderGeometry(0.5, 0.8, 18, 5);
+  const midLegSpacing = 7;
+  angles.forEach((angle) => {
+    const leg = markShadow(new THREE.Mesh(midLegGeo, metalMaterial));
+    leg.position.set(Math.cos(angle) * midLegSpacing, 29, Math.sin(angle) * midLegSpacing);
+    leg.rotation.z = -Math.cos(angle) * 0.16;
+    leg.rotation.x = Math.sin(angle) * 0.16;
+    tower.add(leg);
+
+    const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 18.2, 0.2), goldNeonMaterial);
+    neonStrip.position.copy(leg.position);
+    neonStrip.rotation.copy(leg.rotation);
+    neonStrip.position.x += Math.cos(angle) * 0.5;
+    neonStrip.position.z += Math.sin(angle) * 0.5;
+    tower.add(neonStrip);
+  });
+
+  // Platform 2
+  const plat2 = markShadow(new THREE.Mesh(new THREE.BoxGeometry(11, 1.8, 11), metalMaterial));
+  plat2.position.y = 38;
+  tower.add(plat2);
+
+  const plat2Neon = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.4, 11.4), goldNeonMaterial);
+  plat2Neon.position.y = 38;
+  tower.add(plat2Neon);
+
+  // Spire / Top section
+  const spireGeo = new THREE.CylinderGeometry(0.1, 0.5, 27, 4);
+  const spire = markShadow(new THREE.Mesh(spireGeo, metalMaterial));
+  spire.position.set(0, 51.5, 0);
+  tower.add(spire);
+
+  const spireNeon = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.55, 27.2, 4), goldNeonMaterial);
+  spireNeon.position.set(0, 51.5, 0);
+  tower.add(spireNeon);
+
+  // Top Beacon Light
+  const beaconMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 3.0
+  });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), beaconMat);
+  beacon.position.set(0, 65.5, 0);
+  tower.add(beacon);
+
+  addDecorativePointLight(tower, 0xffffff, 25, 45, 1.2, new THREE.Vector3(0, 65.5, 0));
+
+  group.add(tower);
+}
+
+function buildFerrisWheel(group, curve, roadHalfWidth) {
+  const ferrisGroup = new THREE.Group();
+  ferrisGroup.name = "VegasSkyline:FerrisWheel";
+
+  // Position at progress 0.13, right side (side = -1), offset = roadHalfWidth + 72
+  const transform = getRoadsideTransform(curve, 0.13, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  ferrisGroup.position.copy(transform.position);
+  // Orient it so the wheel is parallel to the road
+  ferrisGroup.rotation.y = transform.rotationY + Math.PI / 2;
+
+  const metalMaterial = createVegasMaterial({ color: 0x222026, roughness: 0.7, metalness: 0.3 });
+
+  const neonCyan = new THREE.MeshStandardMaterial({
+    color: 0x00e5ff,
+    emissive: 0x00e5ff,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  const neonMagenta = new THREE.MeshStandardMaterial({
+    color: 0xff2090,
+    emissive: 0xff2090,
+    emissiveIntensity: 1.6,
+    roughness: 0.1
+  });
+
+  // Supports (A-frame structure)
+  [-1.5, 1.5].forEach((zOffset) => {
+    const legLeft = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legLeft.position.set(-6, 14, zOffset);
+    legLeft.rotation.z = -0.2;
+    ferrisGroup.add(legLeft);
+
+    const legRight = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 30, 5), metalMaterial));
+    legRight.position.set(6, 14, zOffset);
+    legRight.rotation.z = 0.2;
+    ferrisGroup.add(legRight);
+  });
+
+  const axle = markShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.2, 8), metalMaterial));
+  axle.position.set(0, 28, 0);
+  axle.rotation.x = Math.PI / 2;
+  ferrisGroup.add(axle);
+
+  // Rotating part group (this is what spins)
+  const rotatingPart = new THREE.Group();
+  rotatingPart.name = "FerrisWheelRotatingPart";
+  rotatingPart.position.set(0, 28, 0);
+
+  // Set the rotation spin! (slowly rotates around Z-axis)
+  const spinSpeed = 0.08;
+  rotatingPart.userData.spin = { x: 0, y: 0, z: spinSpeed };
+
+  // Double outer rings
+  const ringRadius = 18;
+  [-0.9, 0.9].forEach((zOffset, ringIndex) => {
+    const ringMat = ringIndex === 0 ? neonCyan : neonMagenta;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.35, 8, 36), ringMat);
+    ring.position.set(0, 0, zOffset);
+    rotatingPart.add(ring);
+  });
+
+  // Spokes connecting hub to outer rings
+  const spokeMat = createVegasMaterial({
+    color: 0x0088ff,
+    emissive: 0x0088ff,
+    emissiveIntensity: 0.8,
+    roughness: 0.3
+  });
+  const spokeCount = 12;
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    [-0.9, 0.9].forEach((zOffset) => {
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, ringRadius, 4), spokeMat);
+      spoke.position.set(Math.cos(angle) * (ringRadius * 0.5), Math.sin(angle) * (ringRadius * 0.5), zOffset);
+      spoke.rotation.z = angle + Math.PI / 2;
+      rotatingPart.add(spoke);
+    });
+  }
+
+  // Cabins hanging off the outer edge
+  const cabinColors = [0xffe600, 0xff2090, 0x39ff14, 0x00e5ff, 0xff8800];
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2;
+    const cabinColor = cabinColors[i % cabinColors.length];
+
+    const cabinGroup = new THREE.Group();
+    cabinGroup.name = `FerrisCabin:${i}`;
+    cabinGroup.position.set(Math.cos(angle) * ringRadius, Math.sin(angle) * ringRadius, 0);
+
+    // Apply counter-spin to keep cabin upright!
+    cabinGroup.userData.spin = { x: 0, y: 0, z: -spinSpeed };
+
+    // Support hanger
+    const hanger = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 1.8, 4),
+      metalMaterial
+    );
+    hanger.position.set(0, 0.9, 0);
+    cabinGroup.add(hanger);
+
+    // Main cabin box
+    const cabinMat = new THREE.MeshStandardMaterial({
+      color: cabinColor,
+      emissive: cabinColor,
+      emissiveIntensity: 1.4,
+      roughness: 0.2
+    });
+    const cabinBox = markShadow(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.4), cabinMat));
+    cabinBox.position.set(0, 0, 0);
+    cabinGroup.add(cabinBox);
+
+    // Light inside/under the cabin
+    addDecorativePointLight(cabinGroup, cabinColor, 3, 5, 2.0, new THREE.Vector3(0, -0.6, 0));
+
+    rotatingPart.add(cabinGroup);
+  }
+
+  ferrisGroup.add(rotatingPart);
+
+  // Center hub light
+  addDecorativePointLight(ferrisGroup, 0x00ffcc, 15, 25, 1.5, new THREE.Vector3(0, 28, 0));
+
+  group.add(ferrisGroup);
+}
+
+function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
+  const colors = [0x0d0d20, 0x12112a, 0x0a1830, 0x1a0d2e];
+  const windowColors = [0xffe066, 0xff8800, 0xffffff, 0x88aaff];
+  const progressPoints = [0.08, 0.18, 0.28, 0.42, 0.56, 0.72, 0.86, 0.96];
+
+  progressPoints.forEach((progress, index) => {
+    const tower = new THREE.Group();
+    tower.name = `VegasSkyline:BackgroundTower:${index}`;
+    const side = index % 2 === 0 ? 1 : -1;
+    const width = 20 + pseudoRandom(index + 1.2) * 20;
+    const height = 60 + pseudoRandom(index + 2.4) * 90;
+    const depth = 20 + pseudoRandom(index + 3.6) * 20;
+    const distance = 85 + pseudoRandom(index + 4.8) * 65;
+    const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth, 65);
+    const material = createVegasMaterial({ color: colors[index % colors.length], roughness: 0.62, metalness: 0.08 });
+    const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material));
+
+    tower.position.copy(transform.position);
+    tower.position.addScaledVector(
+      curve.getTangentAt(progress).setY(0).normalize(),
+      (pseudoRandom(index + 9) - 0.5) * 20
+    );
+    tower.rotation.y = transform.rotationY;
+    body.position.y = height * 0.5;
+    tower.add(body);
+
+    const windowCount = 8 + Math.floor(pseudoRandom(index + 6.4) * 8);
+    for (let windowIndex = 0; windowIndex < windowCount; windowIndex += 1) {
+      const color = windowColors[Math.floor(pseudoRandom(index * 31 + windowIndex * 5.7) * windowColors.length) % windowColors.length];
+      const windowMaterial = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: color,
+        emissiveIntensity: 0.9,
+        roughness: 0.45,
+        metalness: 0,
+        flatShading: true
+      });
+      const window = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.2), windowMaterial);
+      const x = (pseudoRandom(index * 17 + windowIndex) - 0.5) * width * 0.72;
+      const y = 10 + pseudoRandom(index * 23 + windowIndex) * (height - 18);
+      window.position.set(x, y, side > 0 ? -depth * 0.5 - 0.12 : depth * 0.5 + 0.12);
+      tower.add(window);
+    }
+
+    group.add(tower);
+  });
+}
+
+function buildVegasSkyline(group, curve, roadHalfWidth) {
+  buildWelcomeToVegasSign(group, curve, roadHalfWidth);
+  buildCaesarsPalace(group, curve, roadHalfWidth);
+  buildMgmGrand(group, curve, roadHalfWidth);
+  buildBellagio(group, curve, roadHalfWidth);
+  buildBackgroundVegasTowers(group, curve, roadHalfWidth);
+  buildEiffelTower(group, curve, roadHalfWidth);
+  buildFerrisWheel(group, curve, roadHalfWidth);
+}
+
+function resolvePropClipping(propsGroup, curve, roadHalfWidth) {
+  propsGroup.children.forEach((child) => {
+    const name = child.name || "";
+    // Skip objects that are meant to span the road (tunnels, gantries, start line, checkpoint gates)
+    // or roadside lamps that are already carefully placed close to the road.
+    if (
+      name.includes("Tunnel") ||
+      name.includes("Gantry") ||
+      name.includes("Checkpoint") ||
+      name.includes("Start") ||
+      name.includes("StreetLamp") ||
+      name.includes("LightPost")
+    ) {
+      return;
+    }
+
+    // Determine safety clearance based on the type of prop
+    let minSafeDistance = roadHalfWidth + 3.0; // default for small props
+
+    if (name.includes("CaesarsPalace") || name.includes("MGMGrand") || name.includes("Bellagio") || name.includes("EiffelTower") || name.includes("FerrisWheel")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("BackgroundTower") || name.includes("Skyscraper")) {
+      minSafeDistance = roadHalfWidth + 25.0;
+    } else if (name.includes("Grandstand") || name.includes("LuxorPyramid") || name.includes("Paddock")) {
+      minSafeDistance = roadHalfWidth + 32.0;
+    } else if (name.includes("Billboard")) {
+      minSafeDistance = roadHalfWidth + 7.5;
+    } else if (name.includes("WelcomeToLasVegasSign")) {
+      minSafeDistance = roadHalfWidth + 9.0;
+    } else if (name.includes("HologramDie")) {
+      if (child.position.y < 3.0) {
+        minSafeDistance = roadHalfWidth + 3.0;
+      } else {
+        return;
+      }
+    }
+
+    const pos = child.position;
+
+    // We run up to 3 relaxation iterations to resolve clipping from all parts of the track
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      let closestPoint = null;
+      let minTrackDist = Infinity;
+      let closestT = 0;
+
+      for (let index = 0; index <= 120; index += 1) {
+        const t = index / 120;
+        const trackPoint = curve.getPointAt(t);
+        const dist = Math.sqrt((pos.x - trackPoint.x) ** 2 + (pos.z - trackPoint.z) ** 2);
+        if (dist < minTrackDist) {
+          minTrackDist = dist;
+          closestPoint = trackPoint;
+          closestT = t;
+        }
+      }
+
+      if (minTrackDist < minSafeDistance) {
+        const pushDir = new THREE.Vector3(pos.x - closestPoint.x, 0, pos.z - closestPoint.z);
+        if (pushDir.lengthSq() < 0.0001) {
+          const tangent = curve.getTangentAt(closestT).setY(0).normalize();
+          pushDir.copy(getRightVector(tangent));
+        } else {
+          pushDir.normalize();
+        }
+        pos.x = closestPoint.x + pushDir.x * minSafeDistance;
+        pos.z = closestPoint.z + pushDir.z * minSafeDistance;
+      } else {
+        break;
+      }
+    }
+  });
+}
+
+function disableDecorativeCastShadows(group) {
+  group.traverse((child) => {
+    if (child.isMesh || child.isInstancedMesh) {
+      child.castShadow = false;
+      child.receiveShadow = true;
+    }
+  });
+}
+
+export function buildVegasProps(group, curve, definition) {
+  const propsGroup = new THREE.Group();
+  propsGroup.name = "VegasDecorativeProps";
+
+  generateCitySkyline(curve, propsGroup, definition);
+  addVegasTunnel(propsGroup, curve, definition, 0.36, 0, 18, 0.009);
+  buildVegasSkyline(propsGroup, curve, definition.roadWidth * 0.5);
+  buildVegasBillboards(propsGroup, curve, definition.roadWidth * 0.5);
+  addVegasF1Venue(propsGroup, curve, definition);
+  addVegasLightPosts(propsGroup, curve, definition);
+  addNeonPalms(propsGroup, curve, definition);
+  addCasinoDice(propsGroup, curve, definition);
+
+  // Clean up and resolve any remaining prop intersections/clipping
+  resolvePropClipping(propsGroup, curve, definition.roadWidth * 0.5);
+
+  disableDecorativeCastShadows(propsGroup);
+  group.add(propsGroup);
+}
