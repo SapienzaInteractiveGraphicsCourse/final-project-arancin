@@ -6279,7 +6279,7 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
   const flagScale = new THREE.Vector3(1, 1, 1);
 
   sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 0.78);
+    const samples = collectMonacoSamples(curve, section.start, section.end, 0.58);
 
     samples.forEach((sample, sampleIndex) => {
       const toTrack = sample.center.clone().sub(
@@ -6290,23 +6290,26 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
 
       for (let row = 0; row < 7; row += 1) {
         const seed = sectionIndex * 10000 + sampleIndex * 17 + row * 101;
-        const rowCrowding = row < 2 ? 0.78 : row < 5 ? 0.9 : 0.72;
-        const cluster = pseudoRandom(sectionIndex * 300 + Math.floor(sampleIndex / 4) * 11 + row * 23);
-        if (pseudoRandom(seed) > rowCrowding || cluster < 0.08) {
+        const rowCrowding = row < 2 ? 0.95 : row < 5 ? 0.985 : 0.92;
+        const microGap = pseudoRandom(sectionIndex * 500 + Math.floor(sampleIndex / 5) * 37 + row * 19);
+        if (pseudoRandom(seed) > rowCrowding && microGap < 0.45) {
+          continue;
+        }
+        if (microGap < 0.012) {
           continue;
         }
 
-        const seatOffset = baseOffset + row * 0.72 + 0.34 + (pseudoRandom(seed + 1) - 0.5) * 0.12;
+        const seatOffset = baseOffset + row * 0.72 + 0.34 + (pseudoRandom(seed + 1) - 0.5) * 0.08;
         const rowY = MONACO_ROAD_Y + 0.17 + row * 0.36;
-        const jitter = (pseudoRandom(seed + 2) - 0.5) * 0.24;
+        const jitter = (pseudoRandom(seed + 2) - 0.5) * 0.16;
         const base = sample.center
           .clone()
           .addScaledVector(sample.right, section.side * seatOffset)
           .addScaledVector(sample.tangent, jitter);
         const shirtIndex = seed % torsoMatrices.length;
         const skinIndex = seed % headMatrices.length;
-        const heightScale = 1.05 + pseudoRandom(seed + 4) * 0.18;
-        const widthScale = 0.95 + pseudoRandom(seed + 5) * 0.16;
+        const heightScale = 1.02 + pseudoRandom(seed + 4) * 0.14;
+        const widthScale = 0.92 + pseudoRandom(seed + 5) * 0.12;
         personScale.set(widthScale, heightScale, widthScale);
 
         torsoQuaternion.copy(quaternion).multiply(
@@ -6609,13 +6612,21 @@ function addMonacoHillsideBuildings(group, curve, definition) {
   const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
   const grandstandBackOffset = roadHalfWidth + barrierClearance + 2.4 + 7 * 0.72 + 1.2;
   const treeOffset = grandstandBackOffset + 5.2;
-  const buildingOffset = grandstandBackOffset + 13.2;
+  const buildingOffset = grandstandBackOffset + 24;
+  const trackClearanceForBuildings = roadHalfWidth + barrierClearance + 7.5;
+  const centerlineSamples = Array.from({ length: 160 }, (_, index) => curve.getPointAt(index / 160));
+  const blockedGrandstandBuildingSeeds = new Set([0, 1, 2, 3]);
   let seed = 0;
   let treeSeed = 0;
 
   sections.forEach((section) => {
     const buildingSamples = collectMonacoSamples(curve, section.start, section.end, 8.6);
     buildingSamples.forEach((sample, sampleIndex) => {
+      if (blockedGrandstandBuildingSeeds.has(seed)) {
+        seed += 1;
+        return;
+      }
+
       const height = 13 + pseudoRandom(seed + 3) * 12 + (sampleIndex % 3) * 2.1;
       const building = createMonacoPalaceBuilding(seed, {
         width: 7.4 + pseudoRandom(seed + 1) * 3.1,
@@ -6625,6 +6636,14 @@ function addMonacoHillsideBuildings(group, curve, definition) {
       const position = sample.center
         .clone()
         .addScaledVector(sample.right, section.side * buildingOffset);
+      const minTrackDistance = centerlineSamples.reduce((closest, point) => {
+        const distance = Math.hypot(position.x - point.x, position.z - point.z);
+        return Math.min(closest, distance);
+      }, Infinity);
+      if (minTrackDistance < trackClearanceForBuildings) {
+        seed += 1;
+        return;
+      }
       building.position.copy(position);
       building.position.y = MONACO_GROUND_Y + (sampleIndex % 2) * 0.22;
       building.rotation.y = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
@@ -6711,14 +6730,25 @@ function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bev
 function createMonacoHarborYacht(seed) {
   const yacht = new THREE.Group();
   yacht.name = `MonacoHarborYacht:${seed}`;
+  const variant = seed % 8;
+  const palette = [
+    { hull: 0xffffff, stripe: 0x173b73, canvas: 0xf8fafc },
+    { hull: 0xf6f9fb, stripe: 0x111827, canvas: 0xe7edf2 },
+    { hull: 0xe9eff4, stripe: 0xb91c1c, canvas: 0xffffff },
+    { hull: 0xfdfaf3, stripe: 0x0f766e, canvas: 0xf3ead5 },
+    { hull: 0x121a24, stripe: 0xf4f7fb, canvas: 0xf8fafc },
+    { hull: 0xf7f3e8, stripe: 0x244f86, canvas: 0xdfe9ef },
+    { hull: 0xfafafa, stripe: 0x9a3412, canvas: 0xf4efe5 },
+    { hull: 0xdfe7ef, stripe: 0x1f2937, canvas: 0xf8fafc }
+  ][variant];
   const hullMat = createFlatStandardMaterial({
-    color: [0xffffff, 0xf6f9fb, 0xe9eff4, 0xfdfaf3][seed % 4],
+    color: palette.hull,
     roughness: 0.22,
     metalness: 0.1
   });
   const undersideMat = createFlatStandardMaterial({ color: 0x0f2f44, roughness: 0.34, metalness: 0.08 });
   const stripeMat = createFlatStandardMaterial({
-    color: [0x173b73, 0x111827, 0xb91c1c, 0x0f766e][seed % 4],
+    color: palette.stripe,
     roughness: 0.36
   });
   const glassMat = createFlatStandardMaterial({
@@ -6732,19 +6762,31 @@ function createMonacoHarborYacht(seed) {
   const deckLineMat = createFlatStandardMaterial({ color: 0xf2dfbd, roughness: 0.58 });
   const steelMat = createFlatStandardMaterial({ color: 0xc9d2d8, roughness: 0.24, metalness: 0.72 });
   const fenderMat = createFlatStandardMaterial({ color: 0xeff4f7, roughness: 0.48 });
-  const canvasMat = createFlatStandardMaterial({ color: 0xf8fafc, roughness: 0.74 });
+  const canvasMat = createFlatStandardMaterial({ color: palette.canvas, roughness: 0.74 });
 
-  const length = 7.2 + pseudoRandom(seed + 1) * 7.8;
-  const width = 2.2 + pseudoRandom(seed + 2) * 1.35;
-  const hullHeight = 0.68 + pseudoRandom(seed + 3) * 0.28;
+  const variantDimensions = [
+    { length: 8.4, width: 2.35, height: 0.7, bow: 0.5, stern: 0.5 },
+    { length: 13.8, width: 3.25, height: 0.92, bow: 0.56, stern: 0.62 },
+    { length: 11.2, width: 2.95, height: 0.84, bow: 0.5, stern: 0.58 },
+    { length: 9.7, width: 3.85, height: 0.62, bow: 0.44, stern: 0.52 },
+    { length: 14.8, width: 3.45, height: 0.88, bow: 0.52, stern: 0.66 },
+    { length: 10.4, width: 2.55, height: 0.72, bow: 0.6, stern: 0.48 },
+    { length: 12.6, width: 3.05, height: 0.82, bow: 0.54, stern: 0.56 },
+    { length: 7.8, width: 2.25, height: 0.64, bow: 0.64, stern: 0.42 }
+  ][variant];
+  const length = variantDimensions.length * (0.94 + pseudoRandom(seed + 1) * 0.12);
+  const width = variantDimensions.width * (0.94 + pseudoRandom(seed + 2) * 0.12);
+  const hullHeight = variantDimensions.height * (0.95 + pseudoRandom(seed + 3) * 0.12);
+  const bowTaper = variantDimensions.bow;
+  const sternBeam = variantDimensions.stern;
   const hullShape = new THREE.Shape();
   hullShape.moveTo(0, length * 0.5);
-  hullShape.quadraticCurveTo(width * 0.52, length * 0.38, width * 0.54, length * 0.12);
-  hullShape.quadraticCurveTo(width * 0.54, -length * 0.3, width * 0.36, -length * 0.48);
-  hullShape.quadraticCurveTo(width * 0.16, -length * 0.58, 0, -length * 0.56);
-  hullShape.quadraticCurveTo(-width * 0.16, -length * 0.58, -width * 0.36, -length * 0.48);
-  hullShape.quadraticCurveTo(-width * 0.54, -length * 0.3, -width * 0.54, length * 0.12);
-  hullShape.quadraticCurveTo(-width * 0.52, length * 0.38, 0, length * 0.5);
+  hullShape.quadraticCurveTo(width * bowTaper, length * 0.38, width * 0.54, length * 0.12);
+  hullShape.quadraticCurveTo(width * 0.56, -length * 0.28, width * sternBeam, -length * 0.47);
+  hullShape.quadraticCurveTo(width * 0.18, -length * 0.59, 0, -length * 0.56);
+  hullShape.quadraticCurveTo(-width * 0.18, -length * 0.59, -width * sternBeam, -length * 0.47);
+  hullShape.quadraticCurveTo(-width * 0.56, -length * 0.28, -width * 0.54, length * 0.12);
+  hullShape.quadraticCurveTo(-width * bowTaper, length * 0.38, 0, length * 0.5);
   hullShape.closePath();
 
   const hullGeometry = new THREE.ExtrudeGeometry(hullShape, {
@@ -6772,8 +6814,8 @@ function createMonacoHarborYacht(seed) {
     yacht.add(stripe);
   });
 
-  const deck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.74, 0.05, length * 0.5, 0.16, 0.02), deckMat);
-  deck.position.set(0, hullHeight + 0.035, -length * 0.1);
+  const deck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * (variant === 3 ? 0.82 : 0.74), 0.05, length * 0.5, 0.16, 0.02), deckMat);
+  deck.position.set(0, hullHeight + 0.035, variant === 5 ? -length * 0.02 : -length * 0.1);
   yacht.add(deck);
 
   for (let line = -1; line <= 1; line += 1) {
@@ -6786,27 +6828,54 @@ function createMonacoHarborYacht(seed) {
   bowDeck.position.set(0, hullHeight + 0.05, length * 0.28);
   yacht.add(bowDeck);
 
-  const cabinLength = length * 0.34;
-  const cabinWidth = width * 0.58;
-  const cabinHeight = 0.78 + pseudoRandom(seed + 4) * 0.18;
+  const cabinLength = length * [0.28, 0.38, 0.32, 0.22, 0.42, 0.26, 0.34, 0.24][variant];
+  const cabinWidth = width * [0.55, 0.62, 0.58, 0.46, 0.64, 0.52, 0.6, 0.5][variant];
+  const cabinHeight = [0.66, 0.92, 0.8, 0.58, 0.86, 0.7, 0.82, 0.56][variant] + pseudoRandom(seed + 4) * 0.12;
   const cabin = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth, cabinHeight, cabinLength, 0.18, 0.035), hullMat);
-  cabin.position.set(0, hullHeight + cabinHeight * 0.5 + 0.08, length * 0.02);
+  cabin.position.set(0, hullHeight + cabinHeight * 0.5 + 0.08, [0.06, -0.02, 0.03, -0.08, -0.04, 0.11, 0, 0.14][variant] * length);
   cabin.castShadow = true;
   yacht.add(cabin);
 
-  const upperDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.74, 0.16, cabinLength * 0.62, 0.14, 0.025), canvasMat);
-  upperDeck.position.set(0, hullHeight + cabinHeight + 0.22, -length * 0.02);
-  yacht.add(upperDeck);
+  if (variant !== 3 && variant !== 7) {
+    const upperDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * (variant === 1 || variant === 4 ? 0.86 : 0.74), 0.16, cabinLength * 0.62, 0.14, 0.025), canvasMat);
+    upperDeck.position.set(0, hullHeight + cabinHeight + 0.22, cabin.position.z - cabinLength * 0.12);
+    yacht.add(upperDeck);
+  }
+
+  if (variant === 1 || variant === 4 || variant === 6) {
+    const secondDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.72, 0.46, cabinLength * 0.46, 0.14, 0.025), hullMat);
+    secondDeck.position.set(0, hullHeight + cabinHeight + 0.32, cabin.position.z - cabinLength * 0.08);
+    secondDeck.castShadow = true;
+    yacht.add(secondDeck);
+
+    const flybridgeGlass = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.58, 0.18, cabinLength * 0.14, 0.04, 0.01), glassMat);
+    flybridgeGlass.position.set(0, secondDeck.position.y + 0.08, secondDeck.position.z + cabinLength * 0.24);
+    yacht.add(flybridgeGlass);
+  }
+
+  if (variant === 3) {
+    [-1, 1].forEach((side) => {
+      const ama = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.23, 0.18, length * 0.62, 0.12, 0.025), undersideMat);
+      ama.position.set(side * width * 0.38, hullHeight + 0.1, -length * 0.02);
+      yacht.add(ama);
+    });
+  }
 
   const windshield = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.88, 0.32, cabinLength * 0.18, 0.05, 0.012), glassMat);
-  windshield.position.set(0, hullHeight + cabinHeight * 0.72 + 0.1, length * 0.2);
+  windshield.position.set(0, hullHeight + cabinHeight * 0.72 + 0.1, cabin.position.z + cabinLength * 0.5);
   yacht.add(windshield);
 
   const sideWindowGeometry = createMonacoRoundedBoxGeometry(0.055, 0.3, cabinLength * 0.42, 0.035, 0.008);
   [-1, 1].forEach((side) => {
     const sideWindow = new THREE.Mesh(sideWindowGeometry, glassMat);
-    sideWindow.position.set(side * (cabinWidth * 0.5 + 0.045), hullHeight + cabinHeight * 0.62 + 0.08, -length * 0.02);
+    sideWindow.position.set(side * (cabinWidth * 0.5 + 0.045), hullHeight + cabinHeight * 0.62 + 0.08, cabin.position.z);
     yacht.add(sideWindow);
+
+    if (variant === 1 || variant === 4 || variant === 6) {
+      const aftWindow = new THREE.Mesh(createMonacoRoundedBoxGeometry(0.052, 0.24, cabinLength * 0.2, 0.03, 0.007), glassMat);
+      aftWindow.position.set(side * (cabinWidth * 0.5 + 0.05), hullHeight + cabinHeight * 0.45, cabin.position.z - cabinLength * 0.33);
+      yacht.add(aftWindow);
+    }
   });
 
   const railGeometry = new THREE.CylinderGeometry(0.018, 0.018, length * 0.76, 8);
@@ -6823,10 +6892,12 @@ function createMonacoHarborYacht(seed) {
     }
   });
 
-  const radarArch = new THREE.Mesh(new THREE.TorusGeometry(width * 0.22, 0.02, 6, 18, Math.PI), steelMat);
-  radarArch.position.set(0, hullHeight + cabinHeight + 0.44, -length * 0.12);
+  const radarArch = new THREE.Mesh(new THREE.TorusGeometry(width * [0.18, 0.26, 0.22, 0.16, 0.3, 0.18, 0.24, 0.15][variant], 0.02, 6, 18, Math.PI), steelMat);
+  radarArch.position.set(0, hullHeight + cabinHeight + 0.44, cabin.position.z - cabinLength * 0.34);
   radarArch.rotation.z = Math.PI;
-  yacht.add(radarArch);
+  if (variant !== 7) {
+    yacht.add(radarArch);
+  }
 
   const radarDish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), steelMat);
   radarDish.scale.set(1.6, 0.35, 0.75);
@@ -6834,9 +6905,27 @@ function createMonacoHarborYacht(seed) {
   yacht.add(radarDish);
 
   const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.018, 1.25, 7), steelMat);
-  antenna.position.set(width * 0.16, hullHeight + cabinHeight + 1.05, -length * 0.13);
-  antenna.rotation.x = -0.2;
+  antenna.position.set(width * 0.16, hullHeight + cabinHeight + 1.05, cabin.position.z - cabinLength * 0.24);
+  antenna.rotation.x = variant === 5 ? -0.46 : -0.2;
   yacht.add(antenna);
+
+  if (variant === 0 || variant === 2 || variant === 5 || variant === 7) {
+    const aftCanopy = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.55, 0.07, length * 0.16, 0.1, 0.018), canvasMat);
+    aftCanopy.position.set(0, hullHeight + cabinHeight * 0.72, -length * 0.32);
+    yacht.add(aftCanopy);
+
+    [-1, 1].forEach((side) => {
+      const canopyPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.58, 6), steelMat);
+      canopyPost.position.set(side * width * 0.24, hullHeight + cabinHeight * 0.48, -length * 0.32);
+      yacht.add(canopyPost);
+    });
+  }
+
+  if (variant === 4) {
+    const tender = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.42, 0.18, length * 0.14, 0.09, 0.02), canvasMat);
+    tender.position.set(0, hullHeight + 0.16, -length * 0.44);
+    yacht.add(tender);
+  }
 
   [-1, 1].forEach((side) => {
     for (let index = 0; index < 3; index += 1) {
@@ -7061,12 +7150,13 @@ function addMonacoOuterPort(group, curve, definition) {
             return;
           }
 
-          const yacht = createMonacoHarborYacht(sectionIndex * 10000 + sampleIndex * 100 + row * 10 + side + 5);
+          const yachtSeed = sectionIndex * 10000 + sampleIndex * 137 + row * 41 + (side > 0 ? 19 : 7) + 5;
+          const yacht = createMonacoHarborYacht(yachtSeed);
           const rowDistance = quayFar + 13 + row * 9.2 + pseudoRandom(sampleIndex * 17 + row) * 1.8;
           const position = sample.center
             .clone()
             .addScaledVector(sample.right, section.side * rowDistance)
-            .addScaledVector(tangent, side * (2.75 + pseudoRandom(row + sampleIndex + 30) * 0.85));
+            .addScaledVector(tangent, side * (3.65 + row * 0.35 + pseudoRandom(row + sampleIndex + 30) * 0.95));
           position.y = MONACO_GROUND_Y + 0.02;
           yacht.position.copy(position);
           yacht.rotation.y = Math.atan2(outward.x, outward.z) + (side > 0 ? 0.05 : -0.05) + (pseudoRandom(sampleIndex + row + 9) - 0.5) * 0.12;
@@ -7076,11 +7166,12 @@ function addMonacoOuterPort(group, curve, definition) {
       }
 
       if (sampleIndex % 8 === 2) {
-        const largeYacht = createMonacoHarborYacht(sectionIndex * 20000 + sampleIndex * 200 + 77);
+        const largeYachtSeed = sectionIndex * 20000 + sampleIndex * 211 + 77;
+        const largeYacht = createMonacoHarborYacht(largeYachtSeed);
         const position = sample.center
           .clone()
           .addScaledVector(sample.right, section.side * (quayFar + pierLength + 13 + pseudoRandom(sampleIndex) * 9))
-          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 3.5);
+          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 4.8);
         position.y = MONACO_GROUND_Y + 0.025;
         largeYacht.position.copy(position);
         largeYacht.rotation.y = Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18;
@@ -7093,6 +7184,171 @@ function addMonacoOuterPort(group, curve, definition) {
   addMonacoInstancedPart(portGroup, bollardGeometry, bollardMat, bollardMatrices, "MonacoHarborBollards");
   optimizeStaticDecorativeProps(portGroup, ["MonacoContinuousSea", "MonacoHarborQuay"]);
   group.add(portGroup);
+}
+
+let cachedMonacoFerrariFlagTexture = null;
+
+function getMonacoFerrariFlagTexture() {
+  if (cachedMonacoFerrariFlagTexture) {
+    return cachedMonacoFerrariFlagTexture;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+
+  const cloth = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  cloth.addColorStop(0, "#f73131");
+  cloth.addColorStop(0.52, "#d80f1b");
+  cloth.addColorStop(1, "#b80d17");
+  ctx.fillStyle = cloth;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  for (let y = 14; y < canvas.height; y += 28) {
+    ctx.fillRect(0, y, canvas.width, 1);
+  }
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  for (let x = 26; x < canvas.width; x += 42) {
+    ctx.fillRect(x, 0, 1, canvas.height);
+  }
+
+  const checkerWidth = 112;
+  const cell = 18;
+  for (let y = 0; y < canvas.height; y += cell) {
+    for (let x = 0; x < checkerWidth; x += cell) {
+      ctx.fillStyle = ((x / cell + y / cell) % 2 === 0) ? "#f9fafb" : "#111827";
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+  const fade = ctx.createLinearGradient(checkerWidth - 8, 0, checkerWidth + 72, 0);
+  fade.addColorStop(0, "rgba(216,15,27,0)");
+  fade.addColorStop(1, "#d80f1b");
+  ctx.fillStyle = fade;
+  ctx.fillRect(checkerWidth - 8, 0, 80, canvas.height);
+
+  ctx.save();
+  ctx.translate(318, 122);
+  ctx.beginPath();
+  ctx.moveTo(-48, -62);
+  ctx.lineTo(48, -62);
+  ctx.lineTo(58, 14);
+  ctx.quadraticCurveTo(0, 76, -58, 14);
+  ctx.closePath();
+  ctx.fillStyle = "#ffd21f";
+  ctx.fill();
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = "#173b2f";
+  ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  ctx.fillStyle = "#111827";
+  ctx.font = "bold 30px serif";
+  ctx.textAlign = "center";
+  ctx.fillText("SF", 0, 28);
+  ctx.beginPath();
+  ctx.moveTo(-6, -12);
+  ctx.bezierCurveTo(-26, -28, -14, -52, 4, -38);
+  ctx.bezierCurveTo(26, -54, 30, -16, 8, -8);
+  ctx.bezierCurveTo(28, 2, 14, 18, -4, 8);
+  ctx.bezierCurveTo(-22, 16, -24, -2, -6, -12);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "#0f5132";
+  ctx.fillRect(236, 38, 118, 8);
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(236, 48, 118, 8);
+  ctx.fillStyle = "#0f5132";
+  ctx.fillRect(236, 58, 118, 8);
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.font = "bold 22px sans-serif";
+  ctx.fillText("Ferrari", 318, 216);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  cachedMonacoFerrariFlagTexture = texture;
+  return texture;
+}
+
+function createMonacoClothFlagGeometry(width = 3.05, height = 1.72, columns = 14, rows = 7) {
+  const geometry = new THREE.PlaneGeometry(width, height, columns, rows);
+  geometry.translate(width * 0.5, 0, 0);
+  const positions = geometry.attributes.position;
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    const normalizedX = (x / width) + 0.5;
+    const wave = Math.sin(normalizedX * Math.PI * 3.5 + y * 4.5) * 0.075 * normalizedX;
+    positions.setZ(index, wave);
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addMonacoFerrariTracksideFlags(group, curve, definition, barrierOffset) {
+  const flagGroup = new THREE.Group();
+  flagGroup.name = "MonacoTracksideFerrariFlags";
+  const clothMat = new THREE.MeshStandardMaterial({
+    map: getMonacoFerrariFlagTexture(),
+    roughness: 0.86,
+    metalness: 0,
+    side: THREE.DoubleSide
+  });
+  const poleMat = createFlatStandardMaterial({ color: 0x2f3a45, roughness: 0.48, metalness: 0.5 });
+  const flagGeometry = createMonacoClothFlagGeometry();
+  const poleGeometry = new THREE.CylinderGeometry(0.026, 0.034, 1.7, 8);
+  const placements = [
+    { side: 1, start: 0.06, end: 0.22, step: 0.038 },
+    { side: 1, start: 0.31, end: 0.46, step: 0.043 },
+    { side: -1, start: 0.56, end: 0.72, step: 0.042 },
+    { side: -1, start: 0.80, end: 0.94, step: 0.046 }
+  ];
+  let flagIndex = 0;
+
+  placements.forEach((section) => {
+    for (let progress = section.start; progress <= section.end; progress += section.step) {
+      const sample = {
+        center: curve.getPointAt(progress),
+        tangent: curve.getTangentAt(progress).setY(0).normalize()
+      };
+      const right = getRightVector(sample.tangent);
+      const outward = right.clone().multiplyScalar(section.side).normalize();
+      const polePosition = sample.center
+        .clone()
+        .addScaledVector(right, section.side * (barrierOffset + 0.52 + pseudoRandom(flagIndex + 3) * 0.18))
+        .addScaledVector(sample.tangent, (pseudoRandom(flagIndex + 10) - 0.5) * 0.45);
+      polePosition.y = MONACO_ROAD_Y + 0.9;
+
+      const pole = new THREE.Mesh(poleGeometry, poleMat);
+      pole.name = `MonacoFerrariFlagPole:${flagIndex}`;
+      pole.position.copy(polePosition);
+      pole.castShadow = true;
+      flagGroup.add(pole);
+
+      const heading = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      const cloth = new THREE.Mesh(flagGeometry, clothMat);
+      cloth.name = `MonacoFerrariTracksideFlag:${flagIndex}`;
+      cloth.position.copy(polePosition).addScaledVector(outward, 0.08);
+      cloth.position.y += 0.86 + pseudoRandom(flagIndex + 5) * 0.16;
+      cloth.rotation.y = heading + Math.PI + (pseudoRandom(flagIndex + 6) - 0.5) * 0.18;
+      cloth.rotation.z = (pseudoRandom(flagIndex + 7) - 0.5) * 0.1;
+      cloth.castShadow = true;
+      cloth.receiveShadow = true;
+      flagGroup.add(cloth);
+      flagIndex += 1;
+    }
+  });
+
+  optimizeStaticDecorativeProps(flagGroup, []);
+  group.add(flagGroup);
 }
 
 function addMonacoTracksideVisuals(group, curve, definition) {
@@ -7215,6 +7471,7 @@ function addMonacoTracksideVisuals(group, curve, definition) {
   addMonacoInstancedPart(tracksideGroup, lampPoleGeometry, lampMat, lampPoleMatrices, "MonacoTrackLampPoles");
   addMonacoInstancedPart(tracksideGroup, lampArmGeometry, lampMat, lampArmMatrices, "MonacoTrackLampArms");
   addMonacoInstancedPart(tracksideGroup, lampHeadGeometry, lampGlowMat, lampHeadMatrices, "MonacoTrackLampHeads");
+  addMonacoFerrariTracksideFlags(tracksideGroup, curve, definition, barrierOffset);
 
   optimizeStaticDecorativeProps(tracksideGroup, ["MonacoCatchFence"]);
   group.add(tracksideGroup);

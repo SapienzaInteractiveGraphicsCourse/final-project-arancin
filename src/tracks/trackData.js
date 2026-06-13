@@ -142,7 +142,7 @@ export const TRACK_DEFINITIONS = {
     themeId: "monaco-formula-1",
     curveType: "catmullrom",
     tension: 0.32,
-    roadWidth: 11.0,
+    roadWidth: 12.6,
     segments: 200,
     groundSize: 300,
     barrierOffset: 0.5,
