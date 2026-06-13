@@ -492,7 +492,7 @@ function addBarriers(group, edgeSamples, definition, material) {
 
   const barriers = new THREE.InstancedMesh(geometry, material, matrices.length);
   barriers.name = `${definition.name}:Barriers`;
-  barriers.castShadow = definition.id !== "vegas";
+  barriers.castShadow = false;
   barriers.receiveShadow = true;
   matrices.forEach((barrierMatrix, index) => barriers.setMatrixAt(index, barrierMatrix));
   barriers.instanceMatrix.needsUpdate = true;
@@ -509,6 +509,9 @@ function createCheckpoints(curve, definition) {
     return {
       id: index,
       name: index === 0 ? "Start" : `Sector ${index}`,
+      order: index,
+      progress,
+      isStartFinish: index === 0,
       position: new THREE.Vector3(position.x, 0, position.z),
       rotationY: getHeading(tangent),
       size: new THREE.Vector3(definition.roadWidth + 0.7, 3, 1.4),
@@ -528,22 +531,39 @@ function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
   const rows = 4;
   const tileWidth = checkpoint.size.x / columns;
   const tileDepth = 0.36;
+  const tileGeometry = new THREE.BoxGeometry(tileWidth, 0.025, tileDepth);
+  const whiteMatrices = [];
+  const darkMatrices = [];
+  const matrix = new THREE.Matrix4();
 
   for (let column = 0; column < columns; column += 1) {
     for (let row = 0; row < rows; row += 1) {
-      const material = (column + row) % 2 === 0 ? materials.startWhite : materials.startDark;
-      const tile = new THREE.Mesh(new THREE.BoxGeometry(tileWidth, 0.025, tileDepth), material);
-      tile.position.set((column - (columns - 1) * 0.5) * tileWidth, 0, (row - 1) * tileDepth);
-      tile.receiveShadow = true;
-      startLine.add(tile);
+      matrix.makeTranslation((column - (columns - 1) * 0.5) * tileWidth, 0, (row - 1) * tileDepth);
+      if ((column + row) % 2 === 0) {
+        whiteMatrices.push(matrix.clone());
+      } else {
+        darkMatrices.push(matrix.clone());
+      }
     }
   }
+
+  [
+    { matrices: whiteMatrices, material: materials.startWhite, name: "StartLineWhiteTiles" },
+    { matrices: darkMatrices, material: materials.startDark, name: "StartLineDarkTiles" }
+  ].forEach(({ matrices, material, name }) => {
+    const tiles = new THREE.InstancedMesh(tileGeometry, material, matrices.length);
+    tiles.name = name;
+    tiles.receiveShadow = true;
+    matrices.forEach((tileMatrix, tileIndex) => tiles.setMatrixAt(tileIndex, tileMatrix));
+    tiles.instanceMatrix.needsUpdate = true;
+    startLine.add(tiles);
+  });
 
   group.add(startLine);
 
   // Add starting grid slots/boxes behind the finish line.
   // Sample the curve at each slot distance so slots follow the track curvature.
-  const startT = 0; // checkpoint is always at t=0
+  const startT = checkpoint.progress ?? 0;
   const totalLength = curve.getLength();
   const gridDistances = [4.8, 8.8, 12.8, 16.8];
   const gridSides = [1, -1, 1, -1];

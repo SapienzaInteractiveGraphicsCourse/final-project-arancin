@@ -196,6 +196,8 @@ Contratto `Track`:
 }
 ```
 
+`checkpoints` mantiene l'ordine logico di gara tramite `order`, non tramite il valore numerico di `progress`. Il checkpoint con `order: 0` / `isStartFinish: true` e' la partenza-arrivo e puo trovarsi su qualunque `progress` della spline, cosi la linea di partenza puo essere posizionata a meta rettilineo.
+
 Regole:
 
 - non cambiare la firma di `createTrackById`;
