@@ -3125,6 +3125,20 @@ function disableDecorativeCastShadows(group) {
   });
 }
 
+function optimizeStaticDecorativeProps(group, receiveShadowNames = []) {
+  group.traverse((child) => {
+    if (child.isMesh || child.isInstancedMesh) {
+      child.castShadow = false;
+      child.receiveShadow = receiveShadowNames.some((name) => child.name.includes(name));
+    }
+
+    if (!child.isLight && !child.userData.spin) {
+      child.updateMatrix();
+      child.matrixAutoUpdate = false;
+    }
+  });
+}
+
 function addVegasProps(group, curve, definition) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "VegasDecorativeProps";
@@ -4859,6 +4873,12 @@ export function buildBeachProps(group, curve, trackDef) {
   addBeachPeople(propsGroup, curve, trackDef);
   // addBeachLampPostsStrict(propsGroup, curve, trackDef);
 
+  optimizeStaticDecorativeProps(propsGroup, [
+    "TropicalBeachPropsGround",
+    "TropicalBeachOceanShore",
+    "TropicalBeachOceanSurf"
+  ]);
+
   group.add(propsGroup);
   group.userData.disposeProps = () => {
     propsGroup.traverse((child) => {
@@ -6068,15 +6088,1152 @@ function addMonacoKerbs(group, curve, definition) {
   }
 }
 
+function createMonacoRibbonMesh(curve, definition, {
+  name,
+  side,
+  start,
+  end,
+  nearOffset,
+  farOffset,
+  y,
+  material,
+  sampleStep = 1
+}) {
+  const vertices = [];
+  const indices = [];
+  const steps = Math.max(2, Math.ceil((end - start) * definition.segments / sampleStep));
+
+  for (let index = 0; index <= steps; index += 1) {
+    const progress = start + (end - start) * (index / steps);
+    const center = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const right = getRightVector(tangent);
+    const near = center.clone().addScaledVector(right, side * nearOffset);
+    const far = center.clone().addScaledVector(right, side * farOffset);
+
+    vertices.push(near.x, y, near.z, far.x, y, far.z);
+  }
+
+  for (let index = 0; index < steps; index += 1) {
+    const current = index * 2;
+    const next = current + 2;
+    if (side > 0) {
+      indices.push(current, next, current + 1, current + 1, next, next + 1);
+    } else {
+      indices.push(current, current + 1, next, current + 1, next + 1, next);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function createMonacoVerticalRibbonMesh(curve, definition, {
+  name,
+  side,
+  start,
+  end,
+  offset,
+  yBottom,
+  yTop,
+  material,
+  sampleStep = 2
+}) {
+  const vertices = [];
+  const indices = [];
+  const steps = Math.max(2, Math.ceil((end - start) * definition.segments / sampleStep));
+
+  for (let index = 0; index <= steps; index += 1) {
+    const progress = start + (end - start) * (index / steps);
+    const center = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const right = getRightVector(tangent);
+    const base = center.clone().addScaledVector(right, side * offset);
+
+    vertices.push(base.x, yBottom, base.z, base.x, yTop, base.z);
+  }
+
+  for (let index = 0; index < steps; index += 1) {
+    const current = index * 2;
+    const next = current + 2;
+    if (side > 0) {
+      indices.push(current, next, current + 1, current + 1, next, next + 1);
+    } else {
+      indices.push(current, current + 1, next, current + 1, next + 1, next);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function collectMonacoSamples(curve, start, end, spacingMeters) {
+  const samples = [];
+  const totalLength = curve.getLength();
+  const step = Math.max(0.002, spacingMeters / totalLength);
+
+  for (let progress = start; progress <= end; progress += step) {
+    const center = curve.getPointAt(progress);
+    const tangent = curve.getTangentAt(progress).setY(0).normalize();
+    const right = getRightVector(tangent);
+    samples.push({ center, tangent, right, progress });
+  }
+
+  return samples;
+}
+
+function addMonacoInstancedPart(group, geometry, material, matrices, name) {
+  if (matrices.length === 0) {
+    return;
+  }
+
+  const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
+  mesh.name = name;
+  matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+}
+
+function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
+  const shirtMaterials = [
+    createFlatStandardMaterial({ color: 0xd92d2d, roughness: 0.78 }),
+    createFlatStandardMaterial({ color: 0xf3f0e8, roughness: 0.8 }),
+    createFlatStandardMaterial({ color: 0x1f5f9e, roughness: 0.82 }),
+    createFlatStandardMaterial({ color: 0xf2c94c, roughness: 0.75 }),
+    createFlatStandardMaterial({ color: 0x2f80ed, roughness: 0.8 }),
+    createFlatStandardMaterial({ color: 0x111827, roughness: 0.82 }),
+    createFlatStandardMaterial({ color: 0x16a34a, roughness: 0.78 })
+  ];
+  const skinMaterials = [
+    createFlatStandardMaterial({ color: 0xf2c09a, roughness: 0.82 }),
+    createFlatStandardMaterial({ color: 0xc68642, roughness: 0.84 }),
+    createFlatStandardMaterial({ color: 0x8d5524, roughness: 0.86 })
+  ];
+  const capMaterials = [
+    createFlatStandardMaterial({ color: 0xd92d2d, roughness: 0.72 }),
+    createFlatStandardMaterial({ color: 0xffffff, roughness: 0.75 }),
+    createFlatStandardMaterial({ color: 0x1f2937, roughness: 0.78 }),
+    createFlatStandardMaterial({ color: 0xffd21f, roughness: 0.74 })
+  ];
+  const pantsMaterial = createFlatStandardMaterial({ color: 0x1f2937, roughness: 0.86 });
+  const lightPantsMaterial = createFlatStandardMaterial({ color: 0xd8d2c6, roughness: 0.84 });
+  const shoeMaterial = createFlatStandardMaterial({ color: 0x15191f, roughness: 0.72 });
+  const ferrariFlagMat = createFlatStandardMaterial({
+    color: 0xd71920,
+    roughness: 0.58,
+    side: THREE.DoubleSide
+  });
+  const ferrariFlagAccentMat = createFlatStandardMaterial({
+    color: 0xffd21f,
+    roughness: 0.62,
+    side: THREE.DoubleSide
+  });
+  const flagPoleMat = createFlatStandardMaterial({ color: 0x2f3a45, roughness: 0.52, metalness: 0.42 });
+
+  const torsoGeometry = new THREE.BoxGeometry(0.26, 0.38, 0.16);
+  const headGeometry = new THREE.SphereGeometry(0.12, 10, 8);
+  const capGeometry = new THREE.CylinderGeometry(0.13, 0.14, 0.05, 10);
+  const armGeometry = new THREE.BoxGeometry(0.06, 0.24, 0.06);
+  const legGeometry = new THREE.BoxGeometry(0.1, 0.09, 0.36);
+  const shoeGeometry = new THREE.BoxGeometry(0.11, 0.055, 0.16);
+  const flagGeometry = new THREE.PlaneGeometry(0.42, 0.28);
+  const flagAccentGeometry = new THREE.PlaneGeometry(0.14, 0.08);
+  const flagPoleGeometry = new THREE.CylinderGeometry(0.014, 0.014, 0.72, 7);
+
+  const torsoMatrices = shirtMaterials.map(() => []);
+  const headMatrices = skinMaterials.map(() => []);
+  const capMatrices = capMaterials.map(() => []);
+  const armMatrices = skinMaterials.map(() => []);
+  const darkLegMatrices = [];
+  const lightLegMatrices = [];
+  const shoeMatrices = [];
+  const ferrariFlagMatrices = [];
+  const ferrariFlagAccentMatrices = [];
+  const flagPoleMatrices = [];
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const torsoQuaternion = new THREE.Quaternion();
+  const leftArmQuaternion = new THREE.Quaternion();
+  const rightArmQuaternion = new THREE.Quaternion();
+  const leftLegQuaternion = new THREE.Quaternion();
+  const rightLegQuaternion = new THREE.Quaternion();
+  const flagQuaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+  const personScale = new THREE.Vector3();
+  const flagScale = new THREE.Vector3(1, 1, 1);
+
+  sections.forEach((section, sectionIndex) => {
+    const samples = collectMonacoSamples(curve, section.start, section.end, 0.78);
+
+    samples.forEach((sample, sampleIndex) => {
+      const toTrack = sample.center.clone().sub(
+        sample.center.clone().addScaledVector(sample.right, section.side * baseOffset)
+      ).setY(0).normalize();
+      const rotationY = Math.atan2(toTrack.x, toTrack.z);
+      quaternion.setFromAxisAngle(UP, rotationY);
+
+      for (let row = 0; row < 7; row += 1) {
+        const seed = sectionIndex * 10000 + sampleIndex * 17 + row * 101;
+        const rowCrowding = row < 2 ? 0.78 : row < 5 ? 0.9 : 0.72;
+        const cluster = pseudoRandom(sectionIndex * 300 + Math.floor(sampleIndex / 4) * 11 + row * 23);
+        if (pseudoRandom(seed) > rowCrowding || cluster < 0.08) {
+          continue;
+        }
+
+        const seatOffset = baseOffset + row * 0.72 + 0.34 + (pseudoRandom(seed + 1) - 0.5) * 0.12;
+        const rowY = MONACO_ROAD_Y + 0.17 + row * 0.36;
+        const jitter = (pseudoRandom(seed + 2) - 0.5) * 0.24;
+        const base = sample.center
+          .clone()
+          .addScaledVector(sample.right, section.side * seatOffset)
+          .addScaledVector(sample.tangent, jitter);
+        const shirtIndex = seed % torsoMatrices.length;
+        const skinIndex = seed % headMatrices.length;
+        const heightScale = 1.05 + pseudoRandom(seed + 4) * 0.18;
+        const widthScale = 0.95 + pseudoRandom(seed + 5) * 0.16;
+        personScale.set(widthScale, heightScale, widthScale);
+
+        torsoQuaternion.copy(quaternion).multiply(
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18 - pseudoRandom(seed + 6) * 0.12, 0, (pseudoRandom(seed + 7) - 0.5) * 0.12))
+        );
+
+        const torsoPosition = base.clone();
+        torsoPosition.y = rowY + 0.28;
+        matrix.compose(torsoPosition, torsoQuaternion, personScale);
+        torsoMatrices[shirtIndex].push(matrix.clone());
+
+        const headPosition = base.clone();
+        headPosition.y = rowY + 0.58;
+        matrix.compose(headPosition, quaternion, personScale);
+        headMatrices[skinIndex].push(matrix.clone());
+
+        if (pseudoRandom(seed + 8) > 0.28) {
+          const capPosition = base.clone();
+          capPosition.y = rowY + 0.7;
+          matrix.compose(capPosition, quaternion, personScale);
+          capMatrices[seed % capMatrices.length].push(matrix.clone());
+        }
+
+        const cheering = pseudoRandom(seed + 9) > 0.82;
+        leftArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.9 : 0.34, 0, cheering ? 0.72 : 0.38)));
+        rightArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.7 : 0.28, 0, cheering ? -0.72 : -0.38)));
+
+        const leftArmPosition = base.clone().addScaledVector(sample.tangent, -0.12);
+        leftArmPosition.y = rowY + (cheering ? 0.44 : 0.28);
+        matrix.compose(leftArmPosition, leftArmQuaternion, personScale);
+        armMatrices[skinIndex].push(matrix.clone());
+
+        const rightArmPosition = base.clone().addScaledVector(sample.tangent, 0.12);
+        rightArmPosition.y = rowY + (cheering ? 0.46 : 0.28);
+        matrix.compose(rightArmPosition, rightArmQuaternion, personScale);
+        armMatrices[skinIndex].push(matrix.clone());
+
+        leftLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.18, 0, 0.08)));
+        rightLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.18, 0, -0.08)));
+        [-1, 1].forEach((legSide) => {
+          const legPosition = base
+            .clone()
+            .addScaledVector(toTrack, 0.23)
+            .addScaledVector(sample.tangent, legSide * 0.075);
+          legPosition.y = rowY + 0.105;
+          matrix.compose(legPosition, legSide < 0 ? leftLegQuaternion : rightLegQuaternion, personScale);
+          (pseudoRandom(seed + 10) > 0.34 ? darkLegMatrices : lightLegMatrices).push(matrix.clone());
+
+          const shoePosition = base
+            .clone()
+            .addScaledVector(toTrack, 0.4)
+            .addScaledVector(sample.tangent, legSide * 0.075);
+          shoePosition.y = rowY + 0.07;
+          matrix.compose(shoePosition, quaternion, personScale);
+          shoeMatrices.push(matrix.clone());
+        });
+
+        if ((shirtIndex === 0 || seed % 29 === 0) && row > 2 && sampleIndex % 6 === 2 && pseudoRandom(seed + 12) > 0.86) {
+          const flagBase = base
+            .clone()
+            .addScaledVector(sample.tangent, 0.18)
+            .addScaledVector(toTrack, -0.04);
+          flagBase.y = rowY + 0.62;
+          matrix.compose(flagBase, quaternion, scale);
+          flagPoleMatrices.push(matrix.clone());
+
+          const flagPosition = flagBase.clone().addScaledVector(sample.tangent, 0.16);
+          flagPosition.y += 0.24;
+          flagQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, (pseudoRandom(seed + 13) - 0.5) * 0.18)));
+          matrix.compose(flagPosition, flagQuaternion, flagScale);
+          ferrariFlagMatrices.push(matrix.clone());
+
+          const accentPosition = flagPosition.clone().addScaledVector(toTrack, 0.006);
+          accentPosition.y += 0.01;
+          matrix.compose(accentPosition, flagQuaternion, flagScale);
+          ferrariFlagAccentMatrices.push(matrix.clone());
+        }
+      }
+    });
+  });
+
+  torsoMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, torsoGeometry, shirtMaterials[index], matrices, `MonacoCrowdTorso:${index}`);
+  });
+  headMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, headGeometry, skinMaterials[index], matrices, `MonacoCrowdHead:${index}`);
+  });
+  capMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, capGeometry, capMaterials[index], matrices, `MonacoCrowdCap:${index}`);
+  });
+  armMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, armGeometry, skinMaterials[index], matrices, `MonacoCrowdArms:${index}`);
+  });
+  addMonacoInstancedPart(group, legGeometry, pantsMaterial, darkLegMatrices, "MonacoCrowdDarkSeatedLegs");
+  addMonacoInstancedPart(group, legGeometry, lightPantsMaterial, lightLegMatrices, "MonacoCrowdLightSeatedLegs");
+  addMonacoInstancedPart(group, shoeGeometry, shoeMaterial, shoeMatrices, "MonacoCrowdShoes");
+  addMonacoInstancedPart(group, flagPoleGeometry, flagPoleMat, flagPoleMatrices, "MonacoCrowdFerrariFlagPoles");
+  addMonacoInstancedPart(group, flagGeometry, ferrariFlagMat, ferrariFlagMatrices, "MonacoCrowdFerrariFlags");
+  addMonacoInstancedPart(group, flagAccentGeometry, ferrariFlagAccentMat, ferrariFlagAccentMatrices, "MonacoCrowdFerrariFlagAccents");
+}
+
+function addMonacoContinuousInnerGrandstands(group, curve, definition) {
+  const grandstandGroup = new THREE.Group();
+  grandstandGroup.name = "MonacoInnerContinuousGrandstands";
+
+  const concreteMat = createFlatStandardMaterial({ color: 0xbeb7ad, roughness: 0.94 });
+  const riserMat = createFlatStandardMaterial({ color: 0x7f7a72, roughness: 0.96 });
+  const roofMat = createFlatStandardMaterial({ color: 0xf6f3ea, roughness: 0.46, metalness: 0.04 });
+  const backWallMat = createFlatStandardMaterial({ color: 0x9f998f, roughness: 0.96 });
+
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
+  const baseOffset = roadHalfWidth + barrierClearance + 2.4;
+  const sections = [
+    { start: 0.02, end: 0.24, side: 1 },
+    { start: 0.27, end: 0.48, side: 1 },
+    { start: 0.50, end: 0.72, side: 1 },
+    { start: 0.74, end: 0.96, side: 1 }
+  ];
+
+  sections.forEach((section, sectionIndex) => {
+    for (let row = 0; row < 7; row += 1) {
+      const nearOffset = baseOffset + row * 0.72;
+      const farOffset = nearOffset + 0.68;
+      const y = MONACO_ROAD_Y + row * 0.36;
+      grandstandGroup.add(createMonacoRibbonMesh(curve, definition, {
+        name: `MonacoGrandstandTier:${sectionIndex}:${row}`,
+        side: section.side,
+        start: section.start,
+        end: section.end,
+        nearOffset,
+        farOffset,
+        y,
+        material: row % 2 === 0 ? concreteMat : riserMat,
+        sampleStep: 2
+      }));
+    }
+
+    grandstandGroup.add(createMonacoRibbonMesh(curve, definition, {
+      name: `MonacoGrandstandBackWall:${sectionIndex}`,
+      side: section.side,
+      start: section.start,
+      end: section.end,
+      nearOffset: baseOffset + 7 * 0.72 + 0.2,
+      farOffset: baseOffset + 7 * 0.72 + 0.85,
+      y: MONACO_ROAD_Y + 2.78,
+      material: backWallMat,
+      sampleStep: 2
+    }));
+
+    grandstandGroup.add(createMonacoRibbonMesh(curve, definition, {
+      name: `MonacoGrandstandCanopy:${sectionIndex}`,
+      side: section.side,
+      start: section.start,
+      end: section.end,
+      nearOffset: baseOffset - 0.2,
+      farOffset: baseOffset + 7 * 0.72 + 1.2,
+      y: MONACO_ROAD_Y + 3.5,
+      material: roofMat,
+      sampleStep: 3
+    }));
+  });
+
+  addMonacoSeatedCrowd(grandstandGroup, curve, definition, sections, baseOffset + 0.28);
+  optimizeStaticDecorativeProps(grandstandGroup, []);
+  group.add(grandstandGroup);
+}
+
+function createMonacoBalconyCrowd(building, balconyPoints, seed, depth) {
+  const shirtMaterials = [
+    createFlatStandardMaterial({ color: 0xd63232, roughness: 0.72 }),
+    createFlatStandardMaterial({ color: 0x2563eb, roughness: 0.72 }),
+    createFlatStandardMaterial({ color: 0xf2c94c, roughness: 0.72 }),
+    createFlatStandardMaterial({ color: 0xf4f1e7, roughness: 0.72 })
+  ];
+  const skinMat = createFlatStandardMaterial({ color: 0xd7a273, roughness: 0.76 });
+  const torsoGeo = new THREE.BoxGeometry(0.16, 0.3, 0.1);
+  const headGeo = new THREE.SphereGeometry(0.08, 8, 6);
+  const torsoMatrices = shirtMaterials.map(() => []);
+  const headMatrices = [];
+  const matrix = new THREE.Matrix4();
+
+  balconyPoints.forEach((point, index) => {
+    if (pseudoRandom(seed * 19 + index * 7) < 0.42) {
+      return;
+    }
+
+    const x = point.x + (pseudoRandom(seed + index) - 0.5) * 0.22;
+    const torsoY = point.y - 0.33;
+    const z = depth * 0.5 + 0.42;
+    matrix.makeTranslation(x, torsoY, z);
+    torsoMatrices[(seed + index) % torsoMatrices.length].push(matrix.clone());
+    matrix.makeTranslation(x, torsoY + 0.22, z + 0.01);
+    headMatrices.push(matrix.clone());
+  });
+
+  torsoMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(building, torsoGeo, shirtMaterials[index], matrices, `MonacoBalconyCrowdTorso:${index}`);
+  });
+  addMonacoInstancedPart(building, headGeo, skinMat, headMatrices, "MonacoBalconyCrowdHeads");
+}
+
+function createMonacoPalaceBuilding(seed, options = {}) {
+  const building = new THREE.Group();
+  building.name = `MonacoPalaceBuilding:${seed}`;
+  const wallColors = [0xf7f0df, 0xf0dfc0, 0xf8f5ec, 0xe7d2aa, 0xf3e4c4];
+  const roofColors = [0xb35a3c, 0xc06b44, 0x8f4e38, 0xd0a75c];
+  const wallMat = createFlatStandardMaterial({ color: wallColors[seed % wallColors.length], roughness: 0.78 });
+  const roofMat = createFlatStandardMaterial({ color: roofColors[seed % roofColors.length], roughness: 0.82 });
+  const glassMat = createFlatStandardMaterial({ color: 0x22364a, roughness: 0.25, metalness: 0.25 });
+  const balconyMat = createFlatStandardMaterial({ color: 0xd8d2c6, roughness: 0.7, metalness: 0.12 });
+
+  const width = options.width ?? (7 + pseudoRandom(seed + 1) * 4.5);
+  const depth = options.depth ?? (5.5 + pseudoRandom(seed + 2) * 2.4);
+  const height = options.height ?? (12 + pseudoRandom(seed + 3) * 14);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMat);
+  body.position.y = height * 0.5;
+  body.receiveShadow = true;
+  building.add(body);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(width * 1.08, 0.55, depth * 1.08), roofMat);
+  roof.position.y = height + 0.28;
+  roof.receiveShadow = true;
+  building.add(roof);
+
+  const rows = Math.max(3, Math.floor(height / 3));
+  const columns = Math.max(2, Math.floor(width / 2.2));
+  const windowGeo = new THREE.BoxGeometry(0.62, 1.05, 0.08);
+  const balconyGeo = new THREE.BoxGeometry(1.12, 0.08, 0.28);
+  const balconyRailGeo = new THREE.BoxGeometry(1.12, 0.34, 0.055);
+  const windowMatrices = [];
+  const balconyMatrices = [];
+  const railMatrices = [];
+  const balconyPoints = [];
+  const matrix = new THREE.Matrix4();
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x = (column - (columns - 1) * 0.5) * (width / (columns + 0.25));
+      const y = 1.6 + row * ((height - 2.4) / rows);
+      matrix.makeTranslation(x, y, depth * 0.5 + 0.045);
+      windowMatrices.push(matrix.clone());
+      matrix.makeTranslation(x, y - 0.68, depth * 0.5 + 0.18);
+      balconyMatrices.push(matrix.clone());
+      matrix.makeTranslation(x, y - 0.48, depth * 0.5 + 0.33);
+      railMatrices.push(matrix.clone());
+      balconyPoints.push({ x, y });
+    }
+  }
+
+  addMonacoInstancedPart(building, windowGeo, glassMat, windowMatrices, "MonacoPalaceWindows");
+  addMonacoInstancedPart(building, balconyGeo, balconyMat, balconyMatrices, "MonacoPalaceBalconies");
+  addMonacoInstancedPart(building, balconyRailGeo, balconyMat, railMatrices, "MonacoPalaceBalconyRails");
+  createMonacoBalconyCrowd(building, balconyPoints, seed, depth);
+  return building;
+}
+
+function createMonacoMediterraneanTree(seed) {
+  const tree = new THREE.Group();
+  tree.name = `MonacoMediterraneanTree:${seed}`;
+  const trunkMat = createFlatStandardMaterial({ color: 0x7a5233, roughness: 0.86 });
+  const leafMat = createFlatStandardMaterial({
+    color: [0x1f5b3a, 0x2d6a42, 0x365f32][seed % 3],
+    roughness: 0.84
+  });
+  const trunkHeight = 1.6 + pseudoRandom(seed + 1) * 0.7;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, trunkHeight, 7), trunkMat);
+  trunk.position.y = trunkHeight * 0.5;
+  trunk.castShadow = true;
+  tree.add(trunk);
+
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.95 + pseudoRandom(seed + 2) * 0.35, 12, 8), leafMat);
+  canopy.scale.set(1.45, 0.62, 1.05);
+  canopy.position.y = trunkHeight + 0.45;
+  canopy.castShadow = true;
+  canopy.receiveShadow = true;
+  tree.add(canopy);
+
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(0.62 + pseudoRandom(seed + 3) * 0.22, 10, 7), leafMat);
+  upper.scale.set(1.2, 0.55, 0.95);
+  upper.position.set((pseudoRandom(seed + 4) - 0.5) * 0.38, trunkHeight + 0.92, (pseudoRandom(seed + 5) - 0.5) * 0.35);
+  upper.castShadow = true;
+  tree.add(upper);
+
+  return tree;
+}
+
+function addMonacoHillsideBuildings(group, curve, definition) {
+  const buildingsGroup = new THREE.Group();
+  buildingsGroup.name = "MonacoInnerTerracedBackdrop";
+  const treesGroup = new THREE.Group();
+  treesGroup.name = "MonacoInnerMediterraneanTrees";
+  const sections = [
+    { start: 0.04, end: 0.22, side: 1 },
+    { start: 0.30, end: 0.46, side: 1 },
+    { start: 0.56, end: 0.70, side: 1 },
+    { start: 0.78, end: 0.94, side: 1 }
+  ];
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
+  const grandstandBackOffset = roadHalfWidth + barrierClearance + 2.4 + 7 * 0.72 + 1.2;
+  const treeOffset = grandstandBackOffset + 5.2;
+  const buildingOffset = grandstandBackOffset + 13.2;
+  let seed = 0;
+  let treeSeed = 0;
+
+  sections.forEach((section) => {
+    const buildingSamples = collectMonacoSamples(curve, section.start, section.end, 8.6);
+    buildingSamples.forEach((sample, sampleIndex) => {
+      const height = 13 + pseudoRandom(seed + 3) * 12 + (sampleIndex % 3) * 2.1;
+      const building = createMonacoPalaceBuilding(seed, {
+        width: 7.4 + pseudoRandom(seed + 1) * 3.1,
+        depth: 5.2 + pseudoRandom(seed + 2) * 1.9,
+        height
+      });
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.right, section.side * buildingOffset);
+      building.position.copy(position);
+      building.position.y = MONACO_GROUND_Y + (sampleIndex % 2) * 0.22;
+      building.rotation.y = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      building.scale.set(0.92 + pseudoRandom(seed + 12) * 0.12, 1, 0.9 + pseudoRandom(seed + 13) * 0.12);
+      buildingsGroup.add(building);
+      seed += 1;
+    });
+
+    const treeSamples = collectMonacoSamples(curve, section.start, section.end, 5.2);
+    treeSamples.forEach((sample, sampleIndex) => {
+      if (sampleIndex % 4 === 1) {
+        return;
+      }
+      const tree = createMonacoMediterraneanTree(treeSeed);
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.right, section.side * (treeOffset + pseudoRandom(treeSeed + 4) * 2.6))
+        .addScaledVector(sample.tangent, (pseudoRandom(treeSeed + 5) - 0.5) * 1.6);
+      tree.position.copy(position);
+      tree.position.y = MONACO_GROUND_Y;
+      tree.rotation.y = pseudoRandom(treeSeed + 6) * Math.PI * 2;
+      tree.scale.setScalar(0.85 + pseudoRandom(treeSeed + 7) * 0.45);
+      treesGroup.add(tree);
+      treeSeed += 1;
+    });
+  });
+
+  const gapSections = [
+    { start: 0.23, end: 0.29, side: 1 },
+    { start: 0.47, end: 0.55, side: 1 },
+    { start: 0.71, end: 0.77, side: 1 },
+    { start: 0.95, end: 0.99, side: 1 }
+  ];
+  gapSections.forEach((section) => {
+    const samples = collectMonacoSamples(curve, section.start, section.end, 3.8);
+    samples.forEach((sample) => {
+      const tree = createMonacoMediterraneanTree(treeSeed);
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.right, section.side * (treeOffset - 1.2 + pseudoRandom(treeSeed + 3) * 5.6))
+        .addScaledVector(sample.tangent, (pseudoRandom(treeSeed + 8) - 0.5) * 1.4);
+      tree.position.copy(position);
+      tree.position.y = MONACO_GROUND_Y;
+      tree.rotation.y = pseudoRandom(treeSeed + 6) * Math.PI * 2;
+      tree.scale.setScalar(0.92 + pseudoRandom(treeSeed + 7) * 0.55);
+      treesGroup.add(tree);
+      treeSeed += 1;
+    });
+  });
+
+  optimizeStaticDecorativeProps(buildingsGroup, []);
+  optimizeStaticDecorativeProps(treesGroup, []);
+  group.add(treesGroup);
+  group.add(buildingsGroup);
+}
+
+function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bevelSize = 0.035) {
+  const halfWidth = width * 0.5;
+  const halfHeight = height * 0.5;
+  const r = Math.min(radius, halfWidth * 0.92, halfHeight * 0.92);
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfWidth + r, -halfHeight);
+  shape.lineTo(halfWidth - r, -halfHeight);
+  shape.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + r);
+  shape.lineTo(halfWidth, halfHeight - r);
+  shape.quadraticCurveTo(halfWidth, halfHeight, halfWidth - r, halfHeight);
+  shape.lineTo(-halfWidth + r, halfHeight);
+  shape.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - r);
+  shape.lineTo(-halfWidth, -halfHeight + r);
+  shape.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + r, -halfHeight);
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSize,
+    bevelThickness: bevelSize,
+    bevelSegments: 2,
+    curveSegments: 8
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  return geometry;
+}
+
+function createMonacoHarborYacht(seed) {
+  const yacht = new THREE.Group();
+  yacht.name = `MonacoHarborYacht:${seed}`;
+  const hullMat = createFlatStandardMaterial({
+    color: [0xffffff, 0xf6f9fb, 0xe9eff4, 0xfdfaf3][seed % 4],
+    roughness: 0.22,
+    metalness: 0.1
+  });
+  const undersideMat = createFlatStandardMaterial({ color: 0x0f2f44, roughness: 0.34, metalness: 0.08 });
+  const stripeMat = createFlatStandardMaterial({
+    color: [0x173b73, 0x111827, 0xb91c1c, 0x0f766e][seed % 4],
+    roughness: 0.36
+  });
+  const glassMat = createFlatStandardMaterial({
+    color: 0x0d2f4f,
+    roughness: 0.08,
+    metalness: 0.38,
+    transparent: true,
+    opacity: 0.72
+  });
+  const deckMat = createFlatStandardMaterial({ color: 0xc79b67, roughness: 0.64 });
+  const deckLineMat = createFlatStandardMaterial({ color: 0xf2dfbd, roughness: 0.58 });
+  const steelMat = createFlatStandardMaterial({ color: 0xc9d2d8, roughness: 0.24, metalness: 0.72 });
+  const fenderMat = createFlatStandardMaterial({ color: 0xeff4f7, roughness: 0.48 });
+  const canvasMat = createFlatStandardMaterial({ color: 0xf8fafc, roughness: 0.74 });
+
+  const length = 7.2 + pseudoRandom(seed + 1) * 7.8;
+  const width = 2.2 + pseudoRandom(seed + 2) * 1.35;
+  const hullHeight = 0.68 + pseudoRandom(seed + 3) * 0.28;
+  const hullShape = new THREE.Shape();
+  hullShape.moveTo(0, length * 0.5);
+  hullShape.quadraticCurveTo(width * 0.52, length * 0.38, width * 0.54, length * 0.12);
+  hullShape.quadraticCurveTo(width * 0.54, -length * 0.3, width * 0.36, -length * 0.48);
+  hullShape.quadraticCurveTo(width * 0.16, -length * 0.58, 0, -length * 0.56);
+  hullShape.quadraticCurveTo(-width * 0.16, -length * 0.58, -width * 0.36, -length * 0.48);
+  hullShape.quadraticCurveTo(-width * 0.54, -length * 0.3, -width * 0.54, length * 0.12);
+  hullShape.quadraticCurveTo(-width * 0.52, length * 0.38, 0, length * 0.5);
+  hullShape.closePath();
+
+  const hullGeometry = new THREE.ExtrudeGeometry(hullShape, {
+    depth: hullHeight,
+    bevelEnabled: true,
+    bevelThickness: 0.1,
+    bevelSize: 0.16,
+    bevelSegments: 4,
+    curveSegments: 10
+  });
+  hullGeometry.rotateX(Math.PI / 2);
+  hullGeometry.translate(0, hullHeight * 0.5, 0);
+  const hull = new THREE.Mesh(hullGeometry, hullMat);
+  hull.castShadow = true;
+  hull.receiveShadow = true;
+  yacht.add(hull);
+
+  const underside = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.46, 0.22, length * 0.72, 0.14, 0.025), undersideMat);
+  underside.position.y = 0.2;
+  yacht.add(underside);
+
+  [-1, 1].forEach((side) => {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.11, length * 0.68), stripeMat);
+    stripe.position.set(side * width * 0.5, hullHeight * 0.58, -length * 0.04);
+    yacht.add(stripe);
+  });
+
+  const deck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.74, 0.05, length * 0.5, 0.16, 0.02), deckMat);
+  deck.position.set(0, hullHeight + 0.035, -length * 0.1);
+  yacht.add(deck);
+
+  for (let line = -1; line <= 1; line += 1) {
+    const deckLine = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.022, length * 0.46), deckLineMat);
+    deckLine.position.set(line * width * 0.18, hullHeight + 0.075, -length * 0.1);
+    yacht.add(deckLine);
+  }
+
+  const bowDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.48, 0.045, length * 0.2, 0.12, 0.018), deckMat);
+  bowDeck.position.set(0, hullHeight + 0.05, length * 0.28);
+  yacht.add(bowDeck);
+
+  const cabinLength = length * 0.34;
+  const cabinWidth = width * 0.58;
+  const cabinHeight = 0.78 + pseudoRandom(seed + 4) * 0.18;
+  const cabin = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth, cabinHeight, cabinLength, 0.18, 0.035), hullMat);
+  cabin.position.set(0, hullHeight + cabinHeight * 0.5 + 0.08, length * 0.02);
+  cabin.castShadow = true;
+  yacht.add(cabin);
+
+  const upperDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.74, 0.16, cabinLength * 0.62, 0.14, 0.025), canvasMat);
+  upperDeck.position.set(0, hullHeight + cabinHeight + 0.22, -length * 0.02);
+  yacht.add(upperDeck);
+
+  const windshield = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.88, 0.32, cabinLength * 0.18, 0.05, 0.012), glassMat);
+  windshield.position.set(0, hullHeight + cabinHeight * 0.72 + 0.1, length * 0.2);
+  yacht.add(windshield);
+
+  const sideWindowGeometry = createMonacoRoundedBoxGeometry(0.055, 0.3, cabinLength * 0.42, 0.035, 0.008);
+  [-1, 1].forEach((side) => {
+    const sideWindow = new THREE.Mesh(sideWindowGeometry, glassMat);
+    sideWindow.position.set(side * (cabinWidth * 0.5 + 0.045), hullHeight + cabinHeight * 0.62 + 0.08, -length * 0.02);
+    yacht.add(sideWindow);
+  });
+
+  const railGeometry = new THREE.CylinderGeometry(0.018, 0.018, length * 0.76, 8);
+  [-1, 1].forEach((side) => {
+    const rail = new THREE.Mesh(railGeometry, steelMat);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.set(side * width * 0.43, hullHeight + 0.32, length * 0.02);
+    yacht.add(rail);
+
+    for (let index = 0; index < 5; index += 1) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.38, 7), steelMat);
+      post.position.set(side * width * 0.43, hullHeight + 0.22, -length * 0.34 + index * length * 0.17);
+      yacht.add(post);
+    }
+  });
+
+  const radarArch = new THREE.Mesh(new THREE.TorusGeometry(width * 0.22, 0.02, 6, 18, Math.PI), steelMat);
+  radarArch.position.set(0, hullHeight + cabinHeight + 0.44, -length * 0.12);
+  radarArch.rotation.z = Math.PI;
+  yacht.add(radarArch);
+
+  const radarDish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), steelMat);
+  radarDish.scale.set(1.6, 0.35, 0.75);
+  radarDish.position.set(-width * 0.12, hullHeight + cabinHeight + 0.58, -length * 0.14);
+  yacht.add(radarDish);
+
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.018, 1.25, 7), steelMat);
+  antenna.position.set(width * 0.16, hullHeight + cabinHeight + 1.05, -length * 0.13);
+  antenna.rotation.x = -0.2;
+  yacht.add(antenna);
+
+  [-1, 1].forEach((side) => {
+    for (let index = 0; index < 3; index += 1) {
+      const fender = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), fenderMat);
+      fender.scale.set(0.7, 1.25, 0.7);
+      fender.position.set(side * (width * 0.5 + 0.05), hullHeight * 0.54, -length * 0.28 + index * length * 0.22);
+      yacht.add(fender);
+    }
+  });
+
+  return yacht;
+}
+
+function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset, farOffset, y, material) {
+  const vertices = [];
+  const indices = [];
+
+  sections.forEach((section) => {
+    const sectionStart = vertices.length / 3 / 2;
+    const steps = Math.max(3, Math.ceil((section.end - section.start) * definition.segments / 1.5));
+
+    for (let index = 0; index <= steps; index += 1) {
+      const progress = section.start + (section.end - section.start) * (index / steps);
+      const center = curve.getPointAt(progress);
+      const tangent = curve.getTangentAt(progress).setY(0).normalize();
+      const right = getRightVector(tangent);
+      const near = center.clone().addScaledVector(right, section.side * nearOffset);
+      const far = center.clone().addScaledVector(right, section.side * farOffset);
+      vertices.push(near.x, y, near.z, far.x, y, far.z);
+    }
+
+    for (let index = 0; index < steps; index += 1) {
+      const current = (sectionStart + index) * 2;
+      const next = current + 2;
+      indices.push(current, current + 1, next, current + 1, next + 1, next);
+    }
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "MonacoContinuousSea";
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, material) {
+  const geometry = new THREE.BoxGeometry(0.08, 0.012, 3.8);
+  const matrices = [];
+  const matrix = new THREE.Matrix4();
+
+  sections.forEach((section, sectionIndex) => {
+    const samples = collectMonacoSamples(curve, section.start, section.end, 4.8);
+    samples.forEach((sample, sampleIndex) => {
+      if ((sampleIndex + sectionIndex) % 2 === 1) {
+        return;
+      }
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.right, section.side * (offset + pseudoRandom(sectionIndex * 19 + sampleIndex) * 26))
+        .addScaledVector(sample.tangent, (pseudoRandom(sampleIndex + 3) - 0.5) * 1.2);
+      position.y = y;
+      const right = sample.right.clone().multiplyScalar(section.side);
+      const tangent = sample.tangent.clone().setY(0).normalize();
+      matrix.makeBasis(right, UP, tangent.clone().negate());
+      matrix.setPosition(position);
+      matrices.push(matrix.clone());
+    });
+  });
+
+  return { geometry, matrices, material };
+}
+
+function addMonacoOuterPort(group, curve, definition) {
+  const portGroup = new THREE.Group();
+  portGroup.name = "MonacoOuterPortAndYachts";
+  const waterMat = createFlatStandardMaterial({
+    color: 0x056f9f,
+    emissive: 0x04364f,
+    emissiveIntensity: 0.22,
+    roughness: 0.045,
+    metalness: 0.28,
+    transparent: true,
+    opacity: 0.94,
+    side: THREE.DoubleSide
+  });
+  const waterHighlightMat = createFlatStandardMaterial({
+    color: 0xa7ecff,
+    emissive: 0x6dd7ff,
+    emissiveIntensity: 0.28,
+    roughness: 0.12,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.46
+  });
+  const quayMat = createFlatStandardMaterial({ color: 0xd7d0c4, roughness: 0.78, metalness: 0.04 });
+  const quayEdgeMat = createFlatStandardMaterial({ color: 0x8c8378, roughness: 0.86 });
+  const pierMat = createFlatStandardMaterial({ color: 0xc5b59a, roughness: 0.68, metalness: 0.03 });
+  const pierEdgeMat = createFlatStandardMaterial({ color: 0x756b5c, roughness: 0.78 });
+  const bollardMat = createFlatStandardMaterial({ color: 0x2f3a45, roughness: 0.5, metalness: 0.48 });
+
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
+  const quayNear = roadHalfWidth + barrierClearance + 1.8;
+  const quayFar = quayNear + 4.6;
+  const waterFar = quayFar + 96;
+  const sections = [
+    { start: 0.012, end: 0.238, side: -1 },
+    { start: 0.252, end: 0.502, side: -1 },
+    { start: 0.518, end: 0.744, side: -1 },
+    { start: 0.758, end: 0.988, side: -1 }
+  ];
+  const waterSections = [
+    { start: 0, end: 1, side: -1 }
+  ];
+  const pierTopGeometry = new THREE.BoxGeometry(0.34, 0.09, 1);
+  const pierSideGeometry = new THREE.BoxGeometry(0.08, 0.12, 1);
+  const bollardGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10);
+  const bollardMatrices = [];
+  const matrix = new THREE.Matrix4();
+
+  portGroup.add(createMonacoContinuousWaterMesh(
+    curve,
+    definition,
+    waterSections,
+    quayNear + 0.3,
+    waterFar,
+    MONACO_GROUND_Y + 0.018,
+    waterMat
+  ));
+
+  const waterHighlights = createMonacoWaterHighlightMesh(
+    curve,
+    definition,
+    waterSections,
+    quayFar + 5,
+    MONACO_GROUND_Y + 0.032,
+    waterHighlightMat
+  );
+  addMonacoInstancedPart(
+    portGroup,
+    waterHighlights.geometry,
+    waterHighlights.material,
+    waterHighlights.matrices,
+    "MonacoSeaReflectionStreaks"
+  );
+
+  sections.forEach((section, sectionIndex) => {
+    portGroup.add(createMonacoRibbonMesh(curve, definition, {
+      name: `MonacoHarborQuay:${sectionIndex}`,
+      side: section.side,
+      start: section.start,
+      end: section.end,
+      nearOffset: quayNear,
+      farOffset: quayFar,
+      y: MONACO_ROAD_Y - 0.02,
+      material: quayMat,
+      sampleStep: 2
+    }));
+
+    portGroup.add(createMonacoVerticalRibbonMesh(curve, definition, {
+      name: `MonacoHarborQuayEdge:${sectionIndex}`,
+      side: section.side,
+      start: section.start,
+      end: section.end,
+      offset: quayFar,
+      yBottom: MONACO_GROUND_Y + 0.02,
+      yTop: MONACO_ROAD_Y - 0.02,
+      material: quayEdgeMat,
+      sampleStep: 2
+    }));
+
+    const samples = collectMonacoSamples(curve, section.start, section.end, 8.8);
+    samples.forEach((sample, sampleIndex) => {
+      const tangent = sample.tangent.clone().setY(0).normalize();
+      const outward = sample.right.clone().multiplyScalar(section.side).setY(0).normalize();
+      const pierLength = 16 + pseudoRandom(sectionIndex * 43 + sampleIndex) * 16;
+      const pierDistance = quayFar + pierLength * 0.5;
+      const basePosition = sample.center.clone().addScaledVector(sample.right, section.side * pierDistance);
+      basePosition.y = MONACO_ROAD_Y - 0.07;
+      const pierHeading = getHeading(tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+
+      const pier = new THREE.Mesh(pierTopGeometry, pierMat);
+      pier.name = `MonacoHarborFingerPier:${sectionIndex}:${sampleIndex}`;
+      pier.position.copy(basePosition);
+      pier.rotation.y = pierHeading;
+      pier.scale.z = pierLength;
+      pier.castShadow = true;
+      pier.receiveShadow = true;
+      portGroup.add(pier);
+
+      [-1, 1].forEach((side) => {
+        const edge = new THREE.Mesh(pierSideGeometry, pierEdgeMat);
+        edge.name = `MonacoHarborFingerPierEdge:${sectionIndex}:${sampleIndex}:${side}`;
+        edge.position.copy(basePosition).addScaledVector(tangent, side * 0.23);
+        edge.rotation.y = pierHeading;
+        edge.scale.z = pierLength;
+        edge.castShadow = true;
+        edge.receiveShadow = true;
+        portGroup.add(edge);
+      });
+
+      [0.22, 0.52, 0.82].forEach((fraction) => {
+        [-1, 1].forEach((side) => {
+          const bollardPosition = sample.center
+            .clone()
+            .addScaledVector(sample.right, section.side * (quayFar + pierLength * fraction))
+            .addScaledVector(tangent, side * 0.24);
+          bollardPosition.y = MONACO_ROAD_Y + 0.04;
+          matrix.makeTranslation(bollardPosition.x, bollardPosition.y, bollardPosition.z);
+          bollardMatrices.push(matrix.clone());
+        });
+      });
+
+      const boatRows = 2;
+      for (let row = 0; row < boatRows; row += 1) {
+        [-1, 1].forEach((side) => {
+          const skipNoise = pseudoRandom(sectionIndex * 9000 + sampleIndex * 31 + row * 7 + side * 3);
+          if (skipNoise < 0.2) {
+            return;
+          }
+
+          const yacht = createMonacoHarborYacht(sectionIndex * 10000 + sampleIndex * 100 + row * 10 + side + 5);
+          const rowDistance = quayFar + 13 + row * 9.2 + pseudoRandom(sampleIndex * 17 + row) * 1.8;
+          const position = sample.center
+            .clone()
+            .addScaledVector(sample.right, section.side * rowDistance)
+            .addScaledVector(tangent, side * (2.75 + pseudoRandom(row + sampleIndex + 30) * 0.85));
+          position.y = MONACO_GROUND_Y + 0.02;
+          yacht.position.copy(position);
+          yacht.rotation.y = Math.atan2(outward.x, outward.z) + (side > 0 ? 0.05 : -0.05) + (pseudoRandom(sampleIndex + row + 9) - 0.5) * 0.12;
+          yacht.scale.setScalar(0.9 + pseudoRandom(sampleIndex * 29 + row * 11 + sectionIndex) * 0.5);
+          portGroup.add(yacht);
+        });
+      }
+
+      if (sampleIndex % 8 === 2) {
+        const largeYacht = createMonacoHarborYacht(sectionIndex * 20000 + sampleIndex * 200 + 77);
+        const position = sample.center
+          .clone()
+          .addScaledVector(sample.right, section.side * (quayFar + pierLength + 13 + pseudoRandom(sampleIndex) * 9))
+          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 3.5);
+        position.y = MONACO_GROUND_Y + 0.025;
+        largeYacht.position.copy(position);
+        largeYacht.rotation.y = Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18;
+        largeYacht.scale.setScalar(1.55 + pseudoRandom(sampleIndex + 31) * 0.65);
+        portGroup.add(largeYacht);
+      }
+    });
+  });
+
+  addMonacoInstancedPart(portGroup, bollardGeometry, bollardMat, bollardMatrices, "MonacoHarborBollards");
+  optimizeStaticDecorativeProps(portGroup, ["MonacoContinuousSea", "MonacoHarborQuay"]);
+  group.add(portGroup);
+}
+
+function addMonacoTracksideVisuals(group, curve, definition) {
+  const tracksideGroup = new THREE.Group();
+  tracksideGroup.name = "MonacoTracksideVisuals";
+
+  const armcoMat = createFlatStandardMaterial({ color: 0xbfc5c9, roughness: 0.42, metalness: 0.65 });
+  const postMat = createFlatStandardMaterial({ color: 0x4b5563, roughness: 0.58, metalness: 0.42 });
+  const netMat = createFlatStandardMaterial({
+    color: 0x7d8790,
+    roughness: 0.7,
+    transparent: true,
+    opacity: 0.34,
+    side: THREE.DoubleSide
+  });
+  netMat.depthWrite = false;
+  const lampMat = createFlatStandardMaterial({ color: 0x2f3a45, roughness: 0.5, metalness: 0.45 });
+  const lampGlowMat = createFlatStandardMaterial({
+    color: 0xfff0b8,
+    emissive: 0xfff0b8,
+    emissiveIntensity: 0.75,
+    roughness: 0.22
+  });
+  const sponsorMaterials = [
+    createFlatStandardMaterial({ color: 0xd92d2d, roughness: 0.55 }),
+    createFlatStandardMaterial({ color: 0x0f3d68, roughness: 0.55 }),
+    createFlatStandardMaterial({ color: 0xffffff, roughness: 0.5 }),
+    createFlatStandardMaterial({ color: 0xf2c94c, roughness: 0.5 })
+  ];
+
+  const roadHalfWidth = definition.roadWidth * 0.5;
+  const barrierOffset = roadHalfWidth + (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5) * 0.5 + 0.18;
+  const armcoGeometry = new THREE.BoxGeometry(0.16, 0.52, 2.8);
+  const postGeometry = new THREE.BoxGeometry(0.14, 1.3, 0.14);
+  const sponsorGeometry = new THREE.BoxGeometry(3.2, 1.0, 0.08);
+  const lampPoleGeometry = new THREE.CylinderGeometry(0.055, 0.075, 3.8, 6);
+  const lampArmGeometry = new THREE.BoxGeometry(1.15, 0.06, 0.06);
+  const lampHeadGeometry = new THREE.BoxGeometry(0.45, 0.16, 0.28);
+  const armcoMatrices = [];
+  const postMatrices = [];
+  const sponsorMatrices = sponsorMaterials.map(() => []);
+  const lampPoleMatrices = [];
+  const lampArmMatrices = [];
+  const lampHeadMatrices = [];
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+
+  [-1, 1].forEach((side) => {
+    const samples = collectMonacoSamples(curve, 0, 0.998, 3.1);
+    samples.forEach((sample, index) => {
+      const right = sample.right.clone().multiplyScalar(side);
+      const tangent = sample.tangent.clone().setY(0).normalize();
+      const position = sample.center.clone().addScaledVector(sample.right, side * barrierOffset);
+      position.y = MONACO_ROAD_Y + 0.42;
+      matrix.makeBasis(right, UP, tangent.clone().negate());
+      matrix.setPosition(position);
+      armcoMatrices.push(matrix.clone());
+
+      if (index % 2 === 0) {
+        const postPosition = sample.center.clone().addScaledVector(sample.right, side * (barrierOffset + 0.12));
+        postPosition.y = MONACO_ROAD_Y + 0.65;
+        matrix.makeBasis(right, UP, tangent.clone().negate());
+        matrix.setPosition(postPosition);
+        postMatrices.push(matrix.clone());
+      }
+
+      if (index % 7 === 0) {
+        const sponsorPosition = sample.center.clone().addScaledVector(sample.right, side * (barrierOffset + 0.18));
+        sponsorPosition.y = MONACO_ROAD_Y + 0.95;
+        matrix.makeBasis(right, UP, tangent.clone().negate());
+        matrix.setPosition(sponsorPosition);
+        sponsorMatrices[(index + (side > 0 ? 1 : 0)) % sponsorMatrices.length].push(matrix.clone());
+      }
+
+      if (index % 13 === 0) {
+        const lampPosition = sample.center.clone().addScaledVector(sample.right, side * (barrierOffset + 1.2));
+        lampPosition.y = MONACO_ROAD_Y + 1.9;
+        quaternion.setFromAxisAngle(UP, getHeading(tangent));
+        matrix.compose(lampPosition, quaternion, scale);
+        lampPoleMatrices.push(matrix.clone());
+
+        const armPosition = lampPosition.clone();
+        armPosition.y += 1.7;
+        armPosition.addScaledVector(sample.right, -side * 0.42);
+        matrix.compose(armPosition, quaternion, scale);
+        lampArmMatrices.push(matrix.clone());
+
+        const headPosition = armPosition.clone().addScaledVector(sample.right, -side * 0.58);
+        matrix.compose(headPosition, quaternion, scale);
+        lampHeadMatrices.push(matrix.clone());
+      }
+    });
+
+    [
+      [0.02, 0.24],
+      [0.28, 0.48],
+      [0.52, 0.72],
+      [0.76, 0.96]
+    ].forEach(([start, end], sectionIndex) => {
+      tracksideGroup.add(createMonacoVerticalRibbonMesh(curve, definition, {
+        name: `MonacoCatchFence:${side}:${sectionIndex}`,
+        side,
+        start,
+        end,
+        offset: barrierOffset + 0.36,
+        yBottom: MONACO_ROAD_Y + 0.58,
+        yTop: MONACO_ROAD_Y + 2.65,
+        material: netMat,
+        sampleStep: 4
+      }));
+    });
+  });
+
+  addMonacoInstancedPart(tracksideGroup, armcoGeometry, armcoMat, armcoMatrices, "MonacoArmcoRails");
+  addMonacoInstancedPart(tracksideGroup, postGeometry, postMat, postMatrices, "MonacoArmcoPosts");
+  sponsorMatrices.forEach((matrices, index) => {
+    addMonacoInstancedPart(tracksideGroup, sponsorGeometry, sponsorMaterials[index], matrices, `MonacoSponsorBoards:${index}`);
+  });
+  addMonacoInstancedPart(tracksideGroup, lampPoleGeometry, lampMat, lampPoleMatrices, "MonacoTrackLampPoles");
+  addMonacoInstancedPart(tracksideGroup, lampArmGeometry, lampMat, lampArmMatrices, "MonacoTrackLampArms");
+  addMonacoInstancedPart(tracksideGroup, lampHeadGeometry, lampGlowMat, lampHeadMatrices, "MonacoTrackLampHeads");
+
+  optimizeStaticDecorativeProps(tracksideGroup, ["MonacoCatchFence"]);
+  group.add(tracksideGroup);
+}
+
+function addMonacoLoopScenery(group, curve, definition) {
+  addMonacoTracksideVisuals(group, curve, definition);
+  addMonacoContinuousInnerGrandstands(group, curve, definition);
+  addMonacoHillsideBuildings(group, curve, definition);
+  addMonacoOuterPort(group, curve, definition);
+}
+
 export function buildMonacoProps(group, curve, definition) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "MonacoProps";
 
-  // Lampioni, cordoli, spalti con spettatori, e porto con yacht
   addMonacoLampPosts(propsGroup, curve, definition);
   addMonacoKerbs(propsGroup, curve, definition);
-  addMonacoGrandstands(propsGroup, curve, definition);
-  addMonacoOuterHarbor(propsGroup, curve, definition);
+  addMonacoLoopScenery(propsGroup, curve, definition);
 
   group.add(propsGroup);
   group.userData.disposeProps = () => {
@@ -6099,4 +7256,3 @@ export function addTrackProps(group, curve, definition) {
     buildMonacoProps(group, curve, definition);
   }
 }
-

@@ -252,7 +252,6 @@ export function startScenePreview(container, setup, options = {}) {
 
     vehicle.setTransform(state.position, state.heading);
     vehicle.update(deltaTime, state);
-    updateCameraFollow(state);
 
     // Auto-enable headlights for night circuits (Vegas)
     if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
@@ -276,8 +275,8 @@ export function startScenePreview(container, setup, options = {}) {
 
     // 3. Update the start gantry F1 countdown lights
     if (gantryStartLights.length > 0) {
-      const countdown = raceState.countdown;
-      const phase = raceState.phase;
+      const countdown = updatedRaceState.countdown;
+      const phase = updatedRaceState.phase;
 
       if (phase === RACE_PHASES.COUNTDOWN) {
         // Lamp 0 (left): red when countdown <= 3.0
