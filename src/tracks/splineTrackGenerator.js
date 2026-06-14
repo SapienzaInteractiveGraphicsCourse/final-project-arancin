@@ -228,18 +228,26 @@ function sampleEdgeByDistance(edgeSamples, distance) {
   };
 }
 
+function sampleEdgeByLoopDistance(edgeSamples, distance) {
+  const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
+  const wrappedDistance = ((distance % totalDistance) + totalDistance) % totalDistance;
+
+  return sampleEdgeByDistance(edgeSamples, wrappedDistance);
+}
+
 function addCenterLineDashes(group, edgeSamples, definition, material) {
   const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
-  const dashCount = Math.floor(totalDistance / CENTER_DASH_INTERVAL);
+  const dashCount = Math.max(1, Math.round(totalDistance / CENTER_DASH_INTERVAL));
   const geometry = new THREE.BoxGeometry(CENTER_DASH_WIDTH, CENTER_DASH_HEIGHT, CENTER_DASH_LENGTH);
   const dashes = new THREE.InstancedMesh(geometry, material, dashCount);
   const matrix = new THREE.Matrix4();
+  const spacing = totalDistance / dashCount;
 
   dashes.name = `${definition.name}:CenterLineDashes`;
   dashes.receiveShadow = true;
 
   for (let index = 0; index < dashCount; index += 1) {
-    const sample = sampleEdgeByDistance(edgeSamples, index * CENTER_DASH_INTERVAL + CENTER_DASH_INTERVAL * 0.5);
+    const sample = sampleEdgeByLoopDistance(edgeSamples, index * spacing + spacing * 0.5);
     const position = sample.center;
     const tangent = sample.tangent.clone().setY(0).normalize();
     const right = getRightVector(tangent);
@@ -267,7 +275,7 @@ function getCurveSide(edgeSamples, index) {
 }
 
 function addApexCurbs(group, edgeSamples, definition, materials) {
-  if (definition.id === "monaco") {
+  if (definition.id === "monaco" || definition.id === "beach" || definition.id === "vegas") {
     return;
   }
 

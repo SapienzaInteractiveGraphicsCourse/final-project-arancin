@@ -4,6 +4,8 @@ import { getHeading, getRightVector, optimizeStaticDecorativeProps, pseudoRandom
 import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh, createMonacoVerticalRibbonMesh } from "./common.js";
 import { MONACO_GROUND_Y, MONACO_ROAD_Y } from "./constants.js";
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bevelSize = 0.035) {
   const halfWidth = width * 0.5;
   const halfHeight = height * 0.5;
@@ -276,6 +278,33 @@ function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset
   mesh.name = "MonacoContinuousSea";
   mesh.receiveShadow = false;
   return mesh;
+}
+
+function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, material) {
+  const geometry = new THREE.BoxGeometry(0.08, 0.012, 3.8);
+  const matrices = [];
+  const matrix = new THREE.Matrix4();
+
+  sections.forEach((section, sectionIndex) => {
+    const samples = collectMonacoSamples(curve, section.start, section.end, 4.8);
+    samples.forEach((sample, sampleIndex) => {
+      if ((sampleIndex + sectionIndex) % 2 === 1) {
+        return;
+      }
+      const position = sample.center
+        .clone()
+        .addScaledVector(sample.right, section.side * (offset + pseudoRandom(sectionIndex * 19 + sampleIndex) * 26))
+        .addScaledVector(sample.tangent, (pseudoRandom(sampleIndex + 3) - 0.5) * 1.2);
+      position.y = y;
+      const right = sample.right.clone().multiplyScalar(section.side);
+      const tangent = sample.tangent.clone().setY(0).normalize();
+      matrix.makeBasis(right, UP, tangent.clone().negate());
+      matrix.setPosition(position);
+      matrices.push(matrix.clone());
+    });
+  });
+
+  return { geometry, matrices, material };
 }
 
 export function addMonacoOuterPort(group, curve, definition) {

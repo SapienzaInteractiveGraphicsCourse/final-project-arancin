@@ -240,8 +240,7 @@ export function addVegasF1Venue(group, curve, definition) {
     const side = index % 2 === 0 ? 1 : -1;
     const position = point
       .clone()
-      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 38))
-      .addScaledVector(tangent, pseudoRandom(index + 2.2) * 8 - 4);
+      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 42));
     clampPropPosition(curve, position, roadHalfWidth, 200, 30, 35);
 
     group.add(createGrandstand({
@@ -257,8 +256,8 @@ export function addVegasF1Venue(group, curve, definition) {
   const paddockPoint = curve.getPointAt(0.18);
   const paddockTangent = curve.getTangentAt(0.18).setY(0).normalize();
   const paddockNormal = getRightVector(paddockTangent);
-  const paddockPosition = paddockPoint.clone().addScaledVector(paddockNormal, definition.roadWidth * 0.5 + 54);
-  clampPropPosition(curve, paddockPosition, roadHalfWidth);
+  const paddockPosition = paddockPoint.clone().addScaledVector(paddockNormal, definition.roadWidth * 0.5 + 62);
+  clampPropPosition(curve, paddockPosition, roadHalfWidth, 200, 38, 42);
   group.add(createPaddockBuilding({
     position: paddockPosition,
     rotationY: getHeading(paddockTangent) - Math.PI / 2
@@ -269,8 +268,8 @@ export function addVegasF1Venue(group, curve, definition) {
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
     const side = index % 2 === 0 ? 1 : -1;
-    const position = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 62));
-    clampPropPosition(curve, position, roadHalfWidth);
+    const position = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 72));
+    clampPropPosition(curve, position, roadHalfWidth, 200, 50, 54);
     group.add(createSkyBeam({
       position,
       color: colors[index % colors.length],
