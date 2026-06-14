@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "../../trackMaterials.js";
-import { getHeading, getRightVector, optimizeStaticDecorativeProps, pseudoRandom, UP } from "../shared.js";
+import { getHeading, getRightVector, optimizeStaticDecorativeProps, pseudoRandom } from "../shared.js";
 import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh, createMonacoVerticalRibbonMesh } from "./common.js";
 import { MONACO_GROUND_Y, MONACO_ROAD_Y } from "./constants.js";
 
@@ -278,33 +278,6 @@ function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset
   return mesh;
 }
 
-function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, material) {
-  const geometry = new THREE.BoxGeometry(0.08, 0.012, 3.8);
-  const matrices = [];
-  const matrix = new THREE.Matrix4();
-
-  sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 4.8);
-    samples.forEach((sample, sampleIndex) => {
-      if ((sampleIndex + sectionIndex) % 2 === 1) {
-        return;
-      }
-      const position = sample.center
-        .clone()
-        .addScaledVector(sample.right, section.side * (offset + pseudoRandom(sectionIndex * 19 + sampleIndex) * 26))
-        .addScaledVector(sample.tangent, (pseudoRandom(sampleIndex + 3) - 0.5) * 1.2);
-      position.y = y;
-      const right = sample.right.clone().multiplyScalar(section.side);
-      const tangent = sample.tangent.clone().setY(0).normalize();
-      matrix.makeBasis(right, UP, tangent.clone().negate());
-      matrix.setPosition(position);
-      matrices.push(matrix.clone());
-    });
-  });
-
-  return { geometry, matrices, material };
-}
-
 export function addMonacoOuterPort(group, curve, definition) {
   const portGroup = new THREE.Group();
   portGroup.name = "MonacoOuterPortAndYachts";
@@ -338,7 +311,10 @@ export function addMonacoOuterPort(group, curve, definition) {
   const quayNear = roadHalfWidth + barrierClearance + 1.8;
   const quayFar = quayNear + 4.6;
   const waterFar = quayFar + 96;
-  const sections = [
+  const quaySections = [
+    { start: 0, end: 1, side: -1 }
+  ];
+  const marinaSections = [
     { start: 0.012, end: 0.238, side: -1 },
     { start: 0.252, end: 0.502, side: -1 },
     { start: 0.518, end: 0.744, side: -1 },
@@ -379,7 +355,7 @@ export function addMonacoOuterPort(group, curve, definition) {
     "MonacoSeaReflectionStreaks"
   );
 
-  sections.forEach((section, sectionIndex) => {
+  quaySections.forEach((section, sectionIndex) => {
     portGroup.add(createMonacoRibbonMesh(curve, definition, {
       name: `MonacoHarborQuay:${sectionIndex}`,
       side: section.side,
@@ -403,7 +379,9 @@ export function addMonacoOuterPort(group, curve, definition) {
       material: quayEdgeMat,
       sampleStep: 2
     }));
+  });
 
+  marinaSections.forEach((section, sectionIndex) => {
     const samples = collectMonacoSamples(curve, section.start, section.end, 8.8);
     samples.forEach((sample, sampleIndex) => {
       const tangent = sample.tangent.clone().setY(0).normalize();
@@ -489,4 +467,3 @@ export function addMonacoOuterPort(group, curve, definition) {
   optimizeStaticDecorativeProps(portGroup, ["MonacoContinuousSea", "MonacoHarborQuay"]);
   group.add(portGroup);
 }
-
