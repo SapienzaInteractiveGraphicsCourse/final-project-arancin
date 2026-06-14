@@ -528,8 +528,6 @@ function addSpectacularTowerSign(sign, color, contrastColor) {
 }
 
 function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
-  const contrastHex = colorToHexStr(contrastColor);
-
   const pillarMaterial = createBillboardMaterial({ color: 0x171724, roughness: 0.68, metalness: 0.12 });
   const barMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
   const bulbMaterial = createBillboardMaterial({
