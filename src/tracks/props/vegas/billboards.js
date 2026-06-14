@@ -400,7 +400,6 @@ function addClassicVegasPylonSign(sign, color, contrastColor) {
 
 function addCasinoNameBoardSign(sign, color, contrastColor) {
   const themeHex = colorToHexStr(color);
-  const contrastHex = colorToHexStr(contrastColor);
 
   const boardMaterial = createBillboardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
   const frameMaterial = createBillboardMaterial({
