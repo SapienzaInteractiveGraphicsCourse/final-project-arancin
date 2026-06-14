@@ -43,7 +43,6 @@ import {
   getRaceLapRecordsKey,
   getRaceRecordKey,
   readBestLapTime,
-  readLapRecords,
   writeBestLapTime
 } from "../systems/raceRecords.js";
 
