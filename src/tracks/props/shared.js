@@ -14,10 +14,6 @@ export function pseudoRandom(seed) {
   return Math.abs(Math.sin(seed * 12.9898) * 43758.5453) % 1;
 }
 
-export function isNearAnyProgress(progress, values, threshold) {
-  return values.some((value) => Math.abs(progress - value) < threshold);
-}
-
 export function markShadow(mesh) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -150,7 +146,7 @@ export function optimizeStaticDecorativeProps(group, receiveShadowNames = []) {
   });
 }
 
-export function disposeObjectTree(root) {
+function disposeObjectTree(root) {
   root.traverse((child) => {
     child.geometry?.dispose();
 

@@ -60,10 +60,18 @@ src/tracks/
   props/
     index.js
     shared.js
+    common/
+      geometry.js
+      instancing.js
+      materials.js
+      placement.js
+      ribbons.js
     vegasProps.js
     vegas/
       billboards.js
       lights.js
+      skyline.js
+      trackside.js
       venue.js
     beachProps.js
     beach/
@@ -92,9 +100,10 @@ Responsabilita:
 - `centerline.js`: campionamento centerline, bounds minimappa, progress/heading helper futuri.
 - `trackMaterials.js`: materiali low-poly flat condivisi.
 - `splineTrackGenerator.js`: genera strada, terreno, checkpoint, boost pad, barriere e `trackInfo`.
-- `props/index.js`: entry point dei builder dei props.
+- i builder props sono importati direttamente dalla factory, senza barrel intermedio.
 - `props/`: props low-poly divisi per tema; `shared.js` contiene helper geometrici, random deterministico, shadow/dispose e ottimizzazione props.
-- `props/vegas/`: sotto-moduli per segnaletica, luci decorative e venue F1 di Vegas, per evitare che `vegasProps.js` torni monolitico.
+- `props/common/`: primitive riusabili tra piste per materiali props, placement su spline, instancing, ribbon mesh e merge geometrie.
+- `props/vegas/`: sotto-moduli per segnaletica, luci decorative, skyline/landmark, props trackside e venue F1 di Vegas, per evitare che `vegasProps.js` torni monolitico.
 - `props/beach/`: sotto-moduli per oceano/terreno, vegetazione, persone, strutture, nuvole e helper comuni Beach.
 - `props/monaco/`: sotto-moduli per base pista, edifici, tribune, porto/yacht, bandiere e dettagli trackside Monaco.
 - `trackFactory.js`: entry point pubblico `createTrackById(trackId)`.

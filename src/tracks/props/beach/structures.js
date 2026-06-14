@@ -570,36 +570,3 @@ export function addBeachUmbrellasStrict(group, curve, trackDef) {
   }
 }
 
-export function addBeachLampPostsStrict(group, curve, trackDef) {
-  const roadHalfWidth = trackDef.roadWidth / 2;
-  const poleMaterial = createBeachMaterial({ color: 0xd4c8a0, roughness: 0.62 });
-  const topMaterial = createBeachMaterial({
-    color: 0xffd080,
-    emissive: 0xffd080,
-    emissiveIntensity: 0.7,
-    roughness: 0.36
-  });
-  const poleGeometry = new THREE.CylinderGeometry(0.2, 0.25, 7, 6);
-  const topGeometry = new THREE.SphereGeometry(0.5, 5, 4);
-
-  for (let index = 0; index < 16; index += 1) {
-    const side = -1;
-    const progress = (index + 0.25) / 16;
-    const { position, rotationY } = safePlace(curve, progress, side, side * (roadHalfWidth + 2.5), roadHalfWidth, 2.0);
-    const lamp = new THREE.Group();
-    lamp.name = "TropicalBeachLampPostStrict";
-    lamp.position.copy(position);
-    lamp.rotation.y = rotationY;
-
-    const pole = markShadow(new THREE.Mesh(poleGeometry, poleMaterial));
-    const top = markShadow(new THREE.Mesh(topGeometry, topMaterial));
-    pole.position.y = 3.5;
-    top.position.y = 7.3;
-    const light = new THREE.PointLight(0xffd080, 20, 18, 2);
-    light.position.y = 7.5;
-
-    lamp.add(pole, top, light);
-    group.add(lamp);
-  }
-}
-

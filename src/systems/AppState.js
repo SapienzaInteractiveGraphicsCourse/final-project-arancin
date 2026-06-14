@@ -1,6 +1,6 @@
 import { DEFAULT_RACE_SETUP } from "../config/raceOptions.js";
 
-export const APP_PHASES = {
+const APP_PHASES = {
   SETUP: "setup",
   LOADING: "loading",
   PREVIEW: "preview",

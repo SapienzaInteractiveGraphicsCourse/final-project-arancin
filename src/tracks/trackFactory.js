@@ -1,6 +1,8 @@
 import { createSplineTrack } from "./splineTrackGenerator.js";
 import { getTrackDefinition, TRACK_IDS } from "./trackData.js";
-import { buildBeachProps, buildMonacoProps, buildVegasProps } from "./props/index.js";
+import { buildBeachProps } from "./props/beachProps.js";
+import { buildMonacoProps } from "./props/monacoProps.js";
+import { buildVegasProps } from "./props/vegasProps.js";
 
 export function createTrackById(trackId) {
   const definition = getTrackDefinition(trackId);

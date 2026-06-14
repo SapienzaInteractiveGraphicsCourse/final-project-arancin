@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { getRightVector } from "../shared.js";
-import { addTransformedBox, createBeachMaterial, createMergedGeometry, getRoadFrame, makeBasisMatrix } from "./common.js";
+import { createBeachMaterial, getRoadFrame } from "./common.js";
 
 export function addBeachGround(group) {
   const material = createBeachMaterial({
@@ -160,77 +160,3 @@ export function addBeachOceanPlane(group, curve, trackDef) {
   oceanMesh.receiveShadow = false;
   group.add(oceanMesh);
 }
-
-
-export function addBeachEdgeStrips(group, curve, trackDef) {
-  const roadHalfWidth = trackDef.roadWidth / 2;
-  const material = createBeachMaterial({
-    color: 0xff6600,
-    emissive: 0xff6600,
-    emissiveIntensity: 1,
-    roughness: 0.55
-  });
-  const segmentCount = trackDef.segments;
-  const source = new THREE.BoxGeometry(0.12, 0.08, 1);
-  const parts = [0, 1, 2, 3].map(() => ({ positions: [], normals: [], indices: [] }));
-  const stripOffsets = [
-    { side: -1, offset: roadHalfWidth + 0.05 },
-    { side: -1, offset: roadHalfWidth - 0.45 },
-    { side: 1, offset: roadHalfWidth - 0.45 },
-    { side: 1, offset: roadHalfWidth + 0.05 }
-  ];
-
-  for (let index = 0; index < segmentCount; index += 1) {
-    const a = index / segmentCount;
-    const b = (index + 1) / segmentCount;
-    const start = getRoadFrame(curve, a);
-    const end = getRoadFrame(curve, b);
-    const segLen = start.point.distanceTo(end.point);
-    const midProgress = (a + b) * 0.5;
-    const frame = getRoadFrame(curve, midProgress >= 1 ? midProgress - 1 : midProgress);
-
-    stripOffsets.forEach(({ side, offset }, partIndex) => {
-      const position = frame.point.clone().addScaledVector(frame.right, side * offset);
-      position.y = 0.08;
-      const matrix = makeBasisMatrix(position, frame.tangent, frame.right, new THREE.Vector3(1, 1, segLen));
-      addTransformedBox(parts[partIndex], source, matrix);
-    });
-  }
-
-  parts.forEach((part, index) => {
-    const mesh = new THREE.Mesh(createMergedGeometry(part), material);
-    mesh.name = `TropicalBeachEdgeStrip:${index}`;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  });
-
-  source.dispose();
-}
-
-export function addBeachCenterDashes(group, curve, trackDef) {
-  const material = createBeachMaterial({
-    color: 0xffffff,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.6,
-    roughness: 0.48
-  });
-  const totalLength = curve.getLength();
-  const dashCount = Math.floor(totalLength / 10);
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.06, 3), material, dashCount);
-  const matrix = new THREE.Matrix4();
-
-  for (let index = 0; index < dashCount; index += 1) {
-    const progress = ((index * 10) + 1.5) / totalLength;
-    const frame = getRoadFrame(curve, progress % 1);
-    const position = frame.point.clone();
-    position.y = 0.07;
-    matrix.copy(makeBasisMatrix(position, frame.tangent, frame.right));
-    dashes.setMatrixAt(index, matrix);
-  }
-
-  dashes.name = "TropicalBeachCenterDashes";
-  dashes.instanceMatrix.needsUpdate = true;
-  dashes.receiveShadow = true;
-  group.add(dashes);
-}
-

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "../../trackMaterials.js";
+import { addInstancedPart } from "../common/instancing.js";
 import {
   clampPropPosition,
   getHeading,
@@ -158,12 +159,9 @@ function addSeatedSpectators(stand, width, rows, seed) {
 }
 
 function addInstancedSpectatorPart(stand, geometry, material, matrices, name) {
-  if (matrices.length === 0) return;
-  const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
-  mesh.name = `VegasGrandstandSpectator${name}`;
-  matrices.forEach((partMatrix, partIndex) => mesh.setMatrixAt(partIndex, partMatrix));
-  mesh.instanceMatrix.needsUpdate = true;
-  stand.add(mesh);
+  addInstancedPart(stand, geometry, material, matrices, `VegasGrandstandSpectator${name}`, {
+    receiveShadow: false
+  });
 }
 
 function createPaddockBuilding({ position, rotationY }) {
@@ -280,5 +278,4 @@ export function addVegasF1Venue(group, curve, definition) {
     }));
   });
 }
-
 
