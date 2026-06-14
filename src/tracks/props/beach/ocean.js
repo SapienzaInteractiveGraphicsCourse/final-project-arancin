@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { getRightVector } from "../shared.js";
-import { createBeachMaterial, getRoadFrame } from "./common.js";
+import { createBeachMaterial } from "./common.js";
 
 export function addBeachGround(group) {
   const material = createBeachMaterial({
