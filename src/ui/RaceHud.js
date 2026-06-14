@@ -111,10 +111,32 @@ function formatPosition(raceState) {
   }
 
   if (raceState.mode === "race") {
-    return `Pos ${raceState.position}/${raceState.participantCount}`;
+    return `${formatOrdinal(raceState.position)}/${raceState.participantCount}`;
   }
 
   return "Solo";
+}
+
+function formatOrdinal(value) {
+  const position = Number(value);
+
+  if (!Number.isFinite(position) || position <= 0) {
+    return "--";
+  }
+
+  const rounded = Math.round(position);
+  const lastTwoDigits = rounded % 100;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+    return `${rounded}th`;
+  }
+
+  const suffixes = {
+    1: "st",
+    2: "nd",
+    3: "rd"
+  };
+
+  return `${rounded}${suffixes[rounded % 10] ?? "th"}`;
 }
 
 function formatGap(raceState) {

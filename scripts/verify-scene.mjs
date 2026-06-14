@@ -149,7 +149,7 @@ async function runVerification() {
   await page.locator(".race-overlay").waitFor({ state: "visible" });
   const raceModeHud = await page.locator(".race-hud").textContent();
 
-  if (!raceModeHud?.includes("Pos 1/2") || !raceModeHud.includes("Lap 1/3")) {
+  if (!raceModeHud?.includes("1st/2") || !raceModeHud.includes("Lap 1/3")) {
     throw new Error(`Race HUD does not include expected race state: ${raceModeHud}`);
   }
 
