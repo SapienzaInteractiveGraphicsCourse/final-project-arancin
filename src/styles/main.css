@@ -151,6 +151,7 @@ canvas {
 
 .race-hud-top-left .race-hud-lap,
 .race-hud-top-left .race-hud-checkpoint,
+.race-hud-top-left .race-hud-fps,
 .race-hud-top-left .race-hud-surface,
 .race-hud-top-left .race-hud-gap {
   justify-self: start;
@@ -314,6 +315,11 @@ canvas {
   transform: rotate(45deg);
 }
 
+.race-hud-fps {
+  min-width: 62px;
+  color: #cbd5e1;
+}
+
 .race-hud-top-left .race-hud-surface {
   grid-column: 1 / span 2;
 }
@@ -329,6 +335,37 @@ canvas {
 }
 
 .race-hud-value[hidden] {
+  display: none;
+}
+
+.debug-stats-panel {
+  position: fixed;
+  right: 16px;
+  top: 56px;
+  z-index: 3;
+  display: grid;
+  min-width: 188px;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+  color: #e5e7eb;
+  background: rgba(8, 12, 20, 0.78);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.debug-stats-panel strong {
+  color: #facc15;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.debug-stats-panel[hidden] {
   display: none;
 }
 
@@ -1544,6 +1581,7 @@ canvas {
 
   .race-hud-top-left .race-hud-lap,
   .race-hud-top-left .race-hud-checkpoint,
+  .race-hud-top-left .race-hud-fps,
   .race-hud-top-left .race-hud-surface,
   .race-hud-top-left .race-hud-gap {
     grid-column: 1 / -1;

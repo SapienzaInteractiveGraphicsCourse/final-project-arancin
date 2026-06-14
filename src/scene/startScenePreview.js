@@ -15,10 +15,17 @@ import { CameraController } from "../systems/CameraController.js";
 import { getOrderedCheckpoints } from "../systems/checkpointUtils.js";
 import { InputManager } from "../systems/InputManager.js";
 import { MinimapSystem } from "../systems/MinimapSystem.js";
-import { RaceManager, RACE_PHASES } from "../systems/RaceManager.js";
+import { RaceManager, RACE_MODES, RACE_PHASES } from "../systems/RaceManager.js";
 import { TrackInteractionSystem } from "../systems/TrackInteractionSystem.js";
 import { WrongWayDetector } from "../systems/WrongWayDetector.js";
 import { createRaceHud } from "../ui/RaceHud.js";
+import {
+  createGhostLapRecorder,
+  getRaceGhostKey,
+  readGhostLap,
+  sampleGhostLap,
+  writeGhostLap
+} from "../systems/ghostLapRecords.js";
 import {
   appendLapRecord,
   ensureBestLapInRecords,
@@ -59,6 +66,8 @@ export function startScenePreview(container, setup, options = {}) {
   let selectedBodyColor = setup.bodyColor ?? VEHICLE_COLOR_OPTIONS[0].value;
   vehicle.setBodyColor(selectedBodyColor);
   const aiVehicle = setup.raceMode === "race" ? createVehicleById(setup.vehicleId) : null;
+  const ghostVehicle = setup.raceMode === RACE_MODES.TIME_TRIAL ? createVehicleById(setup.vehicleId) : null;
+  const ghostPosition = new THREE.Vector3();
   const inputManager = new InputManager(window);
   const audioSettings = readAudioSettings(window.localStorage);
   const audioManager = new AudioManager({
@@ -74,21 +83,34 @@ export function startScenePreview(container, setup, options = {}) {
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
+  const ghostKey = getRaceGhostKey(recordKey);
   const savedBestLapTime = readBestLapTime(window.localStorage, recordKey);
   let savedLapRecords = ensureBestLapInRecords(window.localStorage, lapRecordsKey, savedBestLapTime);
+  let savedGhostLap = readGhostLap(window.localStorage, ghostKey);
+  let pendingGhostLap = null;
+  const ghostRecorder = createGhostLapRecorder({
+    enabled: setup.raceMode === RACE_MODES.TIME_TRIAL
+  });
   const raceManager = new RaceManager({
     mode: setup.raceMode,
     countdownSeconds: 4,
     bestLapTime: savedBestLapTime,
     onLapComplete: (lapRecord) => {
       savedLapRecords = appendLapRecord(window.localStorage, lapRecordsKey, lapRecord);
+      pendingGhostLap = ghostRecorder.complete(lapRecord.time, setup);
     },
     onBestLap: (bestLapTime) => {
       writeBestLapTime(window.localStorage, recordKey, bestLapTime);
+      if (pendingGhostLap) {
+        savedGhostLap = writeGhostLap(window.localStorage, ghostKey, pendingGhostLap);
+      }
+      pendingGhostLap = null;
     }
   });
   const raceOverlay = createRaceOverlay();
   const raceHud = createRaceHud();
+  const frameRateMonitor = createFrameRateMonitor();
+  const debugStatsPanel = createDebugStatsPanel();
   const wrongWayOverlay = createWrongWayOverlay();
   const loadingOverlay = createVehicleLoadingOverlay({
     ...setup,
@@ -137,6 +159,12 @@ export function startScenePreview(container, setup, options = {}) {
   let disposed = false;
   let renderedFinishSignature = "";
   let totalElapsedTime = 0;
+  const debugOptions = {
+    minimap: true,
+    shadows: renderer.shadowMap.enabled,
+    props: true,
+    stats: false
+  };
   let lastAudioCountdownStep = null;
   let lastAudioCheckpoint = 0;
   let lastAudioLapCount = 0;
@@ -150,6 +178,15 @@ export function startScenePreview(container, setup, options = {}) {
   applyTrackLightingTheme(lights, track.trackInfo);
   timer.connect(document);
   scene.add(track.group, vehicle.group);
+  if (ghostVehicle) {
+    ghostVehicle.group.visible = false;
+    scene.add(ghostVehicle.group);
+    ghostVehicle.whenReady().then(() => {
+      if (!disposed) {
+        applyGhostVehicleMaterial(ghostVehicle);
+      }
+    });
+  }
   if (lights.sun && lights.sun.target) {
     scene.add(lights.sun.target);
   }
@@ -163,6 +200,7 @@ export function startScenePreview(container, setup, options = {}) {
   // Cache references to animating props and start lights to avoid costly traversals in the frame loop
   const animatingProps = [];
   const gantryStartLights = [];
+  const decorativePropGroups = [];
 
   track.group.traverse((child) => {
     if (child.userData.spin || child.userData.float) {
@@ -170,6 +208,9 @@ export function startScenePreview(container, setup, options = {}) {
     }
     if (child.name === "GantryStartLights" && child.userData.lamps) {
       gantryStartLights.push(...child.userData.lamps);
+    }
+    if (isDecorativePropsGroup(child)) {
+      decorativePropGroups.push(child);
     }
   });
 
@@ -180,6 +221,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   container.appendChild(raceOverlay);
   container.appendChild(raceHud.element);
+  container.appendChild(debugStatsPanel.element);
   container.appendChild(wrongWayOverlay);
   container.appendChild(minimapPanel);
   container.appendChild(loadingOverlay.element);
@@ -221,11 +263,16 @@ export function startScenePreview(container, setup, options = {}) {
     trackInteraction.reset();
     raceManager.reset();
     wrongWayDetector.reset();
+    ghostRecorder.reset();
     raceManager.startCountdown();
     audioManager.setEngineAudible(true);
     resetAudioEventState();
+    pendingGhostLap = null;
     renderedFinishSignature = "";
     finishScreen.setVisible(false);
+    if (ghostVehicle) {
+      ghostVehicle.group.visible = false;
+    }
     totalElapsedTime = 0;
   }
 
@@ -253,6 +300,31 @@ export function startScenePreview(container, setup, options = {}) {
       cameraController.nextMode();
     }
 
+    if (actions.toggleMinimap) {
+      debugOptions.minimap = !debugOptions.minimap;
+      minimapPanel.hidden = !debugOptions.minimap;
+    }
+
+    if (actions.toggleShadows) {
+      debugOptions.shadows = !debugOptions.shadows;
+      renderer.shadowMap.enabled = debugOptions.shadows;
+      if (lights.sun) {
+        lights.sun.castShadow = debugOptions.shadows;
+      }
+    }
+
+    if (actions.toggleProps) {
+      debugOptions.props = !debugOptions.props;
+      decorativePropGroups.forEach((group) => {
+        group.visible = debugOptions.props;
+      });
+    }
+
+    if (actions.toggleDebugStats) {
+      debugOptions.stats = !debugOptions.stats;
+      debugStatsPanel.setVisible(debugOptions.stats);
+    }
+
     if (paused) {
       return;
     }
@@ -261,15 +333,23 @@ export function startScenePreview(container, setup, options = {}) {
       const state = controller.getState();
       vehicle.setTransform(state.position, state.heading);
       vehicle.update(deltaTime, state);
+      hideGhostVehicle();
       cameraController.update(deltaTime, state, track.trackInfo);
       raceHud.update({
         raceState: raceManager.getState(),
         vehicleState: state,
         wrongWayState: wrongWayDetector.getState(),
         trackId: track.trackInfo.id,
-        trackName: track.trackInfo.name
+        trackName: track.trackInfo.name,
+        performanceState: frameRateMonitor.getState()
       });
-      minimap.update({ playerState: state });
+      updateMinimapIfEnabled(state);
+      debugStatsPanel.update({
+        visible: debugOptions.stats,
+        performanceState: frameRateMonitor.getState(),
+        rendererInfo: renderer.info,
+        options: debugOptions
+      });
       audioManager.update(deltaTime, state);
       return;
     }
@@ -307,7 +387,6 @@ export function startScenePreview(container, setup, options = {}) {
     if (audioEvents?.enginePop) {
       vehicle.triggerExhaustPop?.();
     }
-    updateCameraFollow(cameraController, track.trackInfo, state);
 
     // Auto-enable headlights for night circuits (Vegas)
     if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
@@ -370,8 +449,6 @@ export function startScenePreview(container, setup, options = {}) {
       }
     }
 
-    updateWrongWayOverlay(wrongWayOverlay, wrongWayDetector.update(deltaTime, state, track.trackInfo));
-
     let aiState = null;
 
     if (aiVehicle && aiController) {
@@ -396,16 +473,22 @@ export function startScenePreview(container, setup, options = {}) {
     
     checkpointHighlighter.update(raceState);
     updateRaceOverlay(raceOverlay, raceState);
+    ghostRecorder.update(raceState, state);
+    updateGhostVehicle(deltaTime, raceState);
     raceHud.update({
       raceState,
       vehicleState: state,
       wrongWayState,
       trackId: track.trackInfo.id,
-      trackName: track.trackInfo.name
+      trackName: track.trackInfo.name,
+      performanceState: frameRateMonitor.getState()
     });
-    minimap.update({
-      playerState: state,
-      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    updateMinimapIfEnabled(state, aiState);
+    debugStatsPanel.update({
+      visible: debugOptions.stats,
+      performanceState: frameRateMonitor.getState(),
+      rendererInfo: renderer.info,
+      options: debugOptions
     });
     renderedFinishSignature = updateFinishScreen(
       finishScreen,
@@ -413,6 +496,54 @@ export function startScenePreview(container, setup, options = {}) {
       savedLapRecords,
       renderedFinishSignature
     );
+  }
+
+  function updateMinimapIfEnabled(playerState, aiState = null) {
+    if (!debugOptions.minimap) {
+      return;
+    }
+
+    minimap.update({
+      playerState,
+      aiState: getVisibleAiMinimapState(aiState, aiVehicle)
+    });
+  }
+
+  function updateGhostVehicle(deltaTime, raceState) {
+    if (
+      !ghostVehicle ||
+      !savedGhostLap ||
+      raceState.mode !== RACE_MODES.TIME_TRIAL ||
+      raceState.phase !== RACE_PHASES.RUNNING ||
+      ghostVehicle.isLoading?.()
+    ) {
+      hideGhostVehicle();
+      return;
+    }
+
+    const ghostSample = sampleGhostLap(savedGhostLap, raceState.lapTime);
+    if (!ghostSample) {
+      hideGhostVehicle();
+      return;
+    }
+
+    ghostPosition.set(ghostSample.x, ghostSample.y, ghostSample.z);
+    ghostVehicle.group.visible = true;
+    ghostVehicle.setTransform(ghostPosition, ghostSample.heading);
+    ghostVehicle.update(deltaTime, {
+      position: ghostPosition,
+      heading: ghostSample.heading,
+      speed: ghostSample.speed ?? 0,
+      steering: 0,
+      throttle: 0,
+      braking: false
+    });
+  }
+
+  function hideGhostVehicle() {
+    if (ghostVehicle) {
+      ghostVehicle.group.visible = false;
+    }
   }
 
   function updateRaceAudioCues(raceState, environmentState) {
@@ -483,6 +614,7 @@ export function startScenePreview(container, setup, options = {}) {
   }
 
   function animate(timestamp) {
+    frameRateMonitor.update(timestamp);
     timer.update(timestamp);
     const deltaTime = Math.min(timer.getDelta(), 0.05);
 
@@ -509,6 +641,7 @@ export function startScenePreview(container, setup, options = {}) {
       renderer.domElement.remove();
       raceOverlay.remove();
       raceHud.remove();
+      debugStatsPanel.remove();
       wrongWayOverlay.remove();
       loadingOverlay.remove();
       minimapPanel.remove();
@@ -519,10 +652,14 @@ export function startScenePreview(container, setup, options = {}) {
       track.dispose();
       vehicle.dispose();
       aiVehicle?.dispose();
+      ghostVehicle?.dispose();
       scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
 
       if (aiVehicle) {
         scene.remove(aiVehicle.group);
+      }
+      if (ghostVehicle) {
+        scene.remove(ghostVehicle.group);
       }
     }
   };
@@ -704,10 +841,6 @@ function getRaceProgressScore(lap, progress, totalLaps) {
   return Math.min(totalLaps, Math.max(1, lap) - 1 + Math.max(0, Math.min(1, progress)));
 }
 
-function updateCameraFollow(cameraController, trackInfo, vehicleState) {
-  cameraController.updateFollowCamera(vehicleState, trackInfo);
-}
-
 function applyAiVehicleTransform(vehicle, aiState) {
   vehicle.setTransform(
     new THREE.Vector3(aiState.position.x, aiState.position.y, aiState.position.z),
@@ -724,6 +857,145 @@ function getVisibleAiMinimapState(aiState, aiVehicle) {
     ...aiState,
     hasVisibleModel: aiVehicle.group.visible !== false
   };
+}
+
+function applyGhostVehicleMaterial(vehicle) {
+  vehicle.setHeadlights?.(false);
+  vehicle.group.traverse((child) => {
+    if (child.isLight) {
+      child.visible = false;
+      return;
+    }
+
+    child.castShadow = false;
+    child.receiveShadow = false;
+
+    if (!child.isMesh || !child.material) {
+      return;
+    }
+
+    const materials = Array.isArray(child.material)
+      ? child.material.map(cloneGhostMaterial)
+      : cloneGhostMaterial(child.material);
+    child.material = materials;
+  });
+}
+
+function cloneGhostMaterial(material) {
+  const ghostMaterial = material.clone();
+
+  ghostMaterial.transparent = true;
+  ghostMaterial.opacity = Math.min(ghostMaterial.opacity ?? 1, 0.34);
+  ghostMaterial.depthWrite = false;
+
+  if (ghostMaterial.color) {
+    ghostMaterial.color.lerp(new THREE.Color(0x7dd3fc), 0.68);
+  }
+
+  if (ghostMaterial.emissive) {
+    ghostMaterial.emissive.setHex(0x164e63);
+    ghostMaterial.emissiveIntensity = Math.max(ghostMaterial.emissiveIntensity ?? 0, 0.24);
+  }
+
+  return ghostMaterial;
+}
+
+function createFrameRateMonitor() {
+  const sampleWindowMs = 500;
+  let lastTimestamp = null;
+  let sampleElapsed = 0;
+  let sampleFrames = 0;
+  let displayedFps = null;
+  let smoothedFps = null;
+
+  return {
+    update(timestamp = 0) {
+      if (!Number.isFinite(timestamp)) {
+        return;
+      }
+
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp;
+        return;
+      }
+
+      const deltaMs = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      if (deltaMs <= 0) {
+        return;
+      }
+
+      const instantFps = 1000 / deltaMs;
+      smoothedFps = smoothedFps === null
+        ? instantFps
+        : smoothedFps * 0.86 + instantFps * 0.14;
+      sampleElapsed += deltaMs;
+      sampleFrames += 1;
+
+      if (sampleElapsed >= sampleWindowMs) {
+        displayedFps = sampleFrames * 1000 / sampleElapsed;
+        sampleElapsed = 0;
+        sampleFrames = 0;
+      }
+    },
+    getState() {
+      return {
+        fps: displayedFps ?? smoothedFps
+      };
+    }
+  };
+}
+
+function isDecorativePropsGroup(object) {
+  return typeof object?.name === "string" && object.name.endsWith("Props");
+}
+
+function createDebugStatsPanel() {
+  const element = document.createElement("aside");
+  element.className = "debug-stats-panel";
+  element.hidden = true;
+
+  return {
+    element,
+    setVisible(visible) {
+      element.hidden = !visible;
+    },
+    update({ visible, performanceState, rendererInfo, options } = {}) {
+      if (!visible) {
+        return;
+      }
+
+      const memory = rendererInfo?.memory ?? {};
+      const render = rendererInfo?.render ?? {};
+      element.innerHTML = `
+        <strong>Debug Performance</strong>
+        <span>F1 minimap: ${formatDebugToggle(options?.minimap)}</span>
+        <span>F2 shadows: ${formatDebugToggle(options?.shadows)}</span>
+        <span>F3 props: ${formatDebugToggle(options?.props)}</span>
+        <span>FPS: ${formatDebugNumber(performanceState?.fps)}</span>
+        <span>Draw calls: ${formatDebugNumber(render.calls)}</span>
+        <span>Triangles: ${formatDebugNumber(render.triangles)}</span>
+        <span>Geometries: ${formatDebugNumber(memory.geometries)}</span>
+        <span>Textures: ${formatDebugNumber(memory.textures)}</span>
+      `;
+    },
+    remove() {
+      element.remove();
+    }
+  };
+}
+
+function formatDebugToggle(enabled) {
+  return enabled ? "on" : "off";
+}
+
+function formatDebugNumber(value) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+
+  return Math.round(value).toLocaleString("en-US");
 }
 
 function createCheckpointHighlighter(trackInfo) {

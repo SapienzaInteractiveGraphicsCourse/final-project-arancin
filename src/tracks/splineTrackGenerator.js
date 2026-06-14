@@ -7,7 +7,6 @@ import {
   offsetProgress,
   samplePathAtProgress
 } from "./centerline.js";
-import { addTrackProps } from "./trackProps.js";
 import { createTrackMaterials } from "./trackMaterials.js";
 
 const ROAD_Y = 0.045;
@@ -29,6 +28,8 @@ const CURB_WIDTH = 0.62;
 const CURB_LENGTH = 1.35;
 const CURVE_THRESHOLD = 0.075;
 const UP = new THREE.Vector3(0, 1, 0);
+
+function noopTrackProps() {}
 
 function getRightVector(tangent) {
   return new THREE.Vector3(tangent.z, 0, -tangent.x).normalize();
@@ -759,7 +760,7 @@ function disposeObjectTree(group) {
   });
 }
 
-export function createSplineTrack(definition, propsBuilder = addTrackProps) {
+export function createSplineTrack(definition, propsBuilder = noopTrackProps) {
   const group = new THREE.Group();
   group.name = `${definition.name} Track`;
 

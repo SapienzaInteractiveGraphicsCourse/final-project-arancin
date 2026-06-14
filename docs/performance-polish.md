@@ -22,15 +22,28 @@ Scopo: alleggerire il gioco senza cambiare gameplay.
 
 Interventi candidati:
 
+- mostrare FPS in HUD per confrontare le piste durante il playtest;
 - ridurre il pixel ratio massimo del renderer se la scena e pesante;
 - rendere configurabili shadow map e antialias;
 - ridurre update o animazioni non essenziali lontane dal player;
 - controllare props e materiali delle mappe che generano troppi draw call;
 - evitare traversal o allocazioni inutili nel frame loop.
 
+Interventi completati:
+
+- aggiunto indicatore FPS nel pannello HUD, campionato ogni mezzo secondo per evitare numeri instabili;
+- rimosso l'update duplicato del detector contromano nel frame loop.
+- aggiunti toggle diagnostici runtime:
+  - `F1`: minimap on/off;
+  - `F2`: shadow map/luci con ombre on/off;
+  - `F3`: props decorativi della pista on/off;
+  - `F4`: pannello debug con FPS, draw calls, triangoli, geometrie e texture.
+
 Verifica:
 
-- provare Vegas Neon, Beach e Monaco;
+- provare Vegas Neon e Tropical Beach, segnando FPS medio e microscatti percepiti;
+- ripetere lo stesso tratto con `F1`, `F2` e `F3` per capire quale gruppo incide di piu;
+- usare `F4` per confrontare draw calls e triangoli tra piste;
 - controllare che non peggiori troppo la qualita visiva;
 - verificare assenza errori console.
 
@@ -147,22 +160,102 @@ Verifica:
 
 Scopo: in time trial mostrare un ghost del miglior giro salvato per pista e veicolo.
 
-Approccio pragmatico:
+Comportamento atteso:
 
-- registrare campioni leggeri durante il giro migliore:
+- il ghost appare solo in modalita `time-trial`;
+- il ghost appare solo se esiste gia un best lap salvato per quella combinazione pista/veicolo;
+- durante il primo giro senza best salvato non si vede nessun ghost;
+- dopo un nuovo best lap, al restart successivo il ghost usa il giro appena salvato;
+- il ghost non ha collisioni, non influenza AI, checkpoint, contromano o posizione;
+- il ghost deve essere visivamente riconoscibile ma non fastidioso:
+  - materiale semi-trasparente;
+  - colore freddo/azzurro o bianco;
+  - opacita bassa;
+  - niente luci, audio o effetti collisione.
+
+Cosa segue:
+
+- segue il percorso reale fatto dal player nel miglior giro salvato;
+- non ricalcola fisica e non ripete input;
+- interpola posizione e heading tra campioni temporali;
+- se il player va piu forte, il ghost resta indietro;
+- se il player va piu lento, il ghost scappa avanti;
+- se il giro corrente supera la durata del ghost, il ghost resta sull'ultimo campione o viene nascosto fino al prossimo restart.
+
+Dati da registrare:
+
+- registrare campioni leggeri durante ogni giro valido:
   - tempo;
   - posizione;
   - heading;
-- salvare il ghost in localStorage insieme alla chiave `trackId:vehicleId:mode`;
-- caricare il ghost solo in `time-trial`;
-- renderizzare un veicolo ghost semi-trasparente;
-- interpolare il ghost in base al lap time corrente.
+- opzionale: speed, solo se serve per animazioni ruote;
+- non salvare mesh, input o oggetti Three.js.
+
+Formato candidato:
+
+```js
+{
+  version: 1,
+  trackId: "vegas",
+  vehicleId: "kart",
+  lapTime: 72.34,
+  sampleRate: 10,
+  samples: [
+    { t: 0.0, x: 0, y: 0, z: 0, heading: 0 },
+    { t: 0.1, x: 0.4, y: 0, z: 1.2, heading: 0.02 }
+  ]
+}
+```
+
+Chiave storage:
+
+- usare una chiave separata dal best lap testuale, per esempio `${trackId}:${vehicleId}:time-trial:ghost`;
+- non legarla al colore veicolo, cosi il ghost resta disponibile anche se si cambia colore;
+- se cambia formato, incrementare `version` e ignorare ghost vecchi non compatibili.
+
+Sampling:
+
+- campionare a frequenza fissa, per esempio 10 Hz;
+- non registrare ogni frame, per evitare localStorage troppo grande;
+- registrare solo quando `RaceManager` e in fase `RUNNING`;
+- iniziare dal passaggio valido sullo start;
+- chiudere la registrazione quando il giro viene completato;
+- salvare il ghost solo se il giro appena completato e anche nuovo best lap.
+
+Rendering:
+
+- creare un veicolo ghost separato dal player;
+- usare lo stesso `vehicleId` del player per silhouette coerente;
+- disattivare collisioni e input;
+- nascondere il ghost se il modello non e ancora pronto;
+- applicare materiali trasparenti clonati, senza modificare il veicolo reale;
+- aggiornare transform del ghost in base al tempo del giro corrente.
+
+Interpolazione:
+
+- trovare i due campioni attorno al tempo corrente;
+- interpolare posizione con lerp lineare;
+- interpolare heading scegliendo la rotazione piu breve;
+- se mancano campioni validi, nascondere il ghost invece di rompere la preview.
+
+Divisione consigliata dei commit:
+
+1. `add ghost lap storage helpers`
+   - nuovo modulo per chiavi storage, read/write, validazione formato e versioning.
+2. `record time trial ghost samples`
+   - recorder leggero che campiona il player durante il giro e salva solo il nuovo best.
+3. `render time trial ghost vehicle`
+   - creazione veicolo ghost, materiali trasparenti, update interpolato.
+4. `document and polish ghost behavior`
+   - docs, piccoli ritocchi visivi, test manuali e cleanup.
 
 Non obiettivi:
 
 - ghost perfettamente fisico;
 - replay completo di input;
 - ghost per race mode.
+- ghost multiplayer o confronto tra veicoli diversi;
+- compressione avanzata dei campioni.
 
 Verifica:
 
@@ -170,6 +263,10 @@ Verifica:
 - restartare sulla stessa pista e veicolo;
 - vedere il ghost seguire il giro migliore;
 - migliorare il best e verificare che il ghost venga aggiornato.
+- cambiare veicolo e verificare che il ghost precedente non venga caricato;
+- cambiare pista e verificare che il ghost precedente non venga caricato;
+- race mode non deve mostrare nessun ghost;
+- nessun errore console se localStorage contiene dati corrotti o vecchi.
 
 ## Note Di Playtest
 
@@ -178,4 +275,5 @@ Verifica:
 - [ ] Modalita:
 - [ ] Problema osservato:
 - [ ] Console errors:
-- [ ] FPS/percezione:
+- [ ] FPS HUD:
+- [ ] Percezione scatti:

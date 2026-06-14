@@ -62,7 +62,11 @@ export class InputManager {
       camera: this.pendingActions.has("camera"),
       lights: this.pendingActions.has("lights"),
       restart: this.pendingActions.has("restart"),
-      pause: this.pendingActions.has("pause")
+      pause: this.pendingActions.has("pause"),
+      toggleMinimap: this.pendingActions.has("toggleMinimap"),
+      toggleShadows: this.pendingActions.has("toggleShadows"),
+      toggleProps: this.pendingActions.has("toggleProps"),
+      toggleDebugStats: this.pendingActions.has("toggleDebugStats")
     };
 
     this.pendingActions.clear();
@@ -114,5 +118,9 @@ const ACTION_KEY_MAP = new Map([
   ["c", "camera"],
   ["l", "lights"],
   ["r", "restart"],
-  ["Escape", "pause"]
+  ["Escape", "pause"],
+  ["F1", "toggleMinimap"],
+  ["F2", "toggleShadows"],
+  ["F3", "toggleProps"],
+  ["F4", "toggleDebugStats"]
 ]);
