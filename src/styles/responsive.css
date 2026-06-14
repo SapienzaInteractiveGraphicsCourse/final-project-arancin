@@ -1,0 +1,202 @@
+
+@media (max-width: 760px) {
+  .setup-menu {
+    gap: 0;
+    padding: 6px 14px 10px;
+  }
+
+  .setup-logo {
+    max-width: calc(100vw - 28px);
+    width: min(300px, 78vw);
+  }
+
+  .setup-panel {
+    margin-top: -14px;
+    padding: 12px;
+  }
+
+  .setup-header {
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .setup-progress {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .setup-stage {
+    min-height: 304px;
+    padding: 10px;
+  }
+
+  .setup-step-copy h2 {
+    font-size: 25px;
+  }
+
+  .setup-carousel {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 6px;
+    margin-top: 18px;
+  }
+
+  .setup-carousel-track {
+    height: 178px;
+  }
+
+  .setup-carousel-arrow {
+    width: 36px;
+    height: 58px;
+    font-size: 30px;
+  }
+
+  .setup-option-card {
+    min-height: 164px;
+    padding: 14px;
+  }
+
+  .setup-option-card[data-placement="previous"],
+  .setup-option-card[data-placement="next"] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .setup-option-card strong {
+    font-size: 24px;
+  }
+
+  .setup-option-stat {
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+
+  .setup-option-icon {
+    width: 42px;
+    height: 32px;
+    margin-bottom: 9px;
+  }
+
+  .setup-option-image {
+    width: min(210px, 86%);
+    height: 54px;
+    margin-bottom: 7px;
+  }
+
+  .setup-option-image[data-vehicle-image="kart"] {
+    width: min(148px, 62%);
+  }
+
+  .setup-option-card span {
+    font-size: 13px;
+  }
+
+  .setup-nav {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .setup-nav-button {
+    min-width: 0;
+  }
+
+  .pre-race-color-picker {
+    bottom: 12px;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 11px;
+  }
+
+  .pre-race-color-copy {
+    min-width: 0;
+  }
+
+  .pre-race-color-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pre-race-start-button {
+    width: 100%;
+  }
+
+  .race-hud-main {
+    left: 12px;
+    top: 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, auto);
+    width: min(220px, calc(100vw - 170px));
+    gap: 5px 6px;
+    padding: 8px;
+  }
+
+  .race-hud-track-name {
+    grid-column: 1 / -1;
+    min-height: 20px;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .race-hud-speed {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    min-width: 128px;
+    min-height: 40px;
+    font-size: 25px;
+  }
+
+  .race-hud-time {
+    grid-column: 1;
+    min-width: 0;
+    min-height: 36px;
+    font-size: 21px;
+    justify-self: start;
+  }
+
+  .race-hud-place {
+    grid-column: 2;
+    min-width: 68px;
+    min-height: 24px;
+    font-size: 11px;
+    justify-self: end;
+  }
+
+  .race-hud-chip {
+    grid-column: 1 / -1;
+    justify-self: start;
+    width: 100%;
+    min-height: 24px;
+    max-width: 100%;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .wrong-way-overlay {
+    top: 76px;
+    min-width: 150px;
+    font-size: 15px;
+  }
+
+  .race-overlay,
+  .race-overlay[data-state="ready"],
+  .race-overlay[data-state="countdown"],
+  .race-overlay[data-state="go"] {
+    font-size: 58px;
+    -webkit-text-stroke-width: 2px;
+  }
+
+  .race-minimap-panel {
+    right: 12px;
+    top: 12px;
+  }
+
+  .race-minimap {
+    width: 136px;
+    height: 136px;
+  }
+
+  .finish-summary,
+  .finish-actions {
+    grid-template-columns: 1fr;
+  }
+}

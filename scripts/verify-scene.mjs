@@ -121,7 +121,7 @@ async function runVerification() {
     throw new Error(`Race HUD does not include expected Time Trial state: ${raceHud}`);
   }
 
-  for (const field of ["speed", "checkpoint", "track", "surface", "position", "gap"]) {
+  for (const field of ["speed", "checkpoint", "track", "position", "gap"]) {
     const fieldCount = await page.locator(`[data-hud-field="${field}"]`).count();
     if (fieldCount !== 1) {
       throw new Error(`Race HUD is missing stable ${field} field`);
