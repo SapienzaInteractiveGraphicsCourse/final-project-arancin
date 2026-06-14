@@ -54,8 +54,8 @@ function createWindowMaterial(color, lit) {
 
 function addWindowGrid(group, block, neonColors, seed, face) {
   const isFront = face === "front";
-  const columns = Math.max(3, Math.floor((isFront ? block.width : block.depth) / 1.6));
-  const rows = Math.max(6, Math.floor(block.height / 2.2));
+  const columns = Math.max(3, Math.floor((isFront ? block.width : block.depth) / 2.8));
+  const rows = Math.max(4, Math.floor(block.height / 4.2));
 
   const windowWidth = isFront ? Math.min(0.5, block.width / (columns * 2.2)) : 0.08;
   const windowDepth = isFront ? 0.08 : Math.min(0.5, block.depth / (columns * 2.2));
@@ -66,17 +66,19 @@ function addWindowGrid(group, block, neonColors, seed, face) {
   const yStep = block.height / (rows + 1);
 
   const colorsList = (neonColors && neonColors.length > 0) ? neonColors : [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78];
-  const darkMaterial = getCachedWindowMaterial(0x070811, false);
+  const colorIndex = Math.floor(pseudoRandom(seed + 0.41) * colorsList.length) % colorsList.length;
+  const litMaterial = getCachedWindowMaterial(colorsList[colorIndex], true);
   const geometry = getCachedWindowGeometry(windowWidth, windowHeight, windowDepth);
 
-  const litMatricesByColor = colorsList.map(() => []);
-  const darkMatrices = [];
+  const litMatrices = [];
   const matrix = new THREE.Matrix4();
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
       const noise = pseudoRandom(seed + row * 9.7 + column * 3.1 + (isFront ? 0 : 17));
-      const lit = noise > 0.35;
+      if (noise < 0.42) {
+        continue;
+      }
       const position = new THREE.Vector3();
 
       if (isFront) {
@@ -94,26 +96,12 @@ function addWindowGrid(group, block, neonColors, seed, face) {
       }
 
       matrix.makeTranslation(position.x, position.y, position.z);
-      if (lit) {
-        const colorIndex = Math.floor(pseudoRandom(seed + row * 13.3 + column * 7.7) * colorsList.length);
-        litMatricesByColor[colorIndex].push(matrix.clone());
-      } else {
-        darkMatrices.push(matrix.clone());
-      }
+      litMatrices.push(matrix.clone());
     }
   }
 
-  colorsList.forEach((color, colorIndex) => {
-    const matrices = litMatricesByColor[colorIndex];
-    if (matrices.length === 0) {
-      return;
-    }
-    const litMaterial = getCachedWindowMaterial(color, true);
-    addInstancedPart(group, geometry, litMaterial, matrices, `LitWindows_${colorIndex}`);
-  });
-
-  if (darkMatrices.length > 0) {
-    addInstancedPart(group, geometry, darkMaterial, darkMatrices, "DarkWindows");
+  if (litMatrices.length > 0) {
+    addInstancedPart(group, geometry, litMaterial, litMatrices, `LitWindows_${colorIndex}`);
   }
 }
 
@@ -377,7 +365,7 @@ function createVegasBuilding({ position, rotationY, height, width, depth, color,
 function generateCitySkyline(curve, group, definition) {
   const colors = definition.palette.neon;
   const bodyColors = [0x050508, 0x07070b, 0x090812, 0x08050c];
-  const sampleCount = 20;
+  const sampleCount = 16;
 
   for (let index = 0; index < sampleCount; index += 1) {
     // Alternate left and right side of the track

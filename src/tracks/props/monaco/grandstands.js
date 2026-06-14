@@ -4,6 +4,11 @@ import { optimizeStaticDecorativeProps, pseudoRandom, UP } from "../shared.js";
 import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh } from "./common.js";
 import { MONACO_ROAD_Y } from "./constants.js";
 
+const GRANDSTAND_ROWS = 5;
+const CROWD_SAMPLE_SPACING = 1.24;
+const ROW_DEPTH = 0.72;
+const ROW_HEIGHT = 0.36;
+
 function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
   const shirtMaterials = [
     createFlatStandardMaterial({ color: 0xd92d2d, roughness: 0.78 }),
@@ -41,14 +46,14 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
   const flagPoleMat = createFlatStandardMaterial({ color: 0x2f3a45, roughness: 0.52, metalness: 0.42 });
 
   const torsoGeometry = new THREE.BoxGeometry(0.26, 0.38, 0.16);
-  const headGeometry = new THREE.SphereGeometry(0.12, 10, 8);
-  const capGeometry = new THREE.CylinderGeometry(0.13, 0.14, 0.05, 10);
+  const headGeometry = new THREE.DodecahedronGeometry(0.12, 0);
+  const capGeometry = new THREE.CylinderGeometry(0.13, 0.14, 0.05, 6);
   const armGeometry = new THREE.BoxGeometry(0.06, 0.24, 0.06);
   const legGeometry = new THREE.BoxGeometry(0.1, 0.09, 0.36);
   const shoeGeometry = new THREE.BoxGeometry(0.11, 0.055, 0.16);
   const flagGeometry = new THREE.PlaneGeometry(0.42, 0.28);
   const flagAccentGeometry = new THREE.PlaneGeometry(0.14, 0.08);
-  const flagPoleGeometry = new THREE.CylinderGeometry(0.014, 0.014, 0.72, 7);
+  const flagPoleGeometry = new THREE.CylinderGeometry(0.014, 0.014, 0.72, 5);
 
   const torsoMatrices = shirtMaterials.map(() => []);
   const headMatrices = skinMaterials.map(() => []);
@@ -73,7 +78,7 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
   const flagScale = new THREE.Vector3(1, 1, 1);
 
   sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 0.58);
+    const samples = collectMonacoSamples(curve, section.start, section.end, CROWD_SAMPLE_SPACING);
 
     samples.forEach((sample, sampleIndex) => {
       const toTrack = sample.center.clone().sub(
@@ -82,19 +87,19 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
       const rotationY = Math.atan2(toTrack.x, toTrack.z);
       quaternion.setFromAxisAngle(UP, rotationY);
 
-      for (let row = 0; row < 7; row += 1) {
+      for (let row = 0; row < GRANDSTAND_ROWS; row += 1) {
         const seed = sectionIndex * 10000 + sampleIndex * 17 + row * 101;
-        const rowCrowding = row < 2 ? 0.95 : row < 5 ? 0.985 : 0.92;
+        const rowCrowding = row < 2 ? 0.84 : row < 4 ? 0.9 : 0.78;
         const microGap = pseudoRandom(sectionIndex * 500 + Math.floor(sampleIndex / 5) * 37 + row * 19);
-        if (pseudoRandom(seed) > rowCrowding && microGap < 0.45) {
+        if (pseudoRandom(seed) > rowCrowding || microGap < 0.08) {
           continue;
         }
-        if (microGap < 0.012) {
+        if ((sampleIndex + row + sectionIndex) % 9 === 0 && microGap < 0.45) {
           continue;
         }
 
-        const seatOffset = baseOffset + row * 0.72 + 0.34 + (pseudoRandom(seed + 1) - 0.5) * 0.08;
-        const rowY = MONACO_ROAD_Y + 0.17 + row * 0.36;
+        const seatOffset = baseOffset + row * ROW_DEPTH + 0.34 + (pseudoRandom(seed + 1) - 0.5) * 0.08;
+        const rowY = MONACO_ROAD_Y + 0.17 + row * ROW_HEIGHT;
         const jitter = (pseudoRandom(seed + 2) - 0.5) * 0.16;
         const base = sample.center
           .clone()
@@ -161,7 +166,7 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
           shoeMatrices.push(matrix.clone());
         });
 
-        if ((shirtIndex === 0 || seed % 29 === 0) && row > 2 && sampleIndex % 6 === 2 && pseudoRandom(seed + 12) > 0.86) {
+        if ((shirtIndex === 0 || seed % 29 === 0) && row > 1 && sampleIndex % 8 === 2 && pseudoRandom(seed + 12) > 0.9) {
           const flagBase = base
             .clone()
             .addScaledVector(sample.tangent, 0.18)
@@ -225,10 +230,10 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
   ];
 
   sections.forEach((section, sectionIndex) => {
-    for (let row = 0; row < 7; row += 1) {
-      const nearOffset = baseOffset + row * 0.72;
+    for (let row = 0; row < GRANDSTAND_ROWS; row += 1) {
+      const nearOffset = baseOffset + row * ROW_DEPTH;
       const farOffset = nearOffset + 0.68;
-      const y = MONACO_ROAD_Y + row * 0.36;
+      const y = MONACO_ROAD_Y + row * ROW_HEIGHT;
       grandstandGroup.add(createMonacoRibbonMesh(curve, definition, {
         name: `MonacoGrandstandTier:${sectionIndex}:${row}`,
         side: section.side,
@@ -247,9 +252,9 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
       side: section.side,
       start: section.start,
       end: section.end,
-      nearOffset: baseOffset + 7 * 0.72 + 0.2,
-      farOffset: baseOffset + 7 * 0.72 + 0.85,
-      y: MONACO_ROAD_Y + 2.78,
+      nearOffset: baseOffset + GRANDSTAND_ROWS * ROW_DEPTH + 0.2,
+      farOffset: baseOffset + GRANDSTAND_ROWS * ROW_DEPTH + 0.85,
+      y: MONACO_ROAD_Y + 2.1,
       material: backWallMat,
       sampleStep: 2
     }));
@@ -260,8 +265,8 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
       start: section.start,
       end: section.end,
       nearOffset: baseOffset - 0.2,
-      farOffset: baseOffset + 7 * 0.72 + 1.2,
-      y: MONACO_ROAD_Y + 3.5,
+      farOffset: baseOffset + GRANDSTAND_ROWS * ROW_DEPTH + 1.2,
+      y: MONACO_ROAD_Y + 2.82,
       material: roofMat,
       sampleStep: 3
     }));
@@ -271,4 +276,3 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
   optimizeStaticDecorativeProps(grandstandGroup, []);
   group.add(grandstandGroup);
 }
-

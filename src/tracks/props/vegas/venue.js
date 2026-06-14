@@ -80,13 +80,13 @@ function addSeatedSpectators(stand, width, rows, seed) {
   const hairMaterials = mats.hairs;
   const pantsMaterial = mats.pants;
 
-  const torsoGeometry = new THREE.CylinderGeometry(0.3, 0.24, 0.82, 8);
-  const headGeometry = new THREE.SphereGeometry(0.26, 12, 12);
-  const hairGeometry = new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
-  const legGeometry = new THREE.CylinderGeometry(0.12, 0.1, 0.72, 8);
-  const armGeometry = new THREE.CylinderGeometry(0.095, 0.07, 0.55, 8);
+  const torsoGeometry = new THREE.BoxGeometry(0.42, 0.72, 0.26);
+  const headGeometry = new THREE.DodecahedronGeometry(0.24, 0);
+  const hairGeometry = new THREE.BoxGeometry(0.42, 0.18, 0.32);
+  const legGeometry = new THREE.BoxGeometry(0.16, 0.12, 0.62);
+  const armGeometry = new THREE.BoxGeometry(0.12, 0.44, 0.12);
 
-  const seatsPerRow = Math.max(7, Math.floor(width / 1.62));
+  const seatsPerRow = Math.max(6, Math.floor(width / 2.35));
   const torsoMatrices = shirtMaterials.map(() => []);
   const headMatrices = skinMaterials.map(() => []);
   const hairMatrices = hairMaterials.map(() => []);
@@ -107,7 +107,8 @@ function addSeatedSpectators(stand, width, rows, seed) {
   for (let row = 0; row < rows; row += 1) {
     for (let seat = 0; seat < seatsPerRow; seat += 1) {
       const noise = pseudoRandom(seed * 19 + row * 7.3 + seat * 2.1);
-      if (noise < 0.08) continue;
+      if (noise < 0.28) continue;
+      if ((seat + row + seed) % 7 === 0 && noise < 0.62) continue;
 
       const jitter = (pseudoRandom(seed * 11 + row * 5.1 + seat * 3.7) - 0.5) * 0.12;
       const x = (seat / (seatsPerRow - 1) - 0.5) * width * 0.86 + jitter;
@@ -277,4 +278,3 @@ export function addVegasF1Venue(group, curve, definition) {
     }));
   });
 }
-
