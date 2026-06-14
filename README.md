@@ -4,6 +4,10 @@ Todo list condivisa per il progetto di Interactive Graphics.
 
 Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3 piste, guida arcade, AI, collisioni, HUD/minimappa e documentazione finale.
 
+## GitHub Pages
+
+Playable build: https://sapienzainteractivegraphicscourse.github.io/final-project-arancin/
+
 ## Regole Di Lavoro
 
 - Usare `develop` come branch di integrazione.
