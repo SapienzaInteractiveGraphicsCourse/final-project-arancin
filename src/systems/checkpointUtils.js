@@ -22,7 +22,7 @@ export function isInsideCheckpoint(position, checkpoint) {
   return deltaX * deltaX + deltaZ * deltaZ <= radius * radius;
 }
 
-export function isValidCheckpoint(checkpoint) {
+function isValidCheckpoint(checkpoint) {
   return (
     checkpoint &&
     checkpoint.position &&
@@ -33,7 +33,7 @@ export function isValidCheckpoint(checkpoint) {
   );
 }
 
-export function normalizeCheckpoint(checkpoint) {
+function normalizeCheckpoint(checkpoint) {
   return {
     ...checkpoint,
     order: getCheckpointOrder(checkpoint),

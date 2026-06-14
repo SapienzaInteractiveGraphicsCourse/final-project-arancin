@@ -82,7 +82,7 @@ export function samplePathAtProgress(points, progress) {
   };
 }
 
-export function getPathLength(points) {
+function getPathLength(points) {
   let length = 0;
 
   for (let index = 0; index < points.length; index += 1) {
@@ -131,7 +131,7 @@ export function headingFromLookahead(points, progress, lookAheadMeters = 1.8) {
   return Math.atan2(dx, dz);
 }
 
-export function lerpAngle(current, target, alpha) {
+function lerpAngle(current, target, alpha) {
   let delta = target - current;
 
   if (delta > Math.PI) {
@@ -143,6 +143,6 @@ export function lerpAngle(current, target, alpha) {
   return current + delta * alpha;
 }
 
-export function wrapProgress(progress) {
+function wrapProgress(progress) {
   return ((progress % 1) + 1) % 1;
 }

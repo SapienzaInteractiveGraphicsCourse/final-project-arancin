@@ -69,8 +69,12 @@ Azioni one-shot:
 
 - `C`: cambio camera;
 - `L`: luci;
-- `R`: restart.
+- `R`: restart;
 - `Escape`: pausa/menu runtime.
+- `F1`: toggle diagnostico minimap;
+- `F2`: toggle diagnostico ombre;
+- `F3`: toggle diagnostico props decorativi;
+- `F4`: toggle diagnostico pannello renderer info.
 
 Regole:
 
@@ -432,6 +436,48 @@ trackId:vehicleId:mode:laps
 
 `ensureBestLapInRecords()` serve a migrare i best lap salvati prima dello storico lap persistente.
 
+## Ghost Lap Records
+
+File: `src/systems/ghostLapRecords.js`
+
+Contratto:
+
+```js
+getRaceGhostKey(recordKey) -> string
+readGhostLap(storage, key) -> GhostLap | null
+writeGhostLap(storage, key, ghostLap) -> GhostLap | null
+createGhostLapRecorder({ enabled, sampleRate }) -> GhostLapRecorder
+sampleGhostLap(ghostLap, lapTime) -> GhostSample | null
+```
+
+Chiave ghost:
+
+```text
+trackId:vehicleId:mode:ghost
+```
+
+`GhostLap`:
+
+```js
+{
+  version,
+  trackId,
+  vehicleId,
+  lapTime,
+  sampleRate,
+  createdAt,
+  samples: [{ t, x, y, z, heading, speed }]
+}
+```
+
+Regole:
+
+- usato solo in `time-trial`;
+- non entra in collisioni, AI, checkpoint o posizione gara;
+- salva solo campioni numerici serializzabili in localStorage;
+- ignora dati corrotti o versioni non compatibili;
+- il ghost visuale interpola i campioni sul `lapTime` corrente.
+
 ## Wrong Way Detector
 
 File: `src/systems/WrongWayDetector.js`
@@ -577,7 +623,7 @@ Firma:
 ```js
 createRaceHud() -> {
   element,
-  update({ raceState, vehicleState, wrongWayState, trackId, trackName }),
+  update({ raceState, vehicleState, wrongWayState, trackId, trackName, performanceState }),
   remove()
 }
 ```
@@ -590,9 +636,9 @@ lap
 totalTime
 checkpoint
 track
-surface
 position
 gap
+fps
 ```
 
 Regole:
@@ -600,6 +646,7 @@ Regole:
 - il componente crea il DOM una sola volta;
 - `update()` aggiorna solo i valori testuali dei campi;
 - deve tollerare checkpoint mancanti e dati AI/gap non ancora disponibili;
+- `performanceState.fps` e opzionale e serve solo come diagnostica di playtest;
 - il warning contromano e gli stati di partenza devono usare overlay dedicati, non chip persistenti nell'HUD.
 
 ## Minimap System

@@ -4,7 +4,7 @@ export const TRACK_IDS = {
   MONACO: "monaco"
 };
 
-export const TRACK_DEFINITIONS = {
+const TRACK_DEFINITIONS = {
   [TRACK_IDS.VEGAS]: {
     id: TRACK_IDS.VEGAS,
     name: "Vegas Neon",
@@ -228,8 +228,6 @@ export const TRACK_DEFINITIONS = {
     ]
   }
 };
-
-export const TRACK_DEFINITION_LIST = Object.values(TRACK_DEFINITIONS);
 
 export function getTrackDefinition(trackId) {
   return TRACK_DEFINITIONS[trackId] ?? TRACK_DEFINITIONS[TRACK_IDS.VEGAS];

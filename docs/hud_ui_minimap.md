@@ -26,7 +26,6 @@ Questa pianificazione copre la sezione 8 del README:
 - HUD lap;
 - HUD time;
 - HUD checkpoint;
-- HUD surface;
 - HUD countdown/wrong way overlay;
 - HUD posizione/gap;
 - minimap canvas;
@@ -42,7 +41,7 @@ Il menu setup base, il pulsante Start, countdown, giri, tempi, finish screen e w
 ## Dati E Contratti Da Usare
 
 - `AppState.setup`: pista, veicolo e modalita selezionati.
-- `ArcadeVehicleController.getState()`: speed, surface, boost e stato fisico player.
+- `ArcadeVehicleController.getState()`: speed, boost e stato fisico player.
 - `RaceManager.getState()`: lap, tempi, checkpoint, posizione, partecipanti e stato gara.
 - `WrongWayDetector.update()`: warning contromano.
 - `trackInfo.centerline`: tracciato logico per minimappa.
@@ -163,7 +162,6 @@ Possibili file:
 Contenuto atteso:
 
 - velocita in km/h;
-- surface;
 - countdown e wrong way in overlay dedicati;
 - posizione/gap quando `race` o AI sono disponibili;
 - fallback leggibili quando checkpoint, AI o bounds non esistono.

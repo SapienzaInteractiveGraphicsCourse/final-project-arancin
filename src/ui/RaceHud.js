@@ -1,19 +1,14 @@
 const HUD_GROUPS = [
   {
-    className: "race-hud-top-left",
+    className: "race-hud-main",
     fields: [
       { id: "speed", className: "race-hud-speed" },
       { id: "totalTime", className: "race-hud-time" },
       { id: "position", className: "race-hud-place" },
       { id: "lap", className: "race-hud-chip race-hud-lap" },
       { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
-      { id: "surface", className: "race-hud-chip race-hud-surface" },
-      { id: "gap", className: "race-hud-chip race-hud-gap" }
-    ]
-  },
-  {
-    className: "race-hud-track",
-    fields: [
+      { id: "gap", className: "race-hud-chip race-hud-gap" },
+      { id: "fps", className: "race-hud-chip race-hud-fps" },
       { id: "track", className: "race-hud-track-name" }
     ]
   }
@@ -46,16 +41,16 @@ export function createRaceHud() {
 
   return {
     element,
-    update({ raceState, vehicleState, wrongWayState, trackId, trackName } = {}) {
+    update({ raceState, vehicleState, wrongWayState, trackId, trackName, performanceState } = {}) {
       element.dataset.trackTheme = normalizeTrackTheme(trackId);
       setField(values, "speed", formatSpeed(vehicleState?.speed));
       setField(values, "lap", formatLap(raceState));
       setField(values, "totalTime", formatRaceTime(raceState?.totalTime));
       setField(values, "checkpoint", formatCheckpoint(raceState));
       setField(values, "track", trackName ?? "--");
-      setField(values, "surface", formatSurface(vehicleState?.surfaceType));
       setField(values, "position", formatPosition(raceState));
       setField(values, "gap", formatGap(raceState));
+      setField(values, "fps", formatFps(performanceState));
     },
     remove() {
       element.remove();
@@ -110,14 +105,6 @@ function formatCheckpoint(raceState) {
   return `Checkpoint ${checkpointNumber}/${raceState.checkpointCount}`;
 }
 
-function formatSurface(surfaceType) {
-  if (!surfaceType) {
-    return "Surface --";
-  }
-
-  return `Grip: ${surfaceType.charAt(0).toUpperCase()}${surfaceType.slice(1)}`;
-}
-
 function formatPosition(raceState) {
   if (!raceState) {
     return "--";
@@ -140,6 +127,16 @@ function formatGap(raceState) {
   }
 
   return "";
+}
+
+function formatFps(performanceState) {
+  const fps = performanceState?.fps;
+
+  if (!Number.isFinite(fps)) {
+    return "FPS --";
+  }
+
+  return `FPS ${Math.round(fps)}`;
 }
 
 function formatRaceTime(value) {

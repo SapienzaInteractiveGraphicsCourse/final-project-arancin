@@ -133,6 +133,24 @@ export function createSetupMenu({ onStart }) {
     render();
   });
 
+  progress.addEventListener("click", (event) => {
+    const stepButton = event.target.closest("[data-step-index]");
+
+    if (!stepButton) {
+      return;
+    }
+
+    const nextStepIndex = Number(stepButton.dataset.stepIndex);
+
+    if (!Number.isInteger(nextStepIndex) || nextStepIndex === currentStepIndex) {
+      return;
+    }
+
+    currentStepIndex = nextStepIndex;
+    menuAudio.playUiSelect();
+    render();
+  });
+
   backButton.addEventListener("click", () => {
     menuAudio.playUiSelect();
     currentStepIndex = Math.max(0, currentStepIndex - 1);
@@ -187,10 +205,10 @@ function renderProgress(container, setup, currentStepIndex) {
     const value = labels[labelKeyForStep(step.key)];
 
     return `
-      <div class="setup-progress-item" data-state="${state}">
+      <button class="setup-progress-item" type="button" data-state="${state}" data-step-index="${index}" aria-label="Edit ${step.summaryLabel}">
         <span>${step.summaryLabel}</span>
         <strong>${value}</strong>
-      </div>
+      </button>
     `;
   }).join("");
 }
@@ -202,7 +220,6 @@ function renderStage(container, step, selectedId) {
     <div class="setup-step-copy">
       <span>${step.eyebrow}</span>
       <h2>${step.title}</h2>
-      <p>${step.options[selectedIndex]?.description ?? ""}</p>
     </div>
     <div class="setup-carousel">
       <button class="setup-carousel-arrow" type="button" data-carousel-action="-1" aria-label="Previous option">‹</button>

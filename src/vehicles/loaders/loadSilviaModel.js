@@ -24,7 +24,7 @@ const SILVIA_TEXTURES_BY_NAME = Object.fromEntries(
 
 let silviaTemplatePromise = null;
 
-export async function loadSilviaModelTemplate() {
+async function loadSilviaModelTemplate() {
   if (!silviaTemplatePromise) {
     const manager = new LoadingManager();
     manager.setURLModifier(resolveSilviaTextureUrl);

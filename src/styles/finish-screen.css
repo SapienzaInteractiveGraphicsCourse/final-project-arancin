@@ -1,0 +1,181 @@
+.finish-screen {
+  --finish-accent: #38bdf8;
+  --finish-second: #facc15;
+  --finish-dark: #08121f;
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 12, 20, 0.68);
+}
+
+.finish-screen[data-track-theme="vegas"] {
+  --finish-accent: #a855f7;
+  --finish-second: #facc15;
+  --finish-dark: #13071f;
+}
+
+.finish-screen[data-track-theme="beach"] {
+  --finish-accent: #06b6d4;
+  --finish-second: #facc15;
+  --finish-dark: #06242c;
+}
+
+.finish-screen[data-track-theme="monaco"] {
+  --finish-accent: #ef4444;
+  --finish-second: #f8fafc;
+  --finish-dark: #090b10;
+}
+
+.finish-screen[hidden] {
+  display: none;
+}
+
+.finish-panel {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--finish-accent) 52%, rgba(255, 255, 255, 0.16));
+  border-radius: 8px;
+  color: #f8fafc;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--finish-dark) 78%, #020617), rgba(15, 23, 42, 0.96)),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--finish-accent) 26%, transparent), transparent 42%);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.44),
+    0 0 34px color-mix(in srgb, var(--finish-accent) 20%, transparent);
+}
+
+.finish-eyebrow {
+  margin: 0 0 7px;
+  color: color-mix(in srgb, var(--finish-second) 82%, white);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.finish-panel h2 {
+  margin: 0 0 18px;
+  font-size: 30px;
+  line-height: 1.1;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.finish-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.finish-summary div {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--finish-accent) 30%, rgba(148, 163, 184, 0.24));
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--finish-accent) 12%, rgba(30, 41, 59, 0.68)), rgba(15, 23, 42, 0.62));
+}
+
+.finish-summary span,
+.finish-summary strong {
+  display: block;
+}
+
+.finish-summary span {
+  margin-bottom: 4px;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.finish-summary strong {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--finish-second) 20%, #ffffff);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-table {
+  width: 100%;
+  margin-bottom: 16px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.finish-table caption {
+  padding: 2px 0 7px;
+  color: color-mix(in srgb, var(--finish-accent) 58%, #e5e7eb);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.finish-table th,
+.finish-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--finish-accent) 22%, rgba(148, 163, 184, 0.2));
+  text-align: right;
+}
+
+.finish-table th:first-child,
+.finish-table td:first-child {
+  text-align: left;
+}
+
+.finish-table th {
+  color: #cbd5e1;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.finish-table td {
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.finish-best-lap td {
+  color: color-mix(in srgb, var(--finish-second) 88%, white);
+  font-weight: 800;
+}
+
+.finish-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.finish-button {
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--finish-second) 46%, transparent);
+  border-radius: 7px;
+  color: #08111f;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--finish-accent) 76%, white), var(--finish-second));
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.24);
+}
+
+.finish-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.finish-button-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  color: #e5e7eb;
+  background: color-mix(in srgb, var(--finish-dark) 72%, rgba(30, 41, 59, 0.88));
+}
+
+.finish-button-secondary:hover {
+  background: color-mix(in srgb, var(--finish-accent) 22%, rgba(51, 65, 85, 0.94));
+}

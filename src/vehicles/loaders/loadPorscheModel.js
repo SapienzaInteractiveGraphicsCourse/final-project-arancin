@@ -7,7 +7,7 @@ const PORSCHE_MODEL_URL = new URL(
 
 let porscheTemplatePromise = null;
 
-export async function loadPorscheModelTemplate() {
+async function loadPorscheModelTemplate() {
   if (!porscheTemplatePromise) {
     const loader = new GLTFLoader();
     porscheTemplatePromise = loader.loadAsync(PORSCHE_MODEL_URL);

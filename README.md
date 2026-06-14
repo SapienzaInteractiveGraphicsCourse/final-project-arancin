@@ -399,7 +399,6 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] HUD lap.
 - [x] HUD time.
 - [x] HUD checkpoint.
-- [x] HUD surface.
 - [x] HUD countdown/wrong way overlay.
 - [x] HUD posizione/gap.
 - [x] Minimap canvas.
@@ -478,10 +477,16 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 
 - [ ] Documentare `docs/performance-polish.md`.
 - [ ] Alleggerire mappe pesanti senza cambiare gameplay.
+- [x] Aggiungere FPS in HUD per confrontare gli scatti tra piste.
+- [x] Aggiungere toggle diagnostici `F1`-`F4` per minimap, ombre, props e renderer info.
 - [x] Eliminare flash del placeholder su Porsche/Silvia.
 - [ ] Indagare caricamento e tempo minimo overlay dei veicoli importati.
 - [x] Migliorare leggibilita HUD, tempi e testi runtime.
 - [x] Unificare HUD sinistra/destra in un pannello runtime piu pulito.
 - [x] Alzare menu setup riducendo margine verticale senza ridurre il logo.
 - [x] Correggere avanzamento checkpoint iniziale sul traguardo.
-- [ ] Aggiungere ghost del best lap in time trial.
+- [x] Aggiungere ghost del best lap in time trial.
+  - [x] Storage/versioning dati ghost.
+  - [x] Recorder campioni giro valido.
+  - [x] Rendering veicolo ghost semi-trasparente.
+  - [x] Interpolazione ghost sul tempo giro corrente.
