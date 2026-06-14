@@ -636,7 +636,6 @@ lap
 totalTime
 checkpoint
 track
-surface
 position
 gap
 fps

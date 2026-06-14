@@ -399,7 +399,6 @@ Obiettivo: costruire una web app racing 3D in browser con Three.js, 3 veicoli, 3
 - [x] HUD lap.
 - [x] HUD time.
 - [x] HUD checkpoint.
-- [x] HUD surface.
 - [x] HUD countdown/wrong way overlay.
 - [x] HUD posizione/gap.
 - [x] Minimap canvas.

@@ -7,7 +7,6 @@ const HUD_GROUPS = [
       { id: "position", className: "race-hud-place" },
       { id: "lap", className: "race-hud-chip race-hud-lap" },
       { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
-      { id: "surface", className: "race-hud-chip race-hud-surface" },
       { id: "gap", className: "race-hud-chip race-hud-gap" },
       { id: "fps", className: "race-hud-chip race-hud-fps" },
       { id: "track", className: "race-hud-track-name" }
@@ -49,7 +48,6 @@ export function createRaceHud() {
       setField(values, "totalTime", formatRaceTime(raceState?.totalTime));
       setField(values, "checkpoint", formatCheckpoint(raceState));
       setField(values, "track", trackName ?? "--");
-      setField(values, "surface", formatSurface(vehicleState?.surfaceType));
       setField(values, "position", formatPosition(raceState));
       setField(values, "gap", formatGap(raceState));
       setField(values, "fps", formatFps(performanceState));
@@ -105,14 +103,6 @@ function formatCheckpoint(raceState) {
     : raceState.currentCheckpoint;
 
   return `Checkpoint ${checkpointNumber}/${raceState.checkpointCount}`;
-}
-
-function formatSurface(surfaceType) {
-  if (!surfaceType) {
-    return "Surface --";
-  }
-
-  return `Grip: ${surfaceType.charAt(0).toUpperCase()}${surfaceType.slice(1)}`;
 }
 
 function formatPosition(raceState) {
