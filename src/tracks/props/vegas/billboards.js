@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { clampPropPosition, getRightVector, markShadow, pseudoRandom } from "../shared.js";
+import { clampPropPosition, getHeading, getRightVector, markShadow, pseudoRandom } from "../shared.js";
 import { addDecorativePointLight } from "./lights.js";
 
 export function colorToHexStr(color) {
@@ -632,19 +632,16 @@ export function buildVegasBillboards(group, curve, roadHalfWidth) {
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
 
-    // Scale down distance since billboards are smaller and we want them visible
-    const distance = roadHalfWidth + 9 + pseudoRandom(index * 19.3 + 2.8) * 4;
+    const distance = roadHalfWidth + 13.5;
     const position = point.clone().addScaledVector(normal, side * distance);
     const sign = new THREE.Group();
 
     sign.name = `VegasBillboard:${index}`;
     sign.position.copy(position);
 
-    // Clamp closer to road with custom clearance so it fits beautifully
-    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 8, 9);
+    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 12, 13.5);
 
-    // Stand straight/upright! Point at the track horizontally (y = sign.position.y)
-    sign.lookAt(point.x, sign.position.y, point.z);
+    sign.rotation.y = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
 
     typeBuilders[index % typeBuilders.length](sign, color, contrastColor, index);
 
@@ -656,4 +653,3 @@ export function buildVegasBillboards(group, curve, roadHalfWidth) {
     group.add(sign);
   });
 }
-

@@ -626,32 +626,34 @@ function createNeonPalm({ position, rotationY, scale = 1, color = 0x48ff78 }) {
 function addNeonPalms(group, curve, definition) {
   const roadHalfWidth = definition.roadWidth * 0.5;
   const colors = [0x48ff78, 0x32f6ff];
-  const progressPoints = [0.08, 0.13, 0.18, 0.24, 0.32, 0.39, 0.47, 0.57, 0.66, 0.73, 0.81, 0.88, 0.94];
+  const progressPoints = [0.12, 0.2, 0.32, 0.44, 0.58, 0.7, 0.82, 0.94];
 
   progressPoints.forEach((progress, index) => {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
+    const heading = getHeading(tangent);
 
     let side = index % 2 === 0 ? 1 : -1;
     if (isNearGrandstand(progress, side, 0.05)) {
       side = -side;
     }
 
-    const basePosition = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 2.9));
+    const basePosition = point.clone().addScaledVector(normal, side * (roadHalfWidth + 6.4));
 
-    for (let palmIndex = 0; palmIndex < 5; palmIndex += 1) {
-      const offset = tangent.clone().multiplyScalar((palmIndex - 2) * 1.55);
-      const position = basePosition.clone().add(offset).addScaledVector(normal, side * (palmIndex % 2) * 0.82);
-      clampPropPosition(curve, position, roadHalfWidth, 200, 6, 7);
+    [-1, 1].forEach((slot, palmIndex) => {
+      const position = basePosition
+        .clone()
+        .addScaledVector(tangent, slot * 2.2);
+      clampPropPosition(curve, position, roadHalfWidth, 200, 6.2, 7.2);
       const palm = createNeonPalm({
         position,
-        rotationY: getHeading(tangent) + pseudoRandom(index + palmIndex) * 0.8,
-        scale: 1.15 + pseudoRandom(index * 3 + palmIndex) * 0.45,
+        rotationY: heading + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+        scale: 1.18 + (palmIndex * 0.12),
         color: colors[(index + palmIndex) % colors.length]
       });
       group.add(palm);
-    }
+    });
   });
 }
 
@@ -711,23 +713,25 @@ function createHologramDie({ position, rotationY, scale, color }) {
 
 function addCasinoDice(group, curve, definition) {
   const roadHalfWidth = definition.roadWidth * 0.5;
-  const dice = [0.16, 0.34, 0.6, 0.82];
+  const dice = [
+    { progress: 0.34, side: 1 },
+    { progress: 0.6, side: -1 }
+  ];
 
-  dice.forEach((progress, index) => {
+  dice.forEach(({ progress, side }, index) => {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
     const position = point
       .clone()
-      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 8.5 + index * 0.7));
-    position.y = 4.8 + index * 0.65;
-    clampPropPosition(curve, position, roadHalfWidth);
+      .addScaledVector(normal, side * (roadHalfWidth + 12));
+    position.y = 5.2;
+    clampPropPosition(curve, position, roadHalfWidth, 200, 10, 12);
 
     group.add(createHologramDie({
       position,
-      rotationY: getHeading(tangent) + index * 0.4,
-      scale: 0.75 + pseudoRandom(index + 44) * 0.25,
+      rotationY: getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
+      scale: 0.82,
       color: [0xff2bd6, 0x32f6ff, 0xffd23a, 0x48ff78][index]
     }));
   });
@@ -1343,7 +1347,7 @@ function createVegasSign(curve, definition) {
 function addVegasLightPosts(group, curve, definition) {
   const roadHalfWidth = definition.roadWidth * 0.5;
   const totalLength = curve.getLength();
-  const lampCount = Math.min(24, Math.max(1, Math.floor(totalLength / 25)));
+  const lampCount = Math.min(20, Math.max(1, Math.floor(totalLength / 30)));
   const lampColor = 0xffe8a0;
   const poleGeometry = new THREE.CylinderGeometry(0.25, 0.25, 9, 5);
   const headGeometry = new THREE.BoxGeometry(2, 0.5, 1.5);
@@ -1368,8 +1372,8 @@ function addVegasLightPosts(group, curve, definition) {
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
     const side = index % 2 === 0 ? 1 : -1;
-    const base = point.clone().addScaledVector(normal, side * (roadHalfWidth + 2));
-    clampPropPosition(curve, base, roadHalfWidth);
+    const base = point.clone().addScaledVector(normal, side * (roadHalfWidth + 5.8));
+    clampPropPosition(curve, base, roadHalfWidth, 200, 5.2, 6.2);
 
     const lamp = new THREE.Group();
     lamp.name = `VegasStreetLamp:${index}`;
@@ -1638,10 +1642,9 @@ function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
 
-  // progress=0.055 → midway between start (0) and first grandstand (0.1), right side of track.
-  // offset roadHalfWidth+18 = 23.25u clears absoluteMinClearance from the approach track segment.
-  // rotation +PI*0.5: front face points toward the road center so it's readable while driving.
-  const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
+  // Vegas start/finish is at progress 0.87. Keep the sign outside the right edge
+  // so it is a strong start-line landmark without touching checkpoint logic.
+  const transform = getRoadsideTransform(curve, 0.87, 1, roadHalfWidth + 20, roadHalfWidth, 12);
   signGroup.position.copy(transform.position);
   signGroup.rotation.y = transform.rotationY + Math.PI * 0.5;
 
