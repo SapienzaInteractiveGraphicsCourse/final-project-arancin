@@ -166,6 +166,7 @@ export function startScenePreview(container, setup, options = {}) {
   let disposed = false;
   let renderedFinishSignature = "";
   let totalElapsedTime = 0;
+  let headlightsManuallyToggled = false;
   let lastAudioCountdownStep = null;
   let lastAudioCheckpoint = 0;
   let lastAudioLapCount = 0;
@@ -306,6 +307,11 @@ export function startScenePreview(container, setup, options = {}) {
       cameraController.nextMode();
     }
 
+    if (actions.lights) {
+      headlightsManuallyToggled = true;
+      vehicle.toggleHeadlights();
+    }
+
     debugOptions.applyActions(actions);
 
     if (paused) {
@@ -340,10 +346,6 @@ export function startScenePreview(container, setup, options = {}) {
       resetRace();
     }
 
-    if (actions.lights) {
-      vehicle.toggleHeadlights();
-    }
-
     totalElapsedTime += deltaTime;
 
     const currentVehicleState = controller.getState();
@@ -371,7 +373,7 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     // Auto-enable headlights for night circuits (Vegas)
-    if (track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
+    if (!headlightsManuallyToggled && track.trackInfo.lightingMode === "vegas" && !vehicle.headlightsEnabled) {
       vehicle.setHeadlights(true);
     }
 

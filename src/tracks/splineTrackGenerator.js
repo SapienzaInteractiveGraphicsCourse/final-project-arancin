@@ -729,20 +729,85 @@ function addBoostPads(group, curve, definition, material) {
     padGroup.position.set(point.x, ROAD_Y + 0.045, point.z);
     padGroup.rotation.y = heading;
 
-    const base = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.045, 1.1), material);
-    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.9, 3), material);
-    arrow.rotation.x = Math.PI / 2;
-    arrow.rotation.z = Math.PI / 2;
-    arrow.position.y = 0.045;
-    padGroup.add(base, arrow);
+    createBoostPadVisual(padGroup, material, definition);
     group.add(padGroup);
 
     return {
       position: new THREE.Vector3(point.x, 0.38, point.z),
-      radius: 1.35,
+      radius: 1.55,
       heading
     };
   });
+}
+
+function createBoostPadVisual(padGroup, material, definition) {
+  const boostColor = definition.palette.boost ?? 0xffd23a;
+  const accentColor = definition.id === "beach" ? 0x7dd3fc : (definition.id === "monaco" ? 0xffffff : 0xfff7ad);
+  const glowMaterial = material.clone();
+  glowMaterial.emissive?.setHex(boostColor);
+  glowMaterial.emissiveIntensity = Math.max(glowMaterial.emissiveIntensity ?? 0, 1.9);
+
+  const glassMaterial = new THREE.MeshStandardMaterial({
+    color: boostColor,
+    emissive: boostColor,
+    emissiveIntensity: definition.id === "vegas" ? 3.4 : 2.4,
+    roughness: 0.24,
+    metalness: 0.08,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: accentColor,
+    emissive: accentColor,
+    emissiveIntensity: definition.id === "vegas" ? 4.2 : 2.8,
+    roughness: 0.18,
+    metalness: 0.04
+  });
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.38, 1.38, 0.045, 56), glowMaterial);
+  base.name = "BoostPadDisc";
+  base.receiveShadow = true;
+  padGroup.add(base);
+
+  const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 56), glassMaterial);
+  glowDisc.name = "BoostPadGlow";
+  glowDisc.rotation.x = -Math.PI / 2;
+  glowDisc.position.y = 0.035;
+  padGroup.add(glowDisc);
+
+  const outerRing = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.055, 8, 72), accentMaterial);
+  outerRing.name = "BoostPadOuterRing";
+  outerRing.rotation.x = Math.PI / 2;
+  outerRing.position.y = 0.075;
+  outerRing.userData.spin = { x: 0, y: 0.9, z: 0 };
+  padGroup.add(outerRing);
+
+  const innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.035, 8, 56), glassMaterial);
+  innerRing.name = "BoostPadInnerRing";
+  innerRing.rotation.x = Math.PI / 2;
+  innerRing.position.y = 0.085;
+  innerRing.userData.spin = { x: 0, y: -1.35, z: 0 };
+  padGroup.add(innerRing);
+
+  [-0.32, 0.18].forEach((zOffset, chevronIndex) => {
+    addBoostChevron(padGroup, accentMaterial, zOffset, chevronIndex);
+  });
+}
+
+function addBoostChevron(group, material, zOffset, chevronIndex) {
+  const barGeometry = new THREE.BoxGeometry(0.18, 0.055, 0.82);
+  const leftBar = new THREE.Mesh(barGeometry, material);
+  const rightBar = new THREE.Mesh(barGeometry, material);
+
+  leftBar.name = `BoostChevronLeft:${chevronIndex}`;
+  rightBar.name = `BoostChevronRight:${chevronIndex}`;
+  leftBar.position.set(-0.24, 0.13, zOffset);
+  rightBar.position.set(0.24, 0.13, zOffset);
+  leftBar.rotation.y = 0.58;
+  rightBar.rotation.y = -0.58;
+  group.add(leftBar, rightBar);
 }
 
 function createSpawn(centerline, definition) {
