@@ -69,6 +69,7 @@ export class BaseVehicle {
     this.disposed = true;
     const disposedGeometries = new Set();
     const disposedMaterials = new Set();
+    const disposedTextures = new Set();
 
     this.group.traverse((child) => {
       if (child.geometry && !disposedGeometries.has(child.geometry)) {
@@ -82,6 +83,12 @@ export class BaseVehicle {
 
       materials.forEach((material) => {
         if (material && !disposedMaterials.has(material)) {
+          Object.values(material).forEach((value) => {
+            if (value?.isTexture && !disposedTextures.has(value)) {
+              value.dispose();
+              disposedTextures.add(value);
+            }
+          });
           material.dispose();
           disposedMaterials.add(material);
         }

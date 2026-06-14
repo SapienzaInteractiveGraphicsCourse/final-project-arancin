@@ -38,6 +38,18 @@ Interventi completati:
   - `F2`: shadow map/luci con ombre on/off;
   - `F3`: props decorativi della pista on/off;
   - `F4`: pannello debug con FPS, draw calls, triangoli, geometrie e texture.
+- ridotti i draw call delle piste piu pesanti:
+  - Tropical Beach: vegetazione ripetuta convertita in batch `InstancedMesh` low-poly;
+  - Monaco Formula 1: yacht del porto convertiti da gruppi dettagliati singoli a batch istanziati;
+- spostato il frame loop preview in `src/scene/preview/frameLoop.js`, lasciando `startScenePreview.js` piu concentrato sull'orchestrazione;
+- migliorato il `dispose()` di piste, props e veicoli per deduplicare geometrie/materiali e liberare anche le texture collegate ai materiali.
+
+Audit mesh/draw call dopo l'ottimizzazione:
+
+| Pista | Mesh object | InstancedMesh | Istanze | Draw call stimate | Triangoli effettivi |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Tropical Beach | ~1.612 | 12 | ~1.305 | ~1.612 | ~74k |
+| Monaco Formula 1 | ~1.127 | 362 | ~31.788 | ~1.127 | ~985k |
 
 Verifica:
 
