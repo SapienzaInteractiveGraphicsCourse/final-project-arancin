@@ -14,9 +14,6 @@ Playable build: https://sapienzainteractivegraphicscourse.github.io/final-projec
 - Creare branch per feature, non per persona.
 - Tenere `main` stabile per consegna/GitHub Pages.
 - Prima di merge in `develop`, eseguire `bun run build`.
-- Non copiare meccanicamente il progetto non ufficiale: usarlo come riferimento tecnico.
-- Non esporre Formula 1 come veicolo selezionabile.
-- Documentare tutti gli asset esterni in `docs/asset-register.md`.
 
 ## Stato Branch
 
