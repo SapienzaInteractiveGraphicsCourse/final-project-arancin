@@ -1,0 +1,15 @@
+import * as THREE from "three";
+
+export function createRenderer(container) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+
+  container.appendChild(renderer.domElement);
+
+  return renderer;
+}

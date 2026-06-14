@@ -1,0 +1,23 @@
+.race-minimap-panel {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-family: "Arial Black", Impact, system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.race-minimap {
+  width: 180px;
+  height: 180px;
+  border: 2px solid rgba(226, 232, 240, 0.72);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 3px rgba(15, 23, 42, 0.42),
+    0 14px 34px rgba(0, 0, 0, 0.34),
+    0 0 28px rgba(56, 189, 248, 0.2);
+}
