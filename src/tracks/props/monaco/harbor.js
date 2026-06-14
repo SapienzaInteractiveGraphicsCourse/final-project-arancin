@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "../../trackMaterials.js";
-import { getHeading, getRightVector, optimizeStaticDecorativeProps, pseudoRandom, UP } from "../shared.js";
+import { getHeading, getRightVector, optimizeStaticDecorativeProps, pseudoRandom } from "../shared.js";
 import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh, createMonacoVerticalRibbonMesh } from "./common.js";
 import { MONACO_GROUND_Y, MONACO_ROAD_Y } from "./constants.js";
 
@@ -278,33 +278,6 @@ function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset
   return mesh;
 }
 
-function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, material) {
-  const geometry = new THREE.BoxGeometry(0.08, 0.012, 3.8);
-  const matrices = [];
-  const matrix = new THREE.Matrix4();
-
-  sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 4.8);
-    samples.forEach((sample, sampleIndex) => {
-      if ((sampleIndex + sectionIndex) % 2 === 1) {
-        return;
-      }
-      const position = sample.center
-        .clone()
-        .addScaledVector(sample.right, section.side * (offset + pseudoRandom(sectionIndex * 19 + sampleIndex) * 26))
-        .addScaledVector(sample.tangent, (pseudoRandom(sampleIndex + 3) - 0.5) * 1.2);
-      position.y = y;
-      const right = sample.right.clone().multiplyScalar(section.side);
-      const tangent = sample.tangent.clone().setY(0).normalize();
-      matrix.makeBasis(right, UP, tangent.clone().negate());
-      matrix.setPosition(position);
-      matrices.push(matrix.clone());
-    });
-  });
-
-  return { geometry, matrices, material };
-}
-
 export function addMonacoOuterPort(group, curve, definition) {
   const portGroup = new THREE.Group();
   portGroup.name = "MonacoOuterPortAndYachts";
@@ -317,15 +290,6 @@ export function addMonacoOuterPort(group, curve, definition) {
     transparent: true,
     opacity: 0.94,
     side: THREE.DoubleSide
-  });
-  const waterHighlightMat = createFlatStandardMaterial({
-    color: 0xa7ecff,
-    emissive: 0x6dd7ff,
-    emissiveIntensity: 0.28,
-    roughness: 0.12,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.46
   });
   const quayMat = createFlatStandardMaterial({ color: 0xd7d0c4, roughness: 0.78, metalness: 0.04 });
   const quayEdgeMat = createFlatStandardMaterial({ color: 0x8c8378, roughness: 0.86 });
@@ -365,22 +329,6 @@ export function addMonacoOuterPort(group, curve, definition) {
     MONACO_GROUND_Y + 0.018,
     waterMat
   ));
-
-  const waterHighlights = createMonacoWaterHighlightMesh(
-    curve,
-    definition,
-    waterSections,
-    quayFar + 5,
-    MONACO_GROUND_Y + 0.032,
-    waterHighlightMat
-  );
-  addMonacoInstancedPart(
-    portGroup,
-    waterHighlights.geometry,
-    waterHighlights.material,
-    waterHighlights.matrices,
-    "MonacoSeaReflectionStreaks"
-  );
 
   quaySections.forEach((section, sectionIndex) => {
     portGroup.add(createMonacoRibbonMesh(curve, definition, {

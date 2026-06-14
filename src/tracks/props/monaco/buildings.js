@@ -47,6 +47,8 @@ function createMonacoPalaceBuilding(seed, options = {}) {
   const roofMat = createFlatStandardMaterial({ color: roofColors[seed % roofColors.length], roughness: 0.82 });
   const glassMat = createFlatStandardMaterial({ color: 0x22364a, roughness: 0.25, metalness: 0.25 });
   const balconyMat = createFlatStandardMaterial({ color: 0xd8d2c6, roughness: 0.7, metalness: 0.12 });
+  const awningMat = createFlatStandardMaterial({ color: [0xb91c1c, 0x0f4c81, 0xf4f1e7][seed % 3], roughness: 0.72 });
+  const terraceMat = createFlatStandardMaterial({ color: 0xe8dfce, roughness: 0.78 });
 
   const width = options.width ?? (7 + pseudoRandom(seed + 1) * 4.5);
   const depth = options.depth ?? (5.5 + pseudoRandom(seed + 2) * 2.4);
@@ -66,9 +68,11 @@ function createMonacoPalaceBuilding(seed, options = {}) {
   const windowGeo = new THREE.BoxGeometry(0.62, 1.05, 0.08);
   const balconyGeo = new THREE.BoxGeometry(1.12, 0.08, 0.28);
   const balconyRailGeo = new THREE.BoxGeometry(1.12, 0.34, 0.055);
+  const awningGeo = new THREE.BoxGeometry(1.02, 0.09, 0.34);
   const windowMatrices = [];
   const balconyMatrices = [];
   const railMatrices = [];
+  const awningMatrices = [];
   const balconyPoints = [];
   const matrix = new THREE.Matrix4();
 
@@ -83,12 +87,30 @@ function createMonacoPalaceBuilding(seed, options = {}) {
       matrix.makeTranslation(x, y - 0.48, depth * 0.5 + 0.33);
       railMatrices.push(matrix.clone());
       balconyPoints.push({ x, y });
+      if ((seed + row + column) % 5 === 0) {
+        matrix.makeTranslation(x, y + 0.62, depth * 0.5 + 0.23);
+        awningMatrices.push(matrix.clone());
+      }
     }
   }
 
   addMonacoInstancedPart(building, windowGeo, glassMat, windowMatrices, "MonacoPalaceWindows");
   addMonacoInstancedPart(building, balconyGeo, balconyMat, balconyMatrices, "MonacoPalaceBalconies");
   addMonacoInstancedPart(building, balconyRailGeo, balconyMat, railMatrices, "MonacoPalaceBalconyRails");
+  addMonacoInstancedPart(building, awningGeo, awningMat, awningMatrices, "MonacoPalaceAwnings");
+
+  if (seed % 3 !== 1) {
+    const terrace = new THREE.Mesh(new THREE.BoxGeometry(width * 0.52, 0.18, depth * 0.36), terraceMat);
+    terrace.position.set((pseudoRandom(seed + 21) - 0.5) * width * 0.22, height + 0.72, depth * 0.16);
+    terrace.receiveShadow = true;
+    building.add(terrace);
+
+    const terraceRail = new THREE.Mesh(new THREE.BoxGeometry(width * 0.52, 0.4, 0.06), balconyMat);
+    terraceRail.position.set(terrace.position.x, height + 0.98, depth * 0.35);
+    terraceRail.receiveShadow = true;
+    building.add(terraceRail);
+  }
+
   createMonacoBalconyCrowd(building, balconyPoints, seed, depth);
   return building;
 }
@@ -128,7 +150,7 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
   buildingsGroup.name = "MonacoInnerTerracedBackdrop";
   const treesGroup = new THREE.Group();
   treesGroup.name = "MonacoInnerMediterraneanTrees";
-  const sections = [
+  const grandstandSections = [
     { start: 0.04, end: 0.22, side: 1 },
     { start: 0.30, end: 0.46, side: 1 },
     { start: 0.56, end: 0.70, side: 1 },
@@ -139,48 +161,27 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
   const grandstandBackOffset = roadHalfWidth + barrierClearance + 2.4 + 7 * 0.72 + 1.2;
   const treeOffset = grandstandBackOffset + 5.2;
   const buildingOffset = grandstandBackOffset + 24;
-  const trackClearanceForBuildings = roadHalfWidth + barrierClearance + 7.5;
-  const centerlineSamples = Array.from({ length: 160 }, (_, index) => curve.getPointAt(index / 160));
-  const blockedGrandstandBuildingSeeds = new Set([0, 1, 2, 3, 6, 7, 8, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]);
+  const trackClearanceForBuildings = roadHalfWidth + barrierClearance + 14.7;
+  const centerlineSamples = Array.from({ length: 240 }, (_, index) => curve.getPointAt(index / 240));
+  const occupiedBuildingSpots = [];
+  const occupiedTreeSpots = [];
   let seed = 0;
   let treeSeed = 0;
 
-  sections.forEach((section) => {
-    const buildingSamples = collectMonacoSamples(curve, section.start, section.end, 8.6);
-    buildingSamples.forEach((sample, sampleIndex) => {
-      if (blockedGrandstandBuildingSeeds.has(seed)) {
-        seed += 1;
-        return;
-      }
+  const getTrackDistance = (position) => centerlineSamples.reduce((closest, point) => {
+    const distance = Math.hypot(position.x - point.x, position.z - point.z);
+    return Math.min(closest, distance);
+  }, Infinity);
 
-      const height = 13 + pseudoRandom(seed + 3) * 12 + (sampleIndex % 3) * 2.1;
-      const building = createMonacoPalaceBuilding(seed, {
-        width: 7.4 + pseudoRandom(seed + 1) * 3.1,
-        depth: 5.2 + pseudoRandom(seed + 2) * 1.9,
-        height
-      });
-      const position = sample.center
-        .clone()
-        .addScaledVector(sample.right, section.side * buildingOffset);
-      const minTrackDistance = centerlineSamples.reduce((closest, point) => {
-        const distance = Math.hypot(position.x - point.x, position.z - point.z);
-        return Math.min(closest, distance);
-      }, Infinity);
-      if (minTrackDistance < trackClearanceForBuildings) {
-        seed += 1;
-        return;
-      }
-      building.position.copy(position);
-      building.position.y = MONACO_GROUND_Y + (sampleIndex % 2) * 0.22;
-      building.rotation.y = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
-      building.scale.set(0.92 + pseudoRandom(seed + 12) * 0.12, 1, 0.9 + pseudoRandom(seed + 13) * 0.12);
-      buildingsGroup.add(building);
-      seed += 1;
-    });
+  const isSeparatedFrom = (position, radius, occupiedSpots, clearance) => occupiedSpots.every((spot) => (
+    Math.hypot(position.x - spot.position.x, position.z - spot.position.z) > radius + spot.radius + clearance
+  ));
 
+  grandstandSections.forEach((section, sectionIndex) => {
     const treeSamples = collectMonacoSamples(curve, section.start, section.end, 5.2);
     treeSamples.forEach((sample, sampleIndex) => {
-      if (sampleIndex % 4 === 1) {
+      const isCentralBuildableZone = sectionIndex === 1 || sectionIndex === 2;
+      if (sampleIndex % 4 === 1 || sampleIndex % 6 === 4 || (isCentralBuildableZone && sampleIndex % 3 !== 0)) {
         return;
       }
       const tree = createMonacoMediterraneanTree(treeSeed);
@@ -193,6 +194,7 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
       tree.rotation.y = pseudoRandom(treeSeed + 6) * Math.PI * 2;
       tree.scale.setScalar(0.85 + pseudoRandom(treeSeed + 7) * 0.45);
       treesGroup.add(tree);
+      occupiedTreeSpots.push({ position: position.clone(), radius: 2.8 * tree.scale.x });
       treeSeed += 1;
     });
   });
@@ -205,7 +207,10 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
   ];
   gapSections.forEach((section) => {
     const samples = collectMonacoSamples(curve, section.start, section.end, 3.8);
-    samples.forEach((sample) => {
+    samples.forEach((sample, sampleIndex) => {
+      if (sampleIndex % 2 === 1) {
+        return;
+      }
       const tree = createMonacoMediterraneanTree(treeSeed);
       const position = sample.center
         .clone()
@@ -216,7 +221,61 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
       tree.rotation.y = pseudoRandom(treeSeed + 6) * Math.PI * 2;
       tree.scale.setScalar(0.92 + pseudoRandom(treeSeed + 7) * 0.55);
       treesGroup.add(tree);
+      occupiedTreeSpots.push({ position: position.clone(), radius: 3 * tree.scale.x });
       treeSeed += 1;
+    });
+  });
+
+  const buildingSections = [
+    { start: 0.04, end: 0.22, side: 1 },
+    { start: 0.235, end: 0.29, side: 1 },
+    { start: 0.30, end: 0.46, side: 1 },
+    { start: 0.475, end: 0.55, side: 1 },
+    { start: 0.56, end: 0.70, side: 1 },
+    { start: 0.715, end: 0.77, side: 1 },
+    { start: 0.78, end: 0.94, side: 1 }
+  ];
+
+  buildingSections.forEach((section) => {
+    const buildingSamples = collectMonacoSamples(curve, section.start, section.end, 7);
+    buildingSamples.forEach((sample, sampleIndex) => {
+      const width = 6.8 + pseudoRandom(seed + 1) * 4.4;
+      const depth = 4.7 + pseudoRandom(seed + 2) * 2.3;
+      const height = 12.5 + pseudoRandom(seed + 3) * 13.5 + (sampleIndex % 3) * 1.7;
+      const radius = width * 0.32;
+      const offsetCandidates = [
+        buildingOffset,
+        buildingOffset - 2.8,
+        buildingOffset + 2.8,
+        buildingOffset - 5.1,
+        buildingOffset + 4.8,
+        buildingOffset - 6.4,
+        buildingOffset + 6.2
+      ];
+      const position = offsetCandidates
+        .map((offset) => sample.center
+          .clone()
+          .addScaledVector(sample.right, section.side * offset)
+          .addScaledVector(sample.tangent, (pseudoRandom(seed + 9) - 0.5) * 0.75))
+        .find((candidate) => (
+          getTrackDistance(candidate) >= trackClearanceForBuildings &&
+          isSeparatedFrom(candidate, radius, occupiedBuildingSpots, 0.35) &&
+          isSeparatedFrom(candidate, depth * 0.5 + 0.8, occupiedTreeSpots, 0.35)
+        ));
+
+      if (!position) {
+        seed += 1;
+        return;
+      }
+
+      const building = createMonacoPalaceBuilding(seed, { width, depth, height });
+      building.position.copy(position);
+      building.position.y = MONACO_GROUND_Y + (sampleIndex % 2) * 0.18;
+      building.rotation.y = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      building.scale.set(0.92 + pseudoRandom(seed + 12) * 0.12, 1, 0.9 + pseudoRandom(seed + 13) * 0.12);
+      buildingsGroup.add(building);
+      occupiedBuildingSpots.push({ position: position.clone(), radius });
+      seed += 1;
     });
   });
 
