@@ -148,48 +148,6 @@ function createNeonEdgeMaterial(color) {
   });
 }
 
-function addSegmentedNeonRoadEdges(group, edgeSamples, definition) {
-  const totalDistance = edgeSamples[edgeSamples.length - 1].distance;
-  const segmentCount = Math.floor(totalDistance / NEON_EDGE_INTERVAL);
-  const geometry = new THREE.BoxGeometry(NEON_EDGE_WIDTH, 0.035, NEON_EDGE_LENGTH);
-  const materials = [
-    createNeonEdgeMaterial(0xffffff),
-    createNeonEdgeMaterial(0xff2020)
-  ];
-  const matrices = [[], []];
-  const matrix = new THREE.Matrix4();
-
-  [-1, 1].forEach((side) => {
-    for (let index = 0; index < segmentCount; index += 1) {
-      const sample = sampleEdgeByDistance(edgeSamples, index * NEON_EDGE_INTERVAL + NEON_EDGE_LENGTH * 0.5);
-      const position = sample.center
-        .clone()
-        .addScaledVector(sample.normal, side * sample.roadHalfWidth);
-      const right = sample.normal.clone().multiplyScalar(side);
-      const tangent = sample.tangent.clone().setY(0).normalize();
-      const materialIndex = Math.floor(index / 3) % 2;
-
-      position.y = NEON_EDGE_Y;
-      matrix.makeBasis(right, UP, tangent.negate());
-      matrix.setPosition(position);
-      matrices[materialIndex].push(matrix.clone());
-    }
-  });
-
-  matrices.forEach((materialMatrices, materialIndex) => {
-    if (materialMatrices.length === 0) {
-      return;
-    }
-
-    const mesh = new THREE.InstancedMesh(geometry, materials[materialIndex], materialMatrices.length);
-    mesh.name = `${definition.name}:SegmentedNeonRoadEdge:${materialIndex}`;
-    mesh.receiveShadow = true;
-    materialMatrices.forEach((segmentMatrix, index) => mesh.setMatrixAt(index, segmentMatrix));
-    mesh.instanceMatrix.needsUpdate = true;
-    group.add(mesh);
-  });
-}
-
 function createGround(definition, material) {
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(definition.groundSize, definition.groundSize, 1, 1),
