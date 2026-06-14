@@ -129,51 +129,44 @@ canvas {
   letter-spacing: 0;
 }
 
-.race-hud-top-left {
+.race-hud-main {
   left: 16px;
-  top: 56px;
+  top: 14px;
   display: grid;
-  grid-template-columns: 190px 128px 110px;
+  grid-template-columns: minmax(174px, 1.35fr) minmax(112px, 0.95fr) minmax(78px, 0.7fr);
   grid-auto-rows: minmax(24px, auto);
   align-items: center;
-  gap: 7px 10px;
-  max-width: min(480px, calc(100vw - 236px));
+  gap: 7px 8px;
+  width: min(486px, calc(100vw - 232px));
   padding: 10px 12px;
   border-left: 5px solid var(--hud-primary);
   border-radius: 7px;
   background:
-    linear-gradient(90deg, rgba(var(--hud-panel-rgb), 0.62), rgba(15, 23, 42, 0.32)),
-    rgba(var(--hud-panel-rgb), 0.38);
+    linear-gradient(90deg, rgba(var(--hud-panel-rgb), 0.68), rgba(15, 23, 42, 0.4)),
+    rgba(var(--hud-panel-rgb), 0.42);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 16px 36px rgba(0, 0, 0, 0.22);
-}
-
-.race-hud-top-left .race-hud-lap,
-.race-hud-top-left .race-hud-checkpoint,
-.race-hud-top-left .race-hud-fps,
-.race-hud-top-left .race-hud-surface,
-.race-hud-top-left .race-hud-gap {
-  justify-self: start;
-}
-
-.race-hud-track {
-  left: 50%;
-  top: 18px;
-  transform: translateX(-50%) skewX(-8deg);
+    0 16px 36px rgba(0, 0, 0, 0.24);
 }
 
 .race-hud-track-name {
-  min-height: 36px;
-  padding: 0 10px;
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-width: 0;
+  min-height: 20px;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 4px;
   color: #e0f2fe;
-  font-size: 28px;
+  font-size: 14px;
   font-style: italic;
   text-align: center;
   text-transform: uppercase;
+  text-overflow: ellipsis;
   text-shadow:
     0 2px 0 rgba(8, 12, 20, 0.86),
     0 0 10px rgba(var(--hud-glow-rgb), 0.34);
+  white-space: nowrap;
 }
 
 .race-hud[data-track-theme="vegas"] .race-hud-track-name {
@@ -202,15 +195,17 @@ canvas {
     0 3px 0 rgba(0, 0, 0, 0.78),
     0 0 13px rgba(255, 255, 255, 0.22);
   box-shadow: none;
+  min-width: 0;
   white-space: nowrap;
 }
 
 .race-hud-speed {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   justify-content: flex-start;
-  min-width: 180px;
   min-height: 58px;
   color: #fef3c7;
-  font-size: 43px;
+  font-size: 46px;
   text-align: left;
   text-shadow:
     0 3px 0 rgba(8, 12, 20, 0.78),
@@ -218,7 +213,8 @@ canvas {
 }
 
 .race-hud-time {
-  min-width: 118px;
+  grid-column: 2;
+  grid-row: 1;
   min-height: 42px;
   color: #e0f2fe;
   font-size: 28px;
@@ -232,16 +228,20 @@ canvas {
 }
 
 .race-hud-place {
+  grid-column: 3;
+  grid-row: 1;
   justify-self: end;
-  min-width: 0;
-  min-height: 28px;
-  padding: 3px 8px;
-  border: 1px solid rgba(250, 204, 21, 0.42);
-  border-radius: 4px;
-  color: #fde68a;
-  background: rgba(15, 23, 42, 0.58);
+  min-width: 78px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid rgba(250, 204, 21, 0.56);
+  border-radius: 5px;
+  color: #fef3c7;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0.2)),
+    rgba(15, 23, 42, 0.68);
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 900;
   letter-spacing: 0;
@@ -276,10 +276,15 @@ canvas {
   font-weight: 800;
   text-shadow: none;
   box-shadow: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .race-hud-lap {
+  grid-column: 2;
+  grid-row: 2;
   gap: 6px;
+  justify-self: stretch;
 }
 
 .race-hud-lap::before {
@@ -299,7 +304,10 @@ canvas {
 }
 
 .race-hud-checkpoint {
+  grid-column: 2 / span 2;
+  grid-row: 3;
   gap: 6px;
+  justify-self: stretch;
 }
 
 .race-hud-checkpoint::before {
@@ -316,22 +324,26 @@ canvas {
 }
 
 .race-hud-fps {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
   min-width: 62px;
   color: #cbd5e1;
-}
-
-.race-hud-top-left .race-hud-surface {
-  grid-column: 1 / span 2;
+  opacity: 0.68;
 }
 
 .race-hud-surface {
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: start;
   color: #bbf7d0;
 }
 
 .race-hud-gap {
+  grid-column: 1 / -1;
+  grid-row: 4;
   color: #c4b5fd;
-  grid-column: 3;
-  justify-self: end;
+  justify-self: start;
 }
 
 .race-hud-value[hidden] {
@@ -1558,67 +1570,53 @@ canvas {
     width: 100%;
   }
 
-  .race-hud-top-left {
+  .race-hud-main {
     left: 12px;
-    top: 58px;
-    grid-template-columns: minmax(0, 1fr) minmax(74px, auto);
-    align-items: start;
-    max-width: min(300px, calc(100vw - 166px));
-    gap: 6px;
+    top: 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, auto);
+    width: min(220px, calc(100vw - 170px));
+    gap: 5px 6px;
     padding: 8px;
   }
 
-  .race-hud-top-left .race-hud-speed {
-    grid-column: 1;
-    justify-self: start;
-  }
-
-  .race-hud-top-left .race-hud-time,
-  .race-hud-top-left .race-hud-place {
-    grid-column: 2;
-    justify-self: end;
-  }
-
-  .race-hud-top-left .race-hud-lap,
-  .race-hud-top-left .race-hud-checkpoint,
-  .race-hud-top-left .race-hud-fps,
-  .race-hud-top-left .race-hud-surface,
-  .race-hud-top-left .race-hud-gap {
-    grid-column: 1 / -1;
-  }
-
-  .race-hud-track {
-    top: 10px;
-    max-width: min(240px, calc(100vw - 180px));
-  }
-
   .race-hud-track-name {
-    min-height: 28px;
+    grid-column: 1 / -1;
+    min-height: 20px;
     max-width: 100%;
     overflow: hidden;
-    font-size: 17px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .race-hud-speed {
+    grid-column: 1 / -1;
+    grid-row: auto;
     min-width: 128px;
     min-height: 40px;
     font-size: 25px;
   }
 
   .race-hud-time {
-    min-width: 112px;
+    grid-column: 1;
+    min-width: 0;
     min-height: 36px;
     font-size: 21px;
+    justify-self: start;
   }
 
   .race-hud-place {
+    grid-column: 2;
+    min-width: 68px;
     min-height: 24px;
     font-size: 11px;
+    justify-self: end;
   }
 
   .race-hud-chip {
+    grid-column: 1 / -1;
+    justify-self: start;
+    width: 100%;
     min-height: 24px;
     max-width: 100%;
     font-size: 10px;

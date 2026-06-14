@@ -1,20 +1,15 @@
 const HUD_GROUPS = [
   {
-    className: "race-hud-top-left",
+    className: "race-hud-main",
     fields: [
       { id: "speed", className: "race-hud-speed" },
       { id: "totalTime", className: "race-hud-time" },
       { id: "position", className: "race-hud-place" },
       { id: "lap", className: "race-hud-chip race-hud-lap" },
       { id: "checkpoint", className: "race-hud-chip race-hud-checkpoint" },
-      { id: "fps", className: "race-hud-chip race-hud-fps" },
       { id: "surface", className: "race-hud-chip race-hud-surface" },
-      { id: "gap", className: "race-hud-chip race-hud-gap" }
-    ]
-  },
-  {
-    className: "race-hud-track",
-    fields: [
+      { id: "gap", className: "race-hud-chip race-hud-gap" },
+      { id: "fps", className: "race-hud-chip race-hud-fps" },
       { id: "track", className: "race-hud-track-name" }
     ]
   }
