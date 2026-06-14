@@ -53,13 +53,18 @@ const DEFAULT_AUDIO_SETTINGS = {
   gameVolume: 1,
   ambienceVolume: 1
 };
+const TARGET_FRAME_RATE = 60;
+const TARGET_FRAME_INTERVAL_MS = 1000 / TARGET_FRAME_RATE;
+const FIXED_DELTA_TIME = 1 / TARGET_FRAME_RATE;
+const FRAME_INTERVAL_EPSILON_MS = 0.25;
+const FIXED_DELTA_MAX_INTERVAL_MS = TARGET_FRAME_INTERVAL_MS * 1.5;
+const MAX_DELTA_TIME = 0.25;
 
 export function startScenePreview(container, setup, options = {}) {
   const renderer = createRenderer(container);
   const scene = createScene();
   const camera = createMainCamera();
   const cameraController = new CameraController(camera);
-  const timer = new THREE.Timer();
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
@@ -154,6 +159,8 @@ export function startScenePreview(container, setup, options = {}) {
     }
   });
   let animationFrameId = 0;
+  let nextFrameTimestamp = 0;
+  let lastRenderedTimestamp = 0;
   let paused = false;
   let raceArmed = false;
   let disposed = false;
@@ -176,7 +183,6 @@ export function startScenePreview(container, setup, options = {}) {
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
-  timer.connect(document);
   scene.add(track.group, vehicle.group);
   if (ghostVehicle) {
     ghostVehicle.group.visible = false;
@@ -335,6 +341,7 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.update(deltaTime, state);
       hideGhostVehicle();
       cameraController.update(deltaTime, state, track.trackInfo);
+      updateTrackSkyPosition();
       raceHud.update({
         raceState: raceManager.getState(),
         vehicleState: state,
@@ -403,11 +410,6 @@ export function startScenePreview(container, setup, options = {}) {
       lights.sun.target.position.copy(state.position);
     }
 
-    // 2. Keep the gradient sky sphere centered on the camera
-    if (scene.userData.trackSky) {
-      scene.userData.trackSky.position.copy(camera.position);
-    }
-
     // 3. Update the start gantry F1 countdown lights
     if (gantryStartLights.length > 0) {
       const countdown = updatedRaceState.countdown;
@@ -468,6 +470,7 @@ export function startScenePreview(container, setup, options = {}) {
     }
 
     cameraController.update(deltaTime, state, track.trackInfo);
+    updateTrackSkyPosition();
     const wrongWayState = wrongWayDetector.update(deltaTime, state, track.trackInfo);
     updateWrongWayOverlay(wrongWayOverlay, wrongWayState);
     
@@ -507,6 +510,12 @@ export function startScenePreview(container, setup, options = {}) {
       playerState,
       aiState: getVisibleAiMinimapState(aiState, aiVehicle)
     });
+  }
+
+  function updateTrackSkyPosition() {
+    if (scene.userData.trackSky) {
+      scene.userData.trackSky.position.copy(camera.position);
+    }
   }
 
   function updateGhostVehicle(deltaTime, raceState) {
@@ -614,25 +623,44 @@ export function startScenePreview(container, setup, options = {}) {
   }
 
   function animate(timestamp) {
-    frameRateMonitor.update(timestamp);
-    timer.update(timestamp);
-    const deltaTime = Math.min(timer.getDelta(), 0.05);
+    animationFrameId = requestAnimationFrame(animate);
+
+    if (nextFrameTimestamp === 0) {
+      nextFrameTimestamp = timestamp;
+    }
+
+    if (timestamp + FRAME_INTERVAL_EPSILON_MS < nextFrameTimestamp) {
+      return;
+    }
+
+    const skippedIntervals = Math.max(
+      0,
+      Math.floor((timestamp - nextFrameTimestamp) / TARGET_FRAME_INTERVAL_MS)
+    );
+    nextFrameTimestamp += (skippedIntervals + 1) * TARGET_FRAME_INTERVAL_MS;
+    frameRateMonitor.update(timestamp, TARGET_FRAME_RATE);
+
+    const renderedIntervalMs = lastRenderedTimestamp > 0
+      ? timestamp - lastRenderedTimestamp
+      : TARGET_FRAME_INTERVAL_MS;
+    lastRenderedTimestamp = timestamp;
+    const deltaTime = renderedIntervalMs <= FIXED_DELTA_MAX_INTERVAL_MS
+      ? FIXED_DELTA_TIME
+      : Math.min(renderedIntervalMs / 1000, MAX_DELTA_TIME);
 
     update(deltaTime);
     renderer.render(scene, camera);
-    animationFrameId = requestAnimationFrame(animate);
   }
 
   window.addEventListener("resize", resize);
   resize();
-  animate();
+  animationFrameId = requestAnimationFrame(animate);
 
   return {
     dispose() {
       disposed = true;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", resize);
-      timer.dispose();
       inputManager.dispose();
       audioManager.dispose();
       controller.dispose();
@@ -909,7 +937,7 @@ function createFrameRateMonitor() {
   let smoothedFps = null;
 
   return {
-    update(timestamp = 0) {
+    update(timestamp = 0, maxFps = Infinity) {
       if (!Number.isFinite(timestamp)) {
         return;
       }
@@ -926,7 +954,7 @@ function createFrameRateMonitor() {
         return;
       }
 
-      const instantFps = 1000 / deltaMs;
+      const instantFps = Math.min(maxFps, 1000 / deltaMs);
       smoothedFps = smoothedFps === null
         ? instantFps
         : smoothedFps * 0.86 + instantFps * 0.14;
@@ -934,7 +962,7 @@ function createFrameRateMonitor() {
       sampleFrames += 1;
 
       if (sampleElapsed >= sampleWindowMs) {
-        displayedFps = sampleFrames * 1000 / sampleElapsed;
+        displayedFps = Math.min(maxFps, sampleFrames * 1000 / sampleElapsed);
         sampleElapsed = 0;
         sampleFrames = 0;
       }

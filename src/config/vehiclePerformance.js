@@ -15,10 +15,10 @@ export const VEHICLE_PERFORMANCE = {
     maxForwardSpeed: 65,
     maxReverseSpeed: 8,
     acceleration: 52,
-    brakeAcceleration: 36,
+    brakeAcceleration: 20,
     rollingFriction: 1.6,
     idleFriction: 2.6,
-    handbrakeFriction: 8.4,
+    handbrakeFriction: 3.4,
     turnRate: 2.75,
     steeringReturn: 8.8,
     steeringResponsiveness: 10

@@ -21,6 +21,7 @@ export class CameraController {
     this.camera = camera;
     this.mode = initialMode;
     this.cameraTarget = new THREE.Vector3();
+    this.cameraPosition = new THREE.Vector3().copy(camera.position);
     this.cameraLookAt = new THREE.Vector3();
     this.lookTarget = new THREE.Vector3();
     this.transitionStartPosition = new THREE.Vector3();
@@ -139,6 +140,7 @@ export class CameraController {
   applyCameraTarget(positionLerp, lookLerp) {
     if (this.needsSnap) {
       this.camera.position.copy(this.cameraTarget);
+      this.cameraPosition.copy(this.cameraTarget);
       this.cameraLookAt.copy(this.lookTarget);
       this.needsSnap = false;
       return;
@@ -147,7 +149,8 @@ export class CameraController {
     if (this.isTransitioning) {
       this.transitionTime = Math.min(this.transitionDuration, this.transitionTime + this.deltaTime);
       const alpha = smoothStep(this.transitionTime / this.transitionDuration);
-      this.camera.position.lerpVectors(this.transitionStartPosition, this.cameraTarget, alpha);
+      this.cameraPosition.lerpVectors(this.transitionStartPosition, this.cameraTarget, alpha);
+      this.camera.position.copy(this.cameraPosition);
       this.cameraLookAt.lerpVectors(this.transitionStartLookAt, this.lookTarget, alpha);
 
       if (this.transitionTime >= this.transitionDuration) {
@@ -157,11 +160,14 @@ export class CameraController {
       return;
     }
 
-    this.camera.position.lerp(this.cameraTarget, positionLerp);
-    this.cameraLookAt.lerp(this.lookTarget, lookLerp);
+    this.cameraPosition.lerp(this.cameraTarget, getDeltaAdjustedAlpha(positionLerp, this.deltaTime));
+    this.camera.position.copy(this.cameraPosition);
+    this.cameraLookAt.lerp(this.lookTarget, getDeltaAdjustedAlpha(lookLerp, this.deltaTime));
   }
 
   lookAtTarget() {
+    this.camera.position.copy(this.cameraPosition);
+
     if (this.mode !== CAMERA_MODES.TOP && this.shakeTimer > 0) {
       this.camera.position.add(this.shakeOffset);
     }
@@ -187,7 +193,7 @@ export class CameraController {
   }
 
   startTransition() {
-    this.transitionStartPosition.copy(this.camera.position);
+    this.transitionStartPosition.copy(this.cameraPosition);
     this.transitionStartLookAt.copy(this.cameraLookAt);
     this.transitionTime = 0;
     this.isTransitioning = !this.needsSnap;
@@ -243,4 +249,14 @@ function smoothStep(alpha) {
   const clamped = Math.min(1, Math.max(0, alpha));
 
   return clamped * clamped * (3 - 2 * clamped);
+}
+
+function getDeltaAdjustedAlpha(frameAlpha, deltaTime) {
+  const clampedAlpha = Math.min(1, Math.max(0, frameAlpha));
+
+  if (clampedAlpha <= 0 || deltaTime <= 0) {
+    return clampedAlpha;
+  }
+
+  return 1 - ((1 - clampedAlpha) ** (deltaTime * 60));
 }
