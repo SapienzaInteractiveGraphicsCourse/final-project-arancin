@@ -7,9 +7,9 @@ export const VEHICLE_PERFORMANCE = {
     rollingFriction: 1.5,
     idleFriction: 2.5,
     handbrakeFriction: 8,
-    turnRate: 2.15,
-    steeringReturn: 15,
-    steeringResponsiveness: 19.5
+    turnRate: 2.9,
+    steeringReturn: 14,
+    steeringResponsiveness: 21
   },
   silvia: {
     maxForwardSpeed: 65,
