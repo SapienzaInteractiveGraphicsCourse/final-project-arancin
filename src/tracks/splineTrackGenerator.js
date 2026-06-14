@@ -779,15 +779,37 @@ function createSpawn(centerline, definition) {
   };
 }
 
-function disposeObjectTree(group) {
-  group.traverse((child) => {
-    child.geometry?.dispose();
-
-    if (Array.isArray(child.material)) {
-      child.material.forEach((material) => material.dispose());
-    } else {
-      child.material?.dispose();
+function disposeMaterial(material, disposedTextures) {
+  Object.values(material).forEach((value) => {
+    if (value?.isTexture && !disposedTextures.has(value)) {
+      value.dispose();
+      disposedTextures.add(value);
     }
+  });
+  material.dispose();
+}
+
+function disposeObjectTree(group) {
+  const disposedGeometries = new Set();
+  const disposedMaterials = new Set();
+  const disposedTextures = new Set();
+
+  group.traverse((child) => {
+    if (child.geometry && !disposedGeometries.has(child.geometry)) {
+      child.geometry.dispose();
+      disposedGeometries.add(child.geometry);
+    }
+
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    materials.forEach((material) => {
+      if (material && !disposedMaterials.has(material)) {
+        disposeMaterial(material, disposedTextures);
+        disposedMaterials.add(material);
+      }
+    });
   });
 }
 

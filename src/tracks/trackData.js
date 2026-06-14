@@ -230,5 +230,11 @@ const TRACK_DEFINITIONS = {
 };
 
 export function getTrackDefinition(trackId) {
-  return TRACK_DEFINITIONS[trackId] ?? TRACK_DEFINITIONS[TRACK_IDS.VEGAS];
+  const definition = TRACK_DEFINITIONS[trackId];
+
+  if (!definition) {
+    console.warn(`Unknown track id "${trackId}", falling back to ${TRACK_IDS.VEGAS}.`);
+  }
+
+  return definition ?? TRACK_DEFINITIONS[TRACK_IDS.VEGAS];
 }

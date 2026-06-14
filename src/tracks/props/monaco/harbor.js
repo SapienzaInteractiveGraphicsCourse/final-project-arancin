@@ -5,6 +5,50 @@ import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh, c
 import { MONACO_GROUND_Y, MONACO_ROAD_Y } from "./constants.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
+const SIMPLE_YACHT_PALETTE = [
+  { hull: 0xffffff, stripe: 0x173b73, canvas: 0xf8fafc },
+  { hull: 0xf6f9fb, stripe: 0x111827, canvas: 0xe7edf2 },
+  { hull: 0xe9eff4, stripe: 0xb91c1c, canvas: 0xffffff },
+  { hull: 0xfdfaf3, stripe: 0x0f766e, canvas: 0xf3ead5 },
+  { hull: 0x121a24, stripe: 0xf4f7fb, canvas: 0xf8fafc },
+  { hull: 0xf7f3e8, stripe: 0x244f86, canvas: 0xdfe9ef },
+  { hull: 0xfafafa, stripe: 0x9a3412, canvas: 0xf4efe5 },
+  { hull: 0xdfe7ef, stripe: 0x1f2937, canvas: 0xf8fafc }
+];
+
+const simpleYachtGeometries = {
+  hull: new THREE.BoxGeometry(1, 1, 1),
+  cabin: createMonacoRoundedBoxGeometry(1, 1, 1, 0.08, 0.018),
+  deck: new THREE.BoxGeometry(1, 1, 1),
+  stripe: new THREE.BoxGeometry(1, 1, 1),
+  glass: new THREE.BoxGeometry(1, 1, 1),
+  mast: new THREE.CylinderGeometry(0.018, 0.018, 1, 6)
+};
+
+const simpleYachtMaterials = {
+  hulls: SIMPLE_YACHT_PALETTE.map(({ hull }) => createFlatStandardMaterial({
+    color: hull,
+    roughness: 0.28,
+    metalness: 0.08
+  })),
+  stripes: SIMPLE_YACHT_PALETTE.map(({ stripe }) => createFlatStandardMaterial({
+    color: stripe,
+    roughness: 0.36
+  })),
+  canvases: SIMPLE_YACHT_PALETTE.map(({ canvas }) => createFlatStandardMaterial({
+    color: canvas,
+    roughness: 0.72
+  })),
+  deck: createFlatStandardMaterial({ color: 0xc79b67, roughness: 0.64 }),
+  glass: createFlatStandardMaterial({
+    color: 0x0d2f4f,
+    roughness: 0.08,
+    metalness: 0.34,
+    transparent: true,
+    opacity: 0.68
+  }),
+  steel: createFlatStandardMaterial({ color: 0xc9d2d8, roughness: 0.24, metalness: 0.72 })
+};
 
 function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bevelSize = 0.035) {
   const halfWidth = width * 0.5;
@@ -31,218 +75,6 @@ function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bev
   });
   geometry.translate(0, 0, -depth * 0.5);
   return geometry;
-}
-
-function createMonacoHarborYacht(seed) {
-  const yacht = new THREE.Group();
-  yacht.name = `MonacoHarborYacht:${seed}`;
-  const variant = seed % 8;
-  const palette = [
-    { hull: 0xffffff, stripe: 0x173b73, canvas: 0xf8fafc },
-    { hull: 0xf6f9fb, stripe: 0x111827, canvas: 0xe7edf2 },
-    { hull: 0xe9eff4, stripe: 0xb91c1c, canvas: 0xffffff },
-    { hull: 0xfdfaf3, stripe: 0x0f766e, canvas: 0xf3ead5 },
-    { hull: 0x121a24, stripe: 0xf4f7fb, canvas: 0xf8fafc },
-    { hull: 0xf7f3e8, stripe: 0x244f86, canvas: 0xdfe9ef },
-    { hull: 0xfafafa, stripe: 0x9a3412, canvas: 0xf4efe5 },
-    { hull: 0xdfe7ef, stripe: 0x1f2937, canvas: 0xf8fafc }
-  ][variant];
-  const hullMat = createFlatStandardMaterial({
-    color: palette.hull,
-    roughness: 0.22,
-    metalness: 0.1
-  });
-  const undersideMat = createFlatStandardMaterial({ color: 0x0f2f44, roughness: 0.34, metalness: 0.08 });
-  const stripeMat = createFlatStandardMaterial({
-    color: palette.stripe,
-    roughness: 0.36
-  });
-  const glassMat = createFlatStandardMaterial({
-    color: 0x0d2f4f,
-    roughness: 0.08,
-    metalness: 0.38,
-    transparent: true,
-    opacity: 0.72
-  });
-  const deckMat = createFlatStandardMaterial({ color: 0xc79b67, roughness: 0.64 });
-  const deckLineMat = createFlatStandardMaterial({ color: 0xf2dfbd, roughness: 0.58 });
-  const steelMat = createFlatStandardMaterial({ color: 0xc9d2d8, roughness: 0.24, metalness: 0.72 });
-  const fenderMat = createFlatStandardMaterial({ color: 0xeff4f7, roughness: 0.48 });
-  const canvasMat = createFlatStandardMaterial({ color: palette.canvas, roughness: 0.74 });
-
-  const variantDimensions = [
-    { length: 8.4, width: 2.35, height: 0.7, bow: 0.5, stern: 0.5 },
-    { length: 13.8, width: 3.25, height: 0.92, bow: 0.56, stern: 0.62 },
-    { length: 11.2, width: 2.95, height: 0.84, bow: 0.5, stern: 0.58 },
-    { length: 9.7, width: 3.85, height: 0.62, bow: 0.44, stern: 0.52 },
-    { length: 14.8, width: 3.45, height: 0.88, bow: 0.52, stern: 0.66 },
-    { length: 10.4, width: 2.55, height: 0.72, bow: 0.6, stern: 0.48 },
-    { length: 12.6, width: 3.05, height: 0.82, bow: 0.54, stern: 0.56 },
-    { length: 7.8, width: 2.25, height: 0.64, bow: 0.64, stern: 0.42 }
-  ][variant];
-  const length = variantDimensions.length * (0.94 + pseudoRandom(seed + 1) * 0.12);
-  const width = variantDimensions.width * (0.94 + pseudoRandom(seed + 2) * 0.12);
-  const hullHeight = variantDimensions.height * (0.95 + pseudoRandom(seed + 3) * 0.12);
-  const bowTaper = variantDimensions.bow;
-  const sternBeam = variantDimensions.stern;
-  const hullShape = new THREE.Shape();
-  hullShape.moveTo(0, length * 0.5);
-  hullShape.quadraticCurveTo(width * bowTaper, length * 0.38, width * 0.54, length * 0.12);
-  hullShape.quadraticCurveTo(width * 0.56, -length * 0.28, width * sternBeam, -length * 0.47);
-  hullShape.quadraticCurveTo(width * 0.18, -length * 0.59, 0, -length * 0.56);
-  hullShape.quadraticCurveTo(-width * 0.18, -length * 0.59, -width * sternBeam, -length * 0.47);
-  hullShape.quadraticCurveTo(-width * 0.56, -length * 0.28, -width * 0.54, length * 0.12);
-  hullShape.quadraticCurveTo(-width * bowTaper, length * 0.38, 0, length * 0.5);
-  hullShape.closePath();
-
-  const hullGeometry = new THREE.ExtrudeGeometry(hullShape, {
-    depth: hullHeight,
-    bevelEnabled: true,
-    bevelThickness: 0.1,
-    bevelSize: 0.16,
-    bevelSegments: 4,
-    curveSegments: 10
-  });
-  hullGeometry.rotateX(Math.PI / 2);
-  hullGeometry.translate(0, hullHeight * 0.5, 0);
-  const hull = new THREE.Mesh(hullGeometry, hullMat);
-  hull.castShadow = true;
-  hull.receiveShadow = true;
-  yacht.add(hull);
-
-  const underside = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.46, 0.22, length * 0.72, 0.14, 0.025), undersideMat);
-  underside.position.y = 0.2;
-  yacht.add(underside);
-
-  [-1, 1].forEach((side) => {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.11, length * 0.68), stripeMat);
-    stripe.position.set(side * width * 0.5, hullHeight * 0.58, -length * 0.04);
-    yacht.add(stripe);
-  });
-
-  const deck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * (variant === 3 ? 0.82 : 0.74), 0.05, length * 0.5, 0.16, 0.02), deckMat);
-  deck.position.set(0, hullHeight + 0.035, variant === 5 ? -length * 0.02 : -length * 0.1);
-  yacht.add(deck);
-
-  for (let line = -1; line <= 1; line += 1) {
-    const deckLine = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.022, length * 0.46), deckLineMat);
-    deckLine.position.set(line * width * 0.18, hullHeight + 0.075, -length * 0.1);
-    yacht.add(deckLine);
-  }
-
-  const bowDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.48, 0.045, length * 0.2, 0.12, 0.018), deckMat);
-  bowDeck.position.set(0, hullHeight + 0.05, length * 0.28);
-  yacht.add(bowDeck);
-
-  const cabinLength = length * [0.28, 0.38, 0.32, 0.22, 0.42, 0.26, 0.34, 0.24][variant];
-  const cabinWidth = width * [0.55, 0.62, 0.58, 0.46, 0.64, 0.52, 0.6, 0.5][variant];
-  const cabinHeight = [0.66, 0.92, 0.8, 0.58, 0.86, 0.7, 0.82, 0.56][variant] + pseudoRandom(seed + 4) * 0.12;
-  const cabin = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth, cabinHeight, cabinLength, 0.18, 0.035), hullMat);
-  cabin.position.set(0, hullHeight + cabinHeight * 0.5 + 0.08, [0.06, -0.02, 0.03, -0.08, -0.04, 0.11, 0, 0.14][variant] * length);
-  cabin.castShadow = true;
-  yacht.add(cabin);
-
-  if (variant !== 3 && variant !== 7) {
-    const upperDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * (variant === 1 || variant === 4 ? 0.86 : 0.74), 0.16, cabinLength * 0.62, 0.14, 0.025), canvasMat);
-    upperDeck.position.set(0, hullHeight + cabinHeight + 0.22, cabin.position.z - cabinLength * 0.12);
-    yacht.add(upperDeck);
-  }
-
-  if (variant === 1 || variant === 4 || variant === 6) {
-    const secondDeck = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.72, 0.46, cabinLength * 0.46, 0.14, 0.025), hullMat);
-    secondDeck.position.set(0, hullHeight + cabinHeight + 0.32, cabin.position.z - cabinLength * 0.08);
-    secondDeck.castShadow = true;
-    yacht.add(secondDeck);
-
-    const flybridgeGlass = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.58, 0.18, cabinLength * 0.14, 0.04, 0.01), glassMat);
-    flybridgeGlass.position.set(0, secondDeck.position.y + 0.08, secondDeck.position.z + cabinLength * 0.24);
-    yacht.add(flybridgeGlass);
-  }
-
-  if (variant === 3) {
-    [-1, 1].forEach((side) => {
-      const ama = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.23, 0.18, length * 0.62, 0.12, 0.025), undersideMat);
-      ama.position.set(side * width * 0.38, hullHeight + 0.1, -length * 0.02);
-      yacht.add(ama);
-    });
-  }
-
-  const windshield = new THREE.Mesh(createMonacoRoundedBoxGeometry(cabinWidth * 0.88, 0.32, cabinLength * 0.18, 0.05, 0.012), glassMat);
-  windshield.position.set(0, hullHeight + cabinHeight * 0.72 + 0.1, cabin.position.z + cabinLength * 0.5);
-  yacht.add(windshield);
-
-  const sideWindowGeometry = createMonacoRoundedBoxGeometry(0.055, 0.3, cabinLength * 0.42, 0.035, 0.008);
-  [-1, 1].forEach((side) => {
-    const sideWindow = new THREE.Mesh(sideWindowGeometry, glassMat);
-    sideWindow.position.set(side * (cabinWidth * 0.5 + 0.045), hullHeight + cabinHeight * 0.62 + 0.08, cabin.position.z);
-    yacht.add(sideWindow);
-
-    if (variant === 1 || variant === 4 || variant === 6) {
-      const aftWindow = new THREE.Mesh(createMonacoRoundedBoxGeometry(0.052, 0.24, cabinLength * 0.2, 0.03, 0.007), glassMat);
-      aftWindow.position.set(side * (cabinWidth * 0.5 + 0.05), hullHeight + cabinHeight * 0.45, cabin.position.z - cabinLength * 0.33);
-      yacht.add(aftWindow);
-    }
-  });
-
-  const railGeometry = new THREE.CylinderGeometry(0.018, 0.018, length * 0.76, 8);
-  [-1, 1].forEach((side) => {
-    const rail = new THREE.Mesh(railGeometry, steelMat);
-    rail.rotation.x = Math.PI / 2;
-    rail.position.set(side * width * 0.43, hullHeight + 0.32, length * 0.02);
-    yacht.add(rail);
-
-    for (let index = 0; index < 5; index += 1) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.38, 7), steelMat);
-      post.position.set(side * width * 0.43, hullHeight + 0.22, -length * 0.34 + index * length * 0.17);
-      yacht.add(post);
-    }
-  });
-
-  const radarArch = new THREE.Mesh(new THREE.TorusGeometry(width * [0.18, 0.26, 0.22, 0.16, 0.3, 0.18, 0.24, 0.15][variant], 0.02, 6, 18, Math.PI), steelMat);
-  radarArch.position.set(0, hullHeight + cabinHeight + 0.44, cabin.position.z - cabinLength * 0.34);
-  radarArch.rotation.z = Math.PI;
-  if (variant !== 7) {
-    yacht.add(radarArch);
-  }
-
-  const radarDish = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), steelMat);
-  radarDish.scale.set(1.6, 0.35, 0.75);
-  radarDish.position.set(-width * 0.12, hullHeight + cabinHeight + 0.58, -length * 0.14);
-  yacht.add(radarDish);
-
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.018, 1.25, 7), steelMat);
-  antenna.position.set(width * 0.16, hullHeight + cabinHeight + 1.05, cabin.position.z - cabinLength * 0.24);
-  antenna.rotation.x = variant === 5 ? -0.46 : -0.2;
-  yacht.add(antenna);
-
-  if (variant === 0 || variant === 2 || variant === 5 || variant === 7) {
-    const aftCanopy = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.55, 0.07, length * 0.16, 0.1, 0.018), canvasMat);
-    aftCanopy.position.set(0, hullHeight + cabinHeight * 0.72, -length * 0.32);
-    yacht.add(aftCanopy);
-
-    [-1, 1].forEach((side) => {
-      const canopyPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.58, 6), steelMat);
-      canopyPost.position.set(side * width * 0.24, hullHeight + cabinHeight * 0.48, -length * 0.32);
-      yacht.add(canopyPost);
-    });
-  }
-
-  if (variant === 4) {
-    const tender = new THREE.Mesh(createMonacoRoundedBoxGeometry(width * 0.42, 0.18, length * 0.14, 0.09, 0.02), canvasMat);
-    tender.position.set(0, hullHeight + 0.16, -length * 0.44);
-    yacht.add(tender);
-  }
-
-  [-1, 1].forEach((side) => {
-    for (let index = 0; index < 3; index += 1) {
-      const fender = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), fenderMat);
-      fender.scale.set(0.7, 1.25, 0.7);
-      fender.position.set(side * (width * 0.5 + 0.05), hullHeight * 0.54, -length * 0.28 + index * length * 0.22);
-      yacht.add(fender);
-    }
-  });
-
-  return yacht;
 }
 
 function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset, farOffset, y, material) {
@@ -307,6 +139,105 @@ function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, 
   return { geometry, matrices, material };
 }
 
+function createSimpleYachtBatch() {
+  return {
+    hulls: SIMPLE_YACHT_PALETTE.map(() => []),
+    cabins: SIMPLE_YACHT_PALETTE.map(() => []),
+    decks: [],
+    stripes: SIMPLE_YACHT_PALETTE.map(() => []),
+    glass: [],
+    canvases: SIMPLE_YACHT_PALETTE.map(() => []),
+    masts: []
+  };
+}
+
+function composeSimpleYachtMatrix(basePosition, heading, localPosition, localScale) {
+  const baseRotation = new THREE.Quaternion().setFromAxisAngle(UP, heading);
+  const rotatedLocal = localPosition.clone().applyQuaternion(baseRotation);
+  const position = basePosition.clone().add(rotatedLocal);
+  return new THREE.Matrix4().compose(position, baseRotation, localScale);
+}
+
+function addSimpleYachtToBatch(batch, position, heading, scale, seed, large = false) {
+  const variant = seed % SIMPLE_YACHT_PALETTE.length;
+  const length = (large ? 15.5 : 9.8 + pseudoRandom(seed + 1) * 3.4) * scale;
+  const width = (large ? 3.8 : 2.4 + pseudoRandom(seed + 2) * 1.0) * scale;
+  const hullHeight = (large ? 0.95 : 0.66 + pseudoRandom(seed + 3) * 0.22) * scale;
+  const cabinLength = length * (large ? 0.36 : 0.28 + pseudoRandom(seed + 4) * 0.12);
+  const cabinWidth = width * (large ? 0.62 : 0.5 + pseudoRandom(seed + 5) * 0.14);
+  const cabinHeight = (large ? 0.78 : 0.52 + pseudoRandom(seed + 6) * 0.22) * scale;
+  const basePosition = position.clone();
+  basePosition.y += hullHeight * 0.5;
+
+  batch.hulls[variant].push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(width, hullHeight, length)
+  ));
+  batch.decks.push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, hullHeight * 0.55, -length * 0.08),
+    new THREE.Vector3(width * 0.72, 0.045 * scale, length * 0.52)
+  ));
+  batch.cabins[variant].push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, hullHeight * 0.8 + cabinHeight * 0.5, length * 0.04),
+    new THREE.Vector3(cabinWidth, cabinHeight, cabinLength)
+  ));
+  batch.glass.push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, hullHeight * 0.92 + cabinHeight * 0.72, length * 0.04 + cabinLength * 0.5),
+    new THREE.Vector3(cabinWidth * 0.86, cabinHeight * 0.28, 0.06 * scale)
+  ));
+
+  [-1, 1].forEach((side) => {
+    batch.stripes[variant].push(composeSimpleYachtMatrix(
+      basePosition,
+      heading,
+      new THREE.Vector3(side * width * 0.51, hullHeight * 0.08, -length * 0.04),
+      new THREE.Vector3(0.04 * scale, 0.08 * scale, length * 0.72)
+    ));
+  });
+
+  if (large || variant % 2 === 0) {
+    batch.canvases[variant].push(composeSimpleYachtMatrix(
+      basePosition,
+      heading,
+      new THREE.Vector3(0, hullHeight * 0.98 + cabinHeight + 0.16 * scale, -length * 0.08),
+      new THREE.Vector3(cabinWidth * 0.78, 0.09 * scale, cabinLength * 0.62)
+    ));
+  }
+
+  batch.masts.push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(width * 0.12, hullHeight + cabinHeight + 0.66 * scale, -length * 0.12),
+    new THREE.Vector3(scale, 1.1 * scale, scale)
+  ));
+}
+
+function flushSimpleYachtBatch(group, batch) {
+  batch.hulls.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, simpleYachtGeometries.hull, simpleYachtMaterials.hulls[index], matrices, `MonacoSimpleYachtHulls:${index}`);
+  });
+  addMonacoInstancedPart(group, simpleYachtGeometries.deck, simpleYachtMaterials.deck, batch.decks, "MonacoSimpleYachtDecks");
+  batch.cabins.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, simpleYachtGeometries.cabin, simpleYachtMaterials.hulls[index], matrices, `MonacoSimpleYachtCabins:${index}`);
+  });
+  batch.stripes.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, simpleYachtGeometries.stripe, simpleYachtMaterials.stripes[index], matrices, `MonacoSimpleYachtStripes:${index}`);
+  });
+  addMonacoInstancedPart(group, simpleYachtGeometries.glass, simpleYachtMaterials.glass, batch.glass, "MonacoSimpleYachtGlass");
+  batch.canvases.forEach((matrices, index) => {
+    addMonacoInstancedPart(group, simpleYachtGeometries.deck, simpleYachtMaterials.canvases[index], matrices, `MonacoSimpleYachtCanopies:${index}`);
+  });
+  addMonacoInstancedPart(group, simpleYachtGeometries.mast, simpleYachtMaterials.steel, batch.masts, "MonacoSimpleYachtMasts");
+}
+
 export function addMonacoOuterPort(group, curve, definition) {
   const portGroup = new THREE.Group();
   portGroup.name = "MonacoOuterPortAndYachts";
@@ -356,6 +287,7 @@ export function addMonacoOuterPort(group, curve, definition) {
   const pierSideGeometry = new THREE.BoxGeometry(0.08, 0.12, 1);
   const bollardGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10);
   const bollardMatrices = [];
+  const yachtBatch = createSimpleYachtBatch();
   const matrix = new THREE.Matrix4();
 
   portGroup.add(createMonacoContinuousWaterMesh(
@@ -462,37 +394,43 @@ export function addMonacoOuterPort(group, curve, definition) {
           }
 
           const yachtSeed = sectionIndex * 10000 + sampleIndex * 137 + row * 41 + (side > 0 ? 19 : 7) + 5;
-          const yacht = createMonacoHarborYacht(yachtSeed);
           const rowDistance = quayFar + 13 + row * 9.2 + pseudoRandom(sampleIndex * 17 + row) * 1.8;
           const position = sample.center
             .clone()
             .addScaledVector(sample.right, section.side * rowDistance)
             .addScaledVector(tangent, side * (3.65 + row * 0.35 + pseudoRandom(row + sampleIndex + 30) * 0.95));
           position.y = MONACO_GROUND_Y + 0.02;
-          yacht.position.copy(position);
-          yacht.rotation.y = Math.atan2(outward.x, outward.z) + (side > 0 ? 0.05 : -0.05) + (pseudoRandom(sampleIndex + row + 9) - 0.5) * 0.12;
-          yacht.scale.setScalar(0.9 + pseudoRandom(sampleIndex * 29 + row * 11 + sectionIndex) * 0.5);
-          portGroup.add(yacht);
+          addSimpleYachtToBatch(
+            yachtBatch,
+            position,
+            Math.atan2(outward.x, outward.z) + (side > 0 ? 0.05 : -0.05) + (pseudoRandom(sampleIndex + row + 9) - 0.5) * 0.12,
+            0.9 + pseudoRandom(sampleIndex * 29 + row * 11 + sectionIndex) * 0.5,
+            yachtSeed
+          );
         });
       }
 
       if (sampleIndex % 8 === 2) {
         const largeYachtSeed = sectionIndex * 20000 + sampleIndex * 211 + 77;
-        const largeYacht = createMonacoHarborYacht(largeYachtSeed);
         const position = sample.center
           .clone()
           .addScaledVector(sample.right, section.side * (quayFar + pierLength + 13 + pseudoRandom(sampleIndex) * 9))
           .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 4.8);
         position.y = MONACO_GROUND_Y + 0.025;
-        largeYacht.position.copy(position);
-        largeYacht.rotation.y = Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18;
-        largeYacht.scale.setScalar(1.55 + pseudoRandom(sampleIndex + 31) * 0.65);
-        portGroup.add(largeYacht);
+        addSimpleYachtToBatch(
+          yachtBatch,
+          position,
+          Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18,
+          1.55 + pseudoRandom(sampleIndex + 31) * 0.65,
+          largeYachtSeed,
+          true
+        );
       }
     });
   });
 
   addMonacoInstancedPart(portGroup, bollardGeometry, bollardMat, bollardMatrices, "MonacoHarborBollards");
+  flushSimpleYachtBatch(portGroup, yachtBatch);
   optimizeStaticDecorativeProps(portGroup, ["MonacoContinuousSea", "MonacoHarborQuay"]);
   group.add(portGroup);
 }
