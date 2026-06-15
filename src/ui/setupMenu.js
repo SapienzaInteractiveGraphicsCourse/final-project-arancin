@@ -61,6 +61,13 @@ export function createSetupMenu({ onStart }) {
   menu.className = "setup-menu";
   menu.setAttribute("aria-label", "Race setup");
 
+  const commandsButton = document.createElement("button");
+  commandsButton.className = "setup-commands-button";
+  commandsButton.type = "button";
+  commandsButton.textContent = "Commands";
+
+  const commandsDialog = createCommandsDialog();
+
   const logo = document.createElement("img");
   logo.className = "setup-logo";
   logo.src = logoUrl;
@@ -96,8 +103,10 @@ export function createSetupMenu({ onStart }) {
 
   nav.append(backButton, nextButton);
   panel.append(header, progress, stage, nav);
+  menu.appendChild(commandsButton);
   menu.appendChild(logo);
   menu.appendChild(panel);
+  menu.appendChild(commandsDialog);
 
   function render() {
     const step = SETUP_STEPS[currentStepIndex];
@@ -105,6 +114,7 @@ export function createSetupMenu({ onStart }) {
     const selectedOption = step.options.find((option) => option.id === selectedId) ?? step.options[0];
 
     menu.dataset.setupStep = step.key;
+    applyOptionTheme(menu, selectedOption.id);
     applyOptionTheme(panel, selectedOption.id);
     renderProgress(progress, setup, currentStepIndex);
     renderStage(stage, step, selectedId);
@@ -170,6 +180,25 @@ export function createSetupMenu({ onStart }) {
     onStart?.({ ...setup });
   });
 
+  commandsButton.addEventListener("click", () => {
+    menuAudio.playUiConfirm();
+    commandsDialog.hidden = false;
+  });
+
+  commandsDialog.addEventListener("click", (event) => {
+    const closeButton = event.target.closest("[data-commands-close]");
+    const clickedBackdrop = event.target === commandsDialog;
+
+    if (!closeButton && !clickedBackdrop) {
+      return;
+    }
+
+    menuAudio.playUiSelect();
+    closeCommandsDialog();
+  });
+
+  window.addEventListener("keydown", handleCommandsKeydown);
+
   function moveSelection(direction) {
     const step = SETUP_STEPS[currentStepIndex];
     const selectedIndex = step.options.findIndex((option) => option.id === setup[step.key]);
@@ -177,6 +206,19 @@ export function createSetupMenu({ onStart }) {
 
     setup[step.key] = step.options[nextIndex].id;
     render();
+  }
+
+  function closeCommandsDialog() {
+    commandsDialog.hidden = true;
+  }
+
+  function handleCommandsKeydown(event) {
+    if (event.key !== "Escape" || commandsDialog.hidden || menu.hidden) {
+      return;
+    }
+
+    event.preventDefault();
+    closeCommandsDialog();
   }
 
   render();
@@ -192,9 +234,56 @@ export function createSetupMenu({ onStart }) {
       menu.hidden = true;
     },
     dispose: () => {
+      window.removeEventListener("keydown", handleCommandsKeydown);
       menuAudio.dispose();
     }
   };
+}
+
+function createCommandsDialog() {
+  const dialog = document.createElement("div");
+  dialog.className = "setup-commands-modal";
+  dialog.hidden = true;
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-labelledby", "setup-commands-title");
+  dialog.dataset.commandsClose = "backdrop";
+
+  dialog.innerHTML = `
+    <div class="setup-commands-panel">
+      <header class="setup-commands-header">
+        <div>
+          <span>Driving guide</span>
+          <h2 id="setup-commands-title">Commands</h2>
+        </div>
+        <button class="setup-commands-close" type="button" data-commands-close="button" aria-label="Close commands">Close</button>
+      </header>
+      <div class="setup-commands-grid">
+        ${renderCommandRow("W / Arrow Up", "Accelerate")}
+        ${renderCommandRow("A / Arrow Left", "Turn left")}
+        ${renderCommandRow("S / Arrow Down", "Brake / Reverse")}
+        ${renderCommandRow("D / Arrow Right", "Turn right")}
+        ${renderCommandRow("Space", "Handbrake")}
+        ${renderCommandRow("C", "Change camera")}
+        ${renderCommandRow("L", "Toggle lights")}
+        ${renderCommandRow("R", "Restart race")}
+        ${renderCommandRow("Esc", "Pause menu")}
+        ${renderCommandRow("F1", "Toggle minimap")}
+        ${renderCommandRow("F2 / F3 / F4", "Debug views")}
+      </div>
+    </div>
+  `;
+
+  return dialog;
+}
+
+function renderCommandRow(keys, label) {
+  return `
+    <div class="setup-command-row">
+      <kbd>${keys}</kbd>
+      <span>${label}</span>
+    </div>
+  `;
 }
 
 function renderProgress(container, setup, currentStepIndex) {
