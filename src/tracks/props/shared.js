@@ -139,7 +139,7 @@ export function optimizeStaticDecorativeProps(group, receiveShadowNames = []) {
       child.receiveShadow = receiveShadowNames.some((name) => child.name.includes(name));
     }
 
-    if (!child.isLight && !child.userData.spin) {
+    if (!child.isLight && !child.userData.spin && !child.userData.flight && !child.userData.dynamic) {
       child.updateMatrix();
       child.matrixAutoUpdate = false;
     }

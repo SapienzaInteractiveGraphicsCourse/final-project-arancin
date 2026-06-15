@@ -246,9 +246,17 @@ function buildWelcomeToVegasSign(group, curve, roadHalfWidth) {
   const signGroup = new THREE.Group();
   signGroup.name = "VegasSkyline:WelcomeToLasVegasSign";
 
-  const transform = getRoadsideTransform(curve, 0.055, -1, roadHalfWidth + 18, roadHalfWidth, 8);
+  const startProgress = 0.87;
+  const signProgress = 0.88;
+  const innerRightSide = -1;
+  const transform = getRoadsidePlacement(curve, signProgress, innerRightSide, roadHalfWidth + 17, roadHalfWidth, {
+    minClearance: 14,
+    targetClearance: 16,
+    strategy: "direct"
+  });
   signGroup.position.copy(transform.position);
-  signGroup.rotation.y = transform.rotationY + Math.PI * 0.5;
+  signGroup.rotation.y = transform.frame.heading + Math.PI;
+  signGroup.userData.startProgress = startProgress;
 
   const welcomeTex = getCachedWelcomeToVegasTexture();
   const welcomeMat = new THREE.MeshStandardMaterial({
@@ -498,25 +506,32 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
 function buildBackgroundVegasTowers(group, curve, roadHalfWidth) {
   const colors = [0x0d0d20, 0x12112a, 0x0a1830, 0x1a0d2e];
   const windowColors = [0xffe066, 0xff8800, 0xffffff, 0x88aaff];
-  const progressPoints = [0.08, 0.18, 0.28, 0.42, 0.56, 0.72, 0.86, 0.96];
+  const towerSlots = [
+    { progress: 0.015, side: 1, distance: 92 },
+    { progress: 0.045, side: -1, distance: 104 },
+    { progress: 0.075, side: 1, distance: 116 },
+    { progress: 0.12, side: -1, distance: 96 },
+    { progress: 0.18, side: 1, distance: 118 },
+    { progress: 0.28, side: -1, distance: 110 },
+    { progress: 0.42, side: 1, distance: 100 },
+    { progress: 0.56, side: -1, distance: 122 },
+    { progress: 0.72, side: 1, distance: 108 },
+    { progress: 0.86, side: -1, distance: 96 },
+    { progress: 0.93, side: 1, distance: 124 },
+    { progress: 0.98, side: -1, distance: 112 }
+  ];
 
-  progressPoints.forEach((progress, index) => {
+  towerSlots.forEach(({ progress, side, distance }, index) => {
     const tower = new THREE.Group();
     tower.name = `VegasSkyline:BackgroundTower:${index}`;
-    const side = index % 2 === 0 ? 1 : -1;
-    const width = 20 + pseudoRandom(index + 1.2) * 20;
-    const height = 60 + pseudoRandom(index + 2.4) * 90;
-    const depth = 20 + pseudoRandom(index + 3.6) * 20;
-    const distance = 85 + pseudoRandom(index + 4.8) * 65;
+    const width = 18 + pseudoRandom(index + 1.2) * 16;
+    const height = 58 + pseudoRandom(index + 2.4) * 82;
+    const depth = 18 + pseudoRandom(index + 3.6) * 16;
     const transform = getRoadsideTransform(curve, progress, side, roadHalfWidth + distance, roadHalfWidth, 65);
     const material = createVegasMaterial({ color: colors[index % colors.length], roughness: 0.62, metalness: 0.08 });
     const body = markShadow(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material));
 
     tower.position.copy(transform.position);
-    tower.position.addScaledVector(
-      curve.getTangentAt(progress).setY(0).normalize(),
-      (pseudoRandom(index + 9) - 0.5) * 20
-    );
     tower.rotation.y = transform.rotationY;
     body.position.y = height * 0.5;
     tower.add(body);
