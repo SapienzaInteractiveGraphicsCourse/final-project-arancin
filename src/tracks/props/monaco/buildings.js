@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createFlatStandardMaterial } from "../../trackMaterials.js";
-import { getHeading, optimizeStaticDecorativeProps, pseudoRandom } from "../shared.js";
+import { optimizeStaticDecorativeProps, pseudoRandom } from "../shared.js";
 import { addMonacoInstancedPart, collectMonacoSamples } from "./common.js";
 import { MONACO_GROUND_Y } from "./constants.js";
 
@@ -160,7 +160,7 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
   const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
   const grandstandBackOffset = roadHalfWidth + barrierClearance + 2.4 + 7 * 0.72 + 1.2;
   const treeOffset = grandstandBackOffset + 5.2;
-  const buildingOffset = grandstandBackOffset + 24;
+  const buildingOffset = grandstandBackOffset + 13;
   const trackClearanceForBuildings = roadHalfWidth + barrierClearance + 14.7;
   const centerlineSamples = Array.from({ length: 240 }, (_, index) => curve.getPointAt(index / 240));
   const occupiedBuildingSpots = [];
@@ -271,7 +271,7 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
       const building = createMonacoPalaceBuilding(seed, { width, depth, height });
       building.position.copy(position);
       building.position.y = MONACO_GROUND_Y + (sampleIndex % 2) * 0.18;
-      building.rotation.y = getHeading(sample.tangent) + (section.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      building.rotation.y = Math.atan2(sample.center.x - position.x, sample.center.z - position.z);
       building.scale.set(0.92 + pseudoRandom(seed + 12) * 0.12, 1, 0.9 + pseudoRandom(seed + 13) * 0.12);
       buildingsGroup.add(building);
       occupiedBuildingSpots.push({ position: position.clone(), radius });

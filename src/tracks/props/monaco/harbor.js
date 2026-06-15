@@ -343,7 +343,7 @@ export function addMonacoOuterPort(group, curve, definition) {
   });
 
   marinaSections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 8.8);
+    const samples = collectMonacoSamples(curve, section.start, section.end, 14.5);
     samples.forEach((sample, sampleIndex) => {
       const tangent = sample.tangent.clone().setY(0).normalize();
       const outward = sample.right.clone().multiplyScalar(section.side).setY(0).normalize();
@@ -385,43 +385,36 @@ export function addMonacoOuterPort(group, curve, definition) {
         });
       });
 
-      const boatRows = 2;
-      for (let row = 0; row < boatRows; row += 1) {
-        [-1, 1].forEach((side) => {
-          const skipNoise = pseudoRandom(sectionIndex * 9000 + sampleIndex * 31 + row * 7 + side * 3);
-          if (skipNoise < 0.2) {
-            return;
-          }
-
-          const yachtSeed = sectionIndex * 10000 + sampleIndex * 137 + row * 41 + (side > 0 ? 19 : 7) + 5;
-          const rowDistance = quayFar + 13 + row * 9.2 + pseudoRandom(sampleIndex * 17 + row) * 1.8;
-          const position = sample.center
-            .clone()
-            .addScaledVector(sample.right, section.side * rowDistance)
-            .addScaledVector(tangent, side * (3.65 + row * 0.35 + pseudoRandom(row + sampleIndex + 30) * 0.95));
-          position.y = MONACO_GROUND_Y + 0.02;
-          addSimpleYachtToBatch(
-            yachtBatch,
-            position,
-            Math.atan2(outward.x, outward.z) + (side > 0 ? 0.05 : -0.05) + (pseudoRandom(sampleIndex + row + 9) - 0.5) * 0.12,
-            0.9 + pseudoRandom(sampleIndex * 29 + row * 11 + sectionIndex) * 0.5,
-            yachtSeed
-          );
-        });
+      if (sampleIndex % 2 === 0 || pseudoRandom(sectionIndex * 9000 + sampleIndex * 31) > 0.72) {
+        const side = sampleIndex % 4 === 0 ? -1 : 1;
+        const yachtSeed = sectionIndex * 10000 + sampleIndex * 137 + (side > 0 ? 19 : 7) + 5;
+        const rowDistance = quayFar + 12.8 + pseudoRandom(sampleIndex * 17) * 3.2;
+        const position = sample.center
+          .clone()
+          .addScaledVector(sample.right, section.side * rowDistance)
+          .addScaledVector(tangent, side * (5.3 + pseudoRandom(sampleIndex + 30) * 1.4));
+        position.y = MONACO_GROUND_Y + 0.02;
+        addSimpleYachtToBatch(
+          yachtBatch,
+          position,
+          Math.atan2(outward.x, outward.z) + (side > 0 ? 0.08 : -0.08) + (pseudoRandom(sampleIndex + 9) - 0.5) * 0.08,
+          0.78 + pseudoRandom(sampleIndex * 29 + sectionIndex) * 0.28,
+          yachtSeed
+        );
       }
 
-      if (sampleIndex % 8 === 2) {
+      if (sampleIndex % 14 === 4) {
         const largeYachtSeed = sectionIndex * 20000 + sampleIndex * 211 + 77;
         const position = sample.center
           .clone()
-          .addScaledVector(sample.right, section.side * (quayFar + pierLength + 13 + pseudoRandom(sampleIndex) * 9))
-          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 4.8);
+          .addScaledVector(sample.right, section.side * (quayFar + pierLength + 18 + pseudoRandom(sampleIndex) * 11))
+          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 8.2);
         position.y = MONACO_GROUND_Y + 0.025;
         addSimpleYachtToBatch(
           yachtBatch,
           position,
           Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18,
-          1.55 + pseudoRandom(sampleIndex + 31) * 0.65,
+          1.18 + pseudoRandom(sampleIndex + 31) * 0.32,
           largeYachtSeed,
           true
         );
