@@ -3,14 +3,27 @@ import { createProceduralTrackTextureSet } from "../../../materials/proceduralTe
 import { getRightVector } from "../shared.js";
 import { createBeachMaterial } from "./common.js";
 
-export function addBeachGround(group) {
-  const textureSet = createProceduralTrackTextureSet({ id: "beach", palette: { ground: 0xf1d372 } });
+function createBeachGroundGeometry(size, groundSize) {
+  const halfSize = size * 0.5;
+  const geometry = new THREE.PlaneGeometry(size, size);
+  const uvs = [
+    -halfSize / groundSize + 0.5, -halfSize / groundSize + 0.5,
+    halfSize / groundSize + 0.5, -halfSize / groundSize + 0.5,
+    -halfSize / groundSize + 0.5, halfSize / groundSize + 0.5,
+    halfSize / groundSize + 0.5, halfSize / groundSize + 0.5
+  ];
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  return geometry;
+}
+
+export function addBeachGround(group, trackDef) {
+  const textureSet = createProceduralTrackTextureSet(trackDef);
   const material = createBeachMaterial({
-    color: 0xf1d372,
+    color: trackDef.palette.sand ?? trackDef.palette.ground,
     map: textureSet.ground,
     roughness: 0.95
   });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100), material);
+  const ground = new THREE.Mesh(createBeachGroundGeometry(1100, trackDef.groundSize), material);
   ground.name = "TropicalBeachPropsGround";
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
@@ -38,7 +51,10 @@ function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffse
       nearP.x, y, nearP.z,
       farP.x, y, farP.z
     );
-    uvs.push(t, 0, t, 1);
+    uvs.push(
+      nearP.x / trackDef.groundSize + 0.5, -nearP.z / trackDef.groundSize + 0.5,
+      farP.x / trackDef.groundSize + 0.5, -farP.z / trackDef.groundSize + 0.5
+    );
   }
 
   for (let i = 0; i < segments; i++) {
@@ -116,19 +132,10 @@ function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, mater
 
 export function addBeachOceanPlane(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
-  const textureSet = createProceduralTrackTextureSet(trackDef);
-
-  // Shore Sand (widened)
-  const sandMaterial = createBeachMaterial({
-    color: 0xf1d372,
-    map: textureSet.ground,
-    roughness: 0.95
-  });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 14.0, sandMaterial, "TropicalBeachOceanShore", -0.012);
 
   // Surf/Foam
   const surfMaterial = createBeachMaterial({ color: 0xf0f5e8, roughness: 0.50 });
-  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 14.0, roadHalfWidth + 18.0, surfMaterial, "TropicalBeachOceanSurf", -0.010);
+  addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 17.0, roadHalfWidth + 18.0, surfMaterial, "TropicalBeachOceanSurf", -0.010);
 
   // Gradient ocean: turquoise (riva) → mid blue → deep blue (largo)
   // Uses a static ShaderMaterial with per-vertex aShoreT attribute (0=riva, 1=largo)

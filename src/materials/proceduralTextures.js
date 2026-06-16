@@ -192,7 +192,7 @@ function createCanvas(width, height) {
 
 function getGroundSecondaryColor(definition, base) {
   if (definition.id === "beach") {
-    return new THREE.Color(0xf7df94);
+    return new THREE.Color(0xfff4cc);
   }
   if (definition.id === "vegas") {
     return new THREE.Color(0x17121d);

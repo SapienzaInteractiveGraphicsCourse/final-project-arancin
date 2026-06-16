@@ -11,7 +11,7 @@ export function buildBeachProps(group, curve, trackDef) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "TropicalBeachProps";
 
-  addBeachGround(propsGroup);
+  addBeachGround(propsGroup, trackDef);
   addBeachOceanPlane(propsGroup, curve, trackDef);
   addBeachClouds(propsGroup);
   addBeachSeagullFlock(propsGroup);
@@ -22,7 +22,6 @@ export function buildBeachProps(group, curve, trackDef) {
 
   optimizeStaticDecorativeProps(propsGroup, [
     "TropicalBeachPropsGround",
-    "TropicalBeachOceanShore",
     "TropicalBeachOceanSurf"
   ]);
 
