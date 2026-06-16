@@ -237,7 +237,9 @@ function getBarrierState(playerState, trackInfo) {
     correction,
     impact: {
       type: "barrier",
-      speedMultiplier: BARRIER_IMPACT_SPEED_MULTIPLIER
+      speedMultiplier: BARRIER_IMPACT_SPEED_MULTIPLIER,
+      normal: getNormalizedCorrection(correction),
+      strength: Math.hypot(correction.x, correction.z)
     }
   };
 }
@@ -372,4 +374,19 @@ function normalizePositiveNumber(value, fallback) {
   const number = Number(value);
 
   return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function getNormalizedCorrection(correction) {
+  const x = Number(correction?.x) || 0;
+  const z = Number(correction?.z) || 0;
+  const length = Math.hypot(x, z);
+
+  if (length <= 0.000001) {
+    return null;
+  }
+
+  return {
+    x: x / length,
+    z: z / length
+  };
 }

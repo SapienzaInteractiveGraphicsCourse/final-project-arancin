@@ -16,6 +16,7 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { AudioManager } from "../systems/AudioManager.js";
+import { BarrierParticleSystem } from "../systems/BarrierParticleSystem.js";
 import { CameraController } from "../systems/CameraController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { MinimapSystem } from "../systems/MinimapSystem.js";
@@ -78,6 +79,7 @@ export function startScenePreview(container, setup, options = {}) {
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const trackInteraction = new TrackInteractionSystem();
+  const barrierParticles = new BarrierParticleSystem();
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
@@ -168,7 +170,7 @@ export function startScenePreview(container, setup, options = {}) {
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
-  scene.add(track.group, vehicle.group);
+  scene.add(track.group, vehicle.group, barrierParticles.group);
   if (ghostVehicle) {
     ghostVehicle.group.visible = false;
     scene.add(ghostVehicle.group);
@@ -263,6 +265,7 @@ export function startScenePreview(container, setup, options = {}) {
     raceManager.reset();
     wrongWayDetector.reset();
     ghostRecorder.reset();
+    barrierParticles.reset();
     raceManager.startCountdown();
     audioManager.setEngineAudible(true);
     resetAudioEventState();
@@ -329,6 +332,7 @@ export function startScenePreview(container, setup, options = {}) {
         rendererInfo: renderer.info
       });
       audioManager.update(deltaTime, state);
+      barrierParticles.update(deltaTime);
       return;
     }
 
@@ -466,6 +470,10 @@ export function startScenePreview(container, setup, options = {}) {
     if (environmentState.impact) {
       cameraController.applyShake(environmentState.impact.type === "opponent" ? 0.45 : 1);
     }
+    if (environmentState.impact?.type === "barrier") {
+      barrierParticles.spawnBarrierImpact(state, environmentState.impact, track.trackInfo);
+    }
+    barrierParticles.update(deltaTime);
 
     cameraController.update(deltaTime, state, track.trackInfo);
     updateTrackSkyPosition();
@@ -599,6 +607,7 @@ export function startScenePreview(container, setup, options = {}) {
       inputManager.dispose();
       audioManager.dispose();
       controller.dispose();
+      barrierParticles.dispose();
       cameraController.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -616,7 +625,7 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.dispose();
       aiVehicle?.dispose();
       ghostVehicle?.dispose();
-      scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
+      scene.remove(track.group, vehicle.group, barrierParticles.group, lights.ambient, lights.sun);
 
       if (aiVehicle) {
         scene.remove(aiVehicle.group);

@@ -136,7 +136,8 @@ Campi mancanti devono avere default interni al controller.
   surfaceGrip,
   boostTimer,
   boostActive,
-  collided
+  collided,
+  bounceActive         // true mentre un impatto barriera sta applicando il rimbalzo tweened
 }
 ```
 
@@ -148,7 +149,9 @@ Campi mancanti devono avere default interni al controller.
   surfaceGrip,
   speedLimitMultiplier,
   boostFactor,
-  collided
+  collided,
+  correction,          // opzionale: correzione X/Z anti-penetrazione
+  impact               // opzionale: { type, speedMultiplier, normal, strength }
 }
 ```
 
@@ -161,6 +164,8 @@ Regole:
 - `surfaceGrip` influenza trazione e sterzata;
 - `boostFactor` e collisioni reali vengono forniti da sistemi pista/collisione;
 - `reset(spawn)` deve riportare posizione, heading, velocita, sterzo e stato temporaneo allo spawn.
+- gli impatti con barriera possono avviare un breve rimbalzo interno animato con Tween.js e una velocita di rebound contraria alla direzione d'urto; il controller resta l'unico proprietario della posizione fisica del player.
+- gli impatti con barriera possono essere consumati dalla scena per generare particelle visuali, senza modificare mesh pista o veicolo.
 
 ## Track Factory
 
