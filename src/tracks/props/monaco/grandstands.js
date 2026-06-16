@@ -107,56 +107,73 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
         personScale.set(widthScale, heightScale, widthScale);
 
         torsoQuaternion.copy(quaternion).multiply(
-          new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18 - pseudoRandom(seed + 6) * 0.12, 0, (pseudoRandom(seed + 7) - 0.5) * 0.12))
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0.1 + pseudoRandom(seed + 6) * 0.08, 0, (pseudoRandom(seed + 7) - 0.5) * 0.1))
         );
 
         const torsoPosition = base.clone();
-        torsoPosition.y = rowY + 0.28;
+        torsoPosition.y = rowY + 0.24;
+        torsoPosition.addScaledVector(toTrack, -0.035);
         matrix.compose(torsoPosition, torsoQuaternion, personScale);
         torsoMatrices[shirtIndex].push(matrix.clone());
 
         const headPosition = base.clone();
-        headPosition.y = rowY + 0.58;
+        headPosition.y = rowY + 0.54;
+        headPosition.addScaledVector(toTrack, -0.015);
         matrix.compose(headPosition, quaternion, personScale);
         headMatrices[skinIndex].push(matrix.clone());
 
         if (pseudoRandom(seed + 8) > 0.28) {
           const capPosition = base.clone();
-          capPosition.y = rowY + 0.7;
+          capPosition.y = rowY + 0.66;
+          capPosition.addScaledVector(toTrack, -0.015);
           matrix.compose(capPosition, quaternion, personScale);
           capMatrices[seed % capMatrices.length].push(matrix.clone());
         }
 
         const cheering = pseudoRandom(seed + 9) > 0.82;
-        leftArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.9 : 0.34, 0, cheering ? 0.72 : 0.38)));
-        rightArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.7 : 0.28, 0, cheering ? -0.72 : -0.38)));
+        leftArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.85 : 0.64, 0, cheering ? 0.72 : 0.3)));
+        rightArmQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(cheering ? -0.68 : 0.56, 0, cheering ? -0.72 : -0.3)));
 
         const leftArmPosition = base.clone().addScaledVector(sample.tangent, -0.12);
-        leftArmPosition.y = rowY + (cheering ? 0.44 : 0.28);
+        leftArmPosition.addScaledVector(toTrack, cheering ? 0.0 : 0.05);
+        leftArmPosition.y = rowY + (cheering ? 0.44 : 0.27);
         matrix.compose(leftArmPosition, leftArmQuaternion, personScale);
         armMatrices[skinIndex].push(matrix.clone());
 
         const rightArmPosition = base.clone().addScaledVector(sample.tangent, 0.12);
-        rightArmPosition.y = rowY + (cheering ? 0.46 : 0.28);
+        rightArmPosition.addScaledVector(toTrack, cheering ? 0.0 : 0.05);
+        rightArmPosition.y = rowY + (cheering ? 0.46 : 0.27);
         matrix.compose(rightArmPosition, rightArmQuaternion, personScale);
         armMatrices[skinIndex].push(matrix.clone());
 
-        leftLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.18, 0, 0.08)));
-        rightLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.18, 0, -0.08)));
+        const leftShinQuaternion = new THREE.Quaternion();
+        const rightShinQuaternion = new THREE.Quaternion();
+        leftLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.08)));
+        rightLegQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, -0.08)));
+        leftShinQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.72, 0, 0.05)));
+        rightShinQuaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.72, 0, -0.05)));
         [-1, 1].forEach((legSide) => {
-          const legPosition = base
+          const thighPosition = base
             .clone()
-            .addScaledVector(toTrack, 0.23)
+            .addScaledVector(toTrack, 0.18)
             .addScaledVector(sample.tangent, legSide * 0.075);
-          legPosition.y = rowY + 0.105;
-          matrix.compose(legPosition, legSide < 0 ? leftLegQuaternion : rightLegQuaternion, personScale);
+          thighPosition.y = rowY + 0.13;
+          matrix.compose(thighPosition, legSide < 0 ? leftLegQuaternion : rightLegQuaternion, personScale);
+          (pseudoRandom(seed + 10) > 0.34 ? darkLegMatrices : lightLegMatrices).push(matrix.clone());
+
+          const shinPosition = base
+            .clone()
+            .addScaledVector(toTrack, 0.34)
+            .addScaledVector(sample.tangent, legSide * 0.075);
+          shinPosition.y = rowY + 0.015;
+          matrix.compose(shinPosition, legSide < 0 ? leftShinQuaternion : rightShinQuaternion, personScale);
           (pseudoRandom(seed + 10) > 0.34 ? darkLegMatrices : lightLegMatrices).push(matrix.clone());
 
           const shoePosition = base
             .clone()
-            .addScaledVector(toTrack, 0.4)
+            .addScaledVector(toTrack, 0.48)
             .addScaledVector(sample.tangent, legSide * 0.075);
-          shoePosition.y = rowY + 0.07;
+          shoePosition.y = rowY + 0.018;
           matrix.compose(shoePosition, quaternion, personScale);
           shoeMatrices.push(matrix.clone());
         });
@@ -271,4 +288,3 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
   optimizeStaticDecorativeProps(grandstandGroup, []);
   group.add(grandstandGroup);
 }
-

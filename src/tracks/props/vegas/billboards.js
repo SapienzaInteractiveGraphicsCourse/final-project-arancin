@@ -591,13 +591,11 @@ function addMarqueeArchEntranceSign(sign, color, contrastColor, seed) {
 
 export function isNearGrandstand(progress, side, threshold = 0.05) {
   const locations = [
-    { progress: 0.1, side: 1 },
-    { progress: 0.18, side: -1 },
-    { progress: 0.38, side: 1 },
-    { progress: 0.52, side: -1 },
-    { progress: 0.66, side: 1 },
-    { progress: 0.82, side: -1 },
-    { progress: 0.92, side: 1 }
+    { progress: 0.12, side: 1 },
+    { progress: 0.355, side: -1 },
+    { progress: 0.46, side: 1 },
+    { progress: 0.68, side: -1 },
+    { progress: 0.78, side: 1 }
   ];
   return locations.some((loc) => {
     return loc.side === side && Math.abs(progress - loc.progress) < threshold;
@@ -606,7 +604,14 @@ export function isNearGrandstand(progress, side, threshold = 0.05) {
 
 export function buildVegasBillboards(group, curve, roadHalfWidth) {
   const palette = [0xff2090, 0x00e5ff, 0xffe600, 0x39ff14, 0xff8800];
-  const progressPoints = [0.10, 0.28, 0.45, 0.59, 0.74, 0.87];
+  const billboardSlots = [
+    { progress: 0.2, side: 1 },
+    { progress: 0.26, side: -1 },
+    { progress: 0.41, side: -1 },
+    { progress: 0.53, side: 1 },
+    { progress: 0.94, side: -1 },
+    { progress: 0.9, side: 1 }
+  ];
   const typeBuilders = [
     addClassicVegasPylonSign,
     addCasinoNameBoardSign,
@@ -614,28 +619,22 @@ export function buildVegasBillboards(group, curve, roadHalfWidth) {
     addMarqueeArchEntranceSign
   ];
 
-  progressPoints.forEach((progress, index) => {
+  billboardSlots.forEach(({ progress, side }, index) => {
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress).setY(0).normalize();
     const normal = getRightVector(tangent);
 
-    // Choose side, and flip to opposite side if we are near a grandstand
-    let side = index % 2 === 0 ? -1 : 1;
-    if (isNearGrandstand(progress, side, 0.05)) {
-      side = -side;
-    }
-
     const color = palette[Math.floor(pseudoRandom(index * 13.7 + 4.1) * palette.length) % palette.length];
     const contrastColor = palette[(palette.indexOf(color) + 2) % palette.length];
 
-    const distance = roadHalfWidth + 13.5;
+    const distance = roadHalfWidth + 17;
     const position = point.clone().addScaledVector(normal, side * distance);
     const sign = new THREE.Group();
 
     sign.name = `VegasBillboard:${index}`;
     sign.position.copy(position);
 
-    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 12, 13.5);
+    clampPropPosition(curve, sign.position, roadHalfWidth, 200, 15, 17);
 
     sign.rotation.y = getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
 

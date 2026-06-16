@@ -24,13 +24,37 @@ palmMaterials.leafMid.side = THREE.DoubleSide;
 palmMaterials.leafLight.side = THREE.DoubleSide;
 
 const palmGeometries = {
-  trunk: new THREE.CylinderGeometry(1, 1, 1, 7),
-  band: new THREE.CylinderGeometry(1, 1, 1, 7),
+  trunk: new THREE.CylinderGeometry(1, 1, 1, 10),
+  band: new THREE.CylinderGeometry(1, 1, 1, 10),
   rib: new THREE.BoxGeometry(0.08, 0.05, 1),
-  leaf: new THREE.PlaneGeometry(0.85, 3.6),
+  leaf: createPalmFrondGeometry(),
   coconut: new THREE.SphereGeometry(0.18, 6, 6),
   bush: new THREE.DodecahedronGeometry(0.8, 0)
 };
+
+function createPalmFrondGeometry() {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute([
+    0, 0.0, 0.0,
+    -0.075, -0.65, -0.03,
+    0.075, -0.65, -0.03,
+    -0.095, -1.6, -0.12,
+    0.095, -1.6, -0.12,
+    -0.055, -2.75, -0.26,
+    0.055, -2.75, -0.26,
+    0, -3.65, -0.4
+  ], 3));
+  geometry.setIndex([
+    0, 1, 2,
+    1, 3, 2,
+    2, 3, 4,
+    3, 5, 4,
+    4, 5, 6,
+    5, 7, 6
+  ]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
 
 function composeMatrix(position, quaternion, scale) {
   return new THREE.Matrix4().compose(position, quaternion, scale);
@@ -47,54 +71,60 @@ function addInstancedPalm(batch, position, rotationY, scale, seed) {
     new THREE.Vector3(scale, scale, scale)
   );
   const trunkHeight = 8.8 + (seed % 3) * 0.7;
-  const segmentCount = 5;
-  const lean = seed % 2 === 0 ? 0.075 : -0.075;
+  const segmentCount = 9;
+  const lean = seed % 2 === 0 ? 0.038 : -0.038;
   const segmentHeight = trunkHeight / segmentCount;
 
   for (let index = 0; index < segmentCount; index += 1) {
-    const taper = 1 - index / segmentCount;
-    const localPosition = new THREE.Vector3(lean * index * 0.34, segmentHeight * (index + 0.5), 0);
-    const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, lean));
-    const radius = 0.19 + taper * 0.08;
-    const localScale = new THREE.Vector3(radius, segmentHeight * 1.04, radius);
+    const progress = index / (segmentCount - 1);
+    const bend = lean * progress * progress * trunkHeight * 0.5;
+    const nextBend = lean * ((index + 1) / segmentCount) ** 2 * trunkHeight * 0.5;
+    const localPosition = new THREE.Vector3(bend, segmentHeight * (index + 0.5), 0);
+    const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, (nextBend - bend) / segmentHeight));
+    const radius = 0.18 + (1 - progress) * 0.11;
+    const localScale = new THREE.Vector3(radius, segmentHeight * 1.02, radius);
     batch.trunks.push(multiplyMatrices(baseMatrix, composeMatrix(localPosition, localRotation, localScale)));
 
-    if (index % 2 === 0) {
-      const bandScale = new THREE.Vector3(radius * 1.08, 0.12, radius * 1.08);
+    if (index > 0 && index % 2 === 0) {
+      const bandScale = new THREE.Vector3(radius * 1.06, 0.08, radius * 1.06);
       batch.bands.push(multiplyMatrices(baseMatrix, composeMatrix(localPosition, localRotation, bandScale)));
     }
   }
 
-  const crownCenter = new THREE.Vector3(lean * segmentCount * 0.34, trunkHeight + 0.35, 0);
+  const crownCenter = new THREE.Vector3(lean * trunkHeight * 0.5, trunkHeight + 0.25, 0);
   const leafMaterials = [batch.leavesMid, batch.leavesLight, batch.leavesDark];
 
-  for (let index = 0; index < 10; index += 1) {
-    const angle = (index / 10) * Math.PI * 2 + pseudoRandom(seed + index) * 0.18;
-    const length = 4.7 + pseudoRandom(seed + index * 0.7) * 1.1;
+  for (let index = 0; index < 28; index += 1) {
+    const innerLayer = index % 2 === 1;
+    const layerIndex = Math.floor(index / 2);
+    const layerCount = 14;
+    const angle = (layerIndex / layerCount) * Math.PI * 2 + (innerLayer ? Math.PI / layerCount : 0);
+    const length = innerLayer ? 4.4 : 5.65;
+    const droop = innerLayer ? 0.5 : 0.82;
     const localPosition = crownCenter.clone().add(new THREE.Vector3(
-      Math.sin(angle) * length * 0.34,
-      0.1 - (index % 3) * 0.08,
-      Math.cos(angle) * length * 0.34
+      Math.sin(angle) * length * 0.1,
+      innerLayer ? 0.14 : -0.08,
+      Math.cos(angle) * length * 0.1
     ));
     const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-      Math.PI / 2.8 + (index % 3) * 0.08,
+      Math.PI / 2.62 + droop,
       angle,
-      (index % 2 === 0 ? 1 : -1) * 0.16
+      0
     ));
-    const localScale = new THREE.Vector3(0.9 + pseudoRandom(seed + index + 3) * 0.25, length / 3.6, 1);
+    const localScale = new THREE.Vector3(innerLayer ? 0.74 : 0.86, length / 3.65, 1);
     leafMaterials[index % leafMaterials.length].push(
       multiplyMatrices(baseMatrix, composeMatrix(localPosition, localRotation, localScale))
     );
 
     const ribPosition = crownCenter.clone().add(new THREE.Vector3(
-      Math.sin(angle) * length * 0.45,
-      0.03,
-      Math.cos(angle) * length * 0.45
+      Math.sin(angle) * length * 0.44,
+      -0.04 - droop * 0.32,
+      Math.cos(angle) * length * 0.44
     ));
-    const ribRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, angle, 0));
+    const ribRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2.05 + droop * 0.24, angle, 0));
     batch.ribs.push(multiplyMatrices(
       baseMatrix,
-      composeMatrix(ribPosition, ribRotation, new THREE.Vector3(1, 1, length))
+      composeMatrix(ribPosition, ribRotation, new THREE.Vector3(0.62, 0.62, length * 0.92))
     ));
   }
 

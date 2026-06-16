@@ -194,7 +194,7 @@ export function startScenePreview(container, setup, options = {}) {
   const decorativePropGroups = [];
 
   track.group.traverse((child) => {
-    if (child.userData.spin || child.userData.float) {
+    if (child.userData.spin || child.userData.float || child.userData.flight) {
       animatingProps.push(child);
     }
     if (child.name === "GantryStartLights" && child.userData.lamps) {
@@ -415,6 +415,37 @@ export function startScenePreview(container, setup, options = {}) {
       if (child.userData.float) {
         const f = child.userData.float;
         child.position.y = f.baseY + Math.sin(totalElapsedTime * f.speed + f.phase) * f.amplitude;
+      }
+      if (child.userData.flight) {
+        const f = child.userData.flight;
+        const angle = totalElapsedTime * f.speed + f.phase;
+        const nextAngle = angle + 0.02;
+        const x = f.center.x + Math.cos(angle) * f.radiusX;
+        const z = f.center.z + Math.sin(angle) * f.radiusZ;
+        const nextX = f.center.x + Math.cos(nextAngle) * f.radiusX;
+        const nextZ = f.center.z + Math.sin(nextAngle) * f.radiusZ;
+
+        child.position.set(
+          x,
+          f.center.y + Math.sin(totalElapsedTime * f.bobSpeed + f.phase) * f.bobAmplitude,
+          z
+        );
+        child.rotation.y = Math.atan2(nextX - x, nextZ - z);
+        child.rotation.z = Math.sin(angle) * 0.08;
+
+        if (child.userData.wings) {
+          const flap = Math.sin(totalElapsedTime * f.wingSpeed + f.phase) * f.wingAmplitude;
+          child.userData.wings.leftWing.rotation.x = -0.12 + flap;
+          child.userData.wings.rightWing.rotation.x = -0.12 - flap;
+        }
+        if (child.userData.flockWings) {
+          const flap = Math.sin(totalElapsedTime * f.wingSpeed + f.phase) * f.wingAmplitude;
+          child.userData.flockWings.forEach((wings, wingIndex) => {
+            const offsetFlap = flap * (0.85 + (wingIndex % 3) * 0.08);
+            wings.leftWing.rotation.x = -0.12 + offsetFlap;
+            wings.rightWing.rotation.x = -0.12 - offsetFlap;
+          });
+        }
       }
     }
 
