@@ -1,11 +1,16 @@
 import * as THREE from "three";
+import { createProceduralTrackTextureSet } from "../materials/proceduralTextures.js";
 
 export function createFlatStandardMaterial({
   color,
+  map,
+  normalMap,
+  roughnessMap,
   emissive,
   emissiveIntensity = 0,
   roughness = 0.82,
   metalness = 0.02,
+  normalScale = 1,
   transparent = false,
   opacity = 1,
   side = THREE.FrontSide,
@@ -21,6 +26,19 @@ export function createFlatStandardMaterial({
     flatShading: true,
     fog
   };
+
+  if (map) {
+    parameters.map = map;
+  }
+
+  if (normalMap) {
+    parameters.normalMap = normalMap;
+    parameters.normalScale = new THREE.Vector2(normalScale, normalScale);
+  }
+
+  if (roughnessMap) {
+    parameters.roughnessMap = roughnessMap;
+  }
 
   if (emissive !== undefined) {
     parameters.emissive = emissive;
@@ -101,16 +119,22 @@ function createStartSignTexture(definition) {
 export function createTrackMaterials(definition) {
   const palette = definition.palette;
   const startSignTex = createStartSignTexture(definition);
+  const proceduralTextures = createProceduralTrackTextureSet(definition);
 
   return {
     ground: createFlatStandardMaterial({
       color: palette.ground,
+      map: proceduralTextures.ground,
       emissive: definition.id === "vegas" ? 0x0a0020 : undefined,
       emissiveIntensity: definition.id === "vegas" ? 0.15 : 0,
       roughness: 0.92
     }),
     road: createFlatStandardMaterial({
       color: palette.road,
+      map: proceduralTextures.road.map,
+      normalMap: proceduralTextures.road.normalMap,
+      roughnessMap: proceduralTextures.road.roughnessMap,
+      normalScale: definition.id === "vegas" ? 0.36 : 0.48,
       roughness: definition.id === "vegas" ? 0.5 : 0.8,
       metalness: definition.id === "vegas" ? 0.16 : 0.02
     }),
@@ -181,4 +205,3 @@ export function createTrackMaterials(definition) {
     })
   };
 }
-

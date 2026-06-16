@@ -1,10 +1,13 @@
 import * as THREE from "three";
+import { createProceduralTrackTextureSet } from "../../../materials/proceduralTextures.js";
 import { getRightVector } from "../shared.js";
 import { createBeachMaterial } from "./common.js";
 
 export function addBeachGround(group) {
+  const textureSet = createProceduralTrackTextureSet({ id: "beach", palette: { ground: 0xf1d372 } });
   const material = createBeachMaterial({
-    color: 0xe4c06c,
+    color: 0xf1d372,
+    map: textureSet.ground,
     roughness: 0.95
   });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100), material);
@@ -17,6 +20,7 @@ export function addBeachGround(group) {
 
 function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffset, y) {
   const vertices = [];
+  const uvs = [];
   const indices = [];
   const segments = trackDef.segments || 200;
 
@@ -34,6 +38,7 @@ function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffse
       nearP.x, y, nearP.z,
       farP.x, y, farP.z
     );
+    uvs.push(t, 0, t, 1);
   }
 
   for (let i = 0; i < segments; i++) {
@@ -50,6 +55,7 @@ function createBeachSideBandGeometry(curve, trackDef, side, nearOffset, farOffse
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -110,9 +116,14 @@ function addBeachBand(group, curve, trackDef, side, nearOffset, farOffset, mater
 
 export function addBeachOceanPlane(group, curve, trackDef) {
   const roadHalfWidth = trackDef.roadWidth / 2;
+  const textureSet = createProceduralTrackTextureSet(trackDef);
 
   // Shore Sand (widened)
-  const sandMaterial = createBeachMaterial({ color: 0xe0c66f, roughness: 0.95 });
+  const sandMaterial = createBeachMaterial({
+    color: 0xf1d372,
+    map: textureSet.ground,
+    roughness: 0.95
+  });
   addBeachBand(group, curve, trackDef, 1, roadHalfWidth + 0.65, roadHalfWidth + 14.0, sandMaterial, "TropicalBeachOceanShore", -0.012);
 
   // Surf/Foam
