@@ -248,11 +248,11 @@ export class SilviaVehicle extends PlaceholderVehicle {
 
     this.silviaHeadlights.forEach((light) => {
       light.intensity = this.headlightsEnabled ? 4.2 : 0;
-      light.visible = this.headlightsEnabled;
+      light.visible = true;
     });
 
     this.silviaHeadlightBeams.forEach((beam) => {
-      beam.visible = this.headlightsEnabled;
+      beam.visible = true;
       beam.material.opacity = this.headlightsEnabled ? 0.44 : 0;
     });
   }

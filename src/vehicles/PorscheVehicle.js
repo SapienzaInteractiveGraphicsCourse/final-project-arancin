@@ -304,11 +304,11 @@ export class PorscheVehicle extends PlaceholderVehicle {
 
     this.porscheHeadlights.forEach((light) => {
       light.intensity = this.headlightsEnabled ? 4.6 : 0;
-      light.visible = this.headlightsEnabled;
+      light.visible = true;
     });
 
     this.porscheHeadlightBeams.forEach((beam) => {
-      beam.visible = this.headlightsEnabled;
+      beam.visible = true;
       beam.material.opacity = this.headlightsEnabled ? 0.42 : 0;
     });
 
