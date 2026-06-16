@@ -42,12 +42,22 @@ export class BaseVehicle {
     this.headlightsEnabled = Boolean(enabled);
 
     this.headlights.forEach((light) => {
-      light.visible = this.headlightsEnabled;
+      if (light.userData.headlightIntensity === undefined) {
+        light.userData.headlightIntensity = light.intensity;
+      }
+
+      light.visible = true;
+      light.intensity = this.headlightsEnabled ? light.userData.headlightIntensity : 0;
     });
 
     this.headlightMeshes.forEach((mesh) => {
       if (mesh.material?.emissiveIntensity !== undefined) {
         mesh.material.emissiveIntensity = this.headlightsEnabled ? 1.6 : 0;
+      }
+
+      if (mesh.userData.headlightOpacity !== undefined && mesh.material?.opacity !== undefined) {
+        mesh.visible = true;
+        mesh.material.opacity = this.headlightsEnabled ? mesh.userData.headlightOpacity : 0;
       }
     });
   }
