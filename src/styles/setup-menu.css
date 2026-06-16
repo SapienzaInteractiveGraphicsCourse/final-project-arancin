@@ -654,6 +654,7 @@
 .setup-commands-close:focus-visible,
 .pre-race-color-option:focus-visible,
 .pre-race-start-button:focus-visible,
+.pre-race-free-camera-button:focus-visible,
 .pause-button:focus-visible,
 .finish-button:focus-visible {
   outline: 2px solid #facc15;
