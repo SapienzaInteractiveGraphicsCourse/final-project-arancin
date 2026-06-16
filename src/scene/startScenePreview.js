@@ -18,6 +18,7 @@ import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { AudioManager } from "../systems/AudioManager.js";
 import { BarrierParticleSystem } from "../systems/BarrierParticleSystem.js";
 import { CameraController } from "../systems/CameraController.js";
+import { FreeCameraController } from "../systems/FreeCameraController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { MinimapSystem } from "../systems/MinimapSystem.js";
 import { RaceManager, RACE_MODES, RACE_PHASES } from "../systems/RaceManager.js";
@@ -59,6 +60,9 @@ export function startScenePreview(container, setup, options = {}) {
   const scene = createScene();
   const camera = createMainCamera();
   const cameraController = new CameraController(camera);
+  const freeCameraController = new FreeCameraController(camera, renderer.domElement, {
+    onExit: exitFreeCamera
+  });
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
@@ -129,12 +133,27 @@ export function startScenePreview(container, setup, options = {}) {
       audioManager.playUiSelect();
     },
     onConfirm: () => {
+      exitFreeCamera();
       raceArmed = true;
       colorPicker.hide();
       audioManager.playUiConfirm();
       void audioManager.enable();
       raceManager.startCountdown();
       resetAudioEventState();
+    },
+    onExplore: () => {
+      if (raceArmed) {
+        return;
+      }
+
+      freeCameraController.enter();
+      inputManager.clearHeldState();
+      colorPicker.setExploring(true);
+      audioManager.playUiSelect();
+    },
+    onExitExplore: () => {
+      exitFreeCamera();
+      audioManager.playUiSelect();
     }
   });
   colorPicker.element.hidden = true;
@@ -189,6 +208,7 @@ export function startScenePreview(container, setup, options = {}) {
   window.gameTrack = track;
   window.gameVehicle = vehicle;
   window.gameController = controller;
+  window.gameCamera = camera;
 
   // Cache references to animating props and start lights to avoid costly traversals in the frame loop
   const animatingProps = [];
@@ -258,7 +278,14 @@ export function startScenePreview(container, setup, options = {}) {
     setPaused(false);
   }
 
+  function exitFreeCamera() {
+    freeCameraController.exit({ notify: false });
+    colorPicker.setExploring(false);
+    inputManager.clearHeldState();
+  }
+
   function resetRace() {
+    exitFreeCamera();
     controller.reset(track.spawn);
     aiController?.reset(track.trackInfo);
     trackInteraction.reset();
@@ -293,10 +320,15 @@ export function startScenePreview(container, setup, options = {}) {
     const actions = inputManager.consumeActions();
 
     if (actions.pause) {
+      if (!raceArmed && freeCameraController.enabled) {
+        exitFreeCamera();
+        return;
+      }
+
       setPaused(!paused);
     }
 
-    if (actions.camera) {
+    if (actions.camera && !freeCameraController.enabled) {
       cameraController.nextMode();
     }
 
@@ -316,7 +348,11 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.setTransform(state.position, state.heading);
       vehicle.update(deltaTime, state);
       ghostVehicleController.hide();
-      cameraController.update(deltaTime, state, track.trackInfo);
+      if (freeCameraController.enabled) {
+        freeCameraController.update(deltaTime);
+      } else {
+        cameraController.update(deltaTime, state, track.trackInfo);
+      }
       updateTrackSkyPosition();
       raceHud.update({
         raceState: raceManager.getState(),
@@ -608,6 +644,7 @@ export function startScenePreview(container, setup, options = {}) {
       audioManager.dispose();
       controller.dispose();
       barrierParticles.dispose();
+      freeCameraController.dispose();
       cameraController.dispose();
       renderer.dispose();
       renderer.domElement.remove();

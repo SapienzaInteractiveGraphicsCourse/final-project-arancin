@@ -113,7 +113,9 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .pre-race-start-button {
+  .pre-race-actions,
+  .pre-race-start-button,
+  .pre-race-free-camera-button {
     width: 100%;
   }
 

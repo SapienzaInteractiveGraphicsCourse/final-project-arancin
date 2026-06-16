@@ -493,7 +493,7 @@ function createCheckpoints(curve, definition) {
   });
 }
 
-function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
+function addStartLine(group, checkpoint, materials) {
   const startLine = new THREE.Group();
   startLine.name = "StartFinishLine";
   startLine.position.copy(checkpoint.position);
@@ -533,46 +533,6 @@ function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
   });
 
   group.add(startLine);
-
-  // Add starting grid slots/boxes behind the finish line.
-  // Sample the curve at each slot distance so slots follow the track curvature.
-  const startT = checkpoint.progress ?? 0;
-  const totalLength = curve.getLength();
-  const gridDistances = [4.8, 8.8, 12.8, 16.8];
-  const gridSides = [1, -1, 1, -1];
-
-  gridDistances.forEach((dist, idx) => {
-    // Walk backwards along the curve by 'dist' meters
-    const backT = ((startT - dist / totalLength) + 1) % 1;
-    const slotPoint = curve.getPointAt(backT);
-    const slotTangent = curve.getTangentAt(backT).setY(0).normalize();
-    const slotNormal = new THREE.Vector3(-slotTangent.z, 0, slotTangent.x);
-    const side = gridSides[idx];
-    const sideOffset = side * roadHalfWidth * 0.44;
-
-    const slotPos = slotPoint.clone().addScaledVector(slotNormal, sideOffset);
-    slotPos.y = ROAD_Y + 0.051;
-
-    const slotGroup = new THREE.Group();
-    slotGroup.name = `StartGridSlot:${idx}`;
-    slotGroup.position.copy(slotPos);
-    slotGroup.rotation.y = getHeading(slotTangent);
-
-    const bracketMaterial = materials.startWhite;
-    const line = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.08), bracketMaterial);
-    line.receiveShadow = true;
-    slotGroup.add(line);
-
-    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
-    sideLeft.position.set(-0.8, 0, 0.2);
-    sideLeft.receiveShadow = true;
-    const sideRight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
-    sideRight.position.set(0.8, 0, 0.2);
-    sideRight.receiveShadow = true;
-
-    slotGroup.add(sideLeft, sideRight);
-    group.add(slotGroup);
-  });
 
   const checkpointMarker = new THREE.Group();
   checkpointMarker.name = "StartFinishCheckpointGate";
@@ -850,7 +810,7 @@ export function createSplineTrack(definition, propsBuilder = noopTrackProps) {
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
   const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier, materials.ground);
   const checkpoints = createCheckpoints(curve, definition);
-  addStartLine(group, checkpoints[0], materials, curve, roadHalfWidth);
+  addStartLine(group, checkpoints[0], materials);
   addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);
