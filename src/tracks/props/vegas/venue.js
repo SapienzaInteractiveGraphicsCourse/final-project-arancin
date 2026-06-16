@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { createFlatStandardMaterial } from "../../trackMaterials.js";
 import { addInstancedPart } from "../common/instancing.js";
 import {
-  clampPropPosition,
   getHeading,
   getRightVector,
   markShadow,
   pseudoRandom
 } from "../shared.js";
+import { getRoadsidePlacement } from "../common/placement.js";
 
 function createGrandstand({ position, rotationY, width, rows, accentColor, index }) {
   const stand = new THREE.Group();
@@ -231,23 +231,33 @@ function createSkyBeam({ position, color, height = 170, rotationZ = 0 }) {
 export function addVegasF1Venue(group, curve, definition) {
   const roadHalfWidth = definition.roadWidth * 0.5;
   const colors = [0x32f6ff, 0xd7e6ff, 0xff2bd6, 0xffd23a];
-  const grandstandProgress = [0.1, 0.18, 0.38, 0.52, 0.66, 0.82, 0.92];
+  const grandstandSlots = [
+    { progress: 0.12, side: 1, width: 30, rows: 6 },
+    { progress: 0.355, side: -1, width: 26, rows: 7 },
+    { progress: 0.46, side: 1, width: 28, rows: 6 },
+    { progress: 0.68, side: -1, width: 30, rows: 7 },
+    { progress: 0.78, side: 1, width: 28, rows: 6 }
+  ];
 
-  grandstandProgress.forEach((progress, index) => {
-    const point = curve.getPointAt(progress);
-    const tangent = curve.getTangentAt(progress).setY(0).normalize();
-    const normal = getRightVector(tangent);
-    const side = index % 2 === 0 ? 1 : -1;
-    const position = point
-      .clone()
-      .addScaledVector(normal, side * (definition.roadWidth * 0.5 + 42));
-    clampPropPosition(curve, position, roadHalfWidth, 200, 30, 35);
+  grandstandSlots.forEach(({ progress, side, width, rows }, index) => {
+    const placement = getRoadsidePlacement(
+      curve,
+      progress,
+      side,
+      roadHalfWidth + 18,
+      roadHalfWidth,
+      {
+        minClearance: 12,
+        targetClearance: 14,
+        strategy: "direct"
+      }
+    );
 
     group.add(createGrandstand({
-      position,
-      rotationY: getHeading(tangent) + (side > 0 ? -Math.PI / 2 : Math.PI / 2),
-      width: 28 + pseudoRandom(index + 5.4) * 18,
-      rows: 6 + Math.floor(pseudoRandom(index + 7.8) * 4),
+      position: placement.position,
+      rotationY: placement.rotationY,
+      width,
+      rows,
       accentColor: colors[index % colors.length],
       index
     }));
@@ -257,7 +267,6 @@ export function addVegasF1Venue(group, curve, definition) {
   const paddockTangent = curve.getTangentAt(0.18).setY(0).normalize();
   const paddockNormal = getRightVector(paddockTangent);
   const paddockPosition = paddockPoint.clone().addScaledVector(paddockNormal, definition.roadWidth * 0.5 + 62);
-  clampPropPosition(curve, paddockPosition, roadHalfWidth, 200, 38, 42);
   group.add(createPaddockBuilding({
     position: paddockPosition,
     rotationY: getHeading(paddockTangent) - Math.PI / 2
@@ -269,7 +278,6 @@ export function addVegasF1Venue(group, curve, definition) {
     const normal = getRightVector(tangent);
     const side = index % 2 === 0 ? 1 : -1;
     const position = point.clone().addScaledVector(normal, side * (definition.roadWidth * 0.5 + 72));
-    clampPropPosition(curve, position, roadHalfWidth, 200, 50, 54);
     group.add(createSkyBeam({
       position,
       color: colors[index % colors.length],
@@ -277,4 +285,3 @@ export function addVegasF1Venue(group, curve, definition) {
     }));
   });
 }
-
