@@ -18,7 +18,7 @@ export function createHeadlightBeam({
   const beam = new THREE.Mesh(new THREE.PlaneGeometry(width, length), material);
   beam.name = name;
   beam.rotation.x = -Math.PI / 2;
-  beam.visible = false;
+  beam.userData.headlightOpacity = opacity;
   return beam;
 }
 
