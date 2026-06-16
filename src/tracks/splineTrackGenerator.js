@@ -368,8 +368,9 @@ function createBarrierRibbonGeometry(edgeSamples, side, offset, height, thicknes
   return geometry;
 }
 
-function createBeachShoulderGeometry(edgeSamples, side, width) {
+function createBeachShoulderGeometry(edgeSamples, side, width, groundSize) {
   const vertices = [];
+  const uvs = [];
   const indices = [];
 
   edgeSamples.forEach((sample) => {
@@ -382,6 +383,10 @@ function createBeachShoulderGeometry(edgeSamples, side, width) {
       roadEdge.x, roadEdge.y, roadEdge.z,
       shoulderEdge.x, shoulderEdge.y, shoulderEdge.z
     );
+    uvs.push(
+      roadEdge.x / groundSize + 0.5, -roadEdge.z / groundSize + 0.5,
+      shoulderEdge.x / groundSize + 0.5, -shoulderEdge.z / groundSize + 0.5
+    );
   });
 
   for (let index = 0; index < edgeSamples.length - 1; index += 1) {
@@ -392,12 +397,13 @@ function createBeachShoulderGeometry(edgeSamples, side, width) {
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function addBarriers(group, edgeSamples, definition, material) {
+function addBarriers(group, edgeSamples, definition, material, groundMaterial) {
   const colliders = [];
   const matrices = [];
   const offset = definition.barrierOffset ?? 0.85;
@@ -428,8 +434,8 @@ function addBarriers(group, edgeSamples, definition, material) {
   }
 
   if (definition.id === "beach") {
-    const shoulderMaterial = material.clone();
-    shoulderMaterial.color.setHex(0xe0c66f);
+    const shoulderMaterial = groundMaterial.clone();
+    shoulderMaterial.color.setHex(definition.palette.sand ?? definition.palette.ground);
     shoulderMaterial.side = THREE.DoubleSide;
     const barrierMaterial = material.clone();
     barrierMaterial.side = THREE.DoubleSide;
@@ -438,7 +444,7 @@ function addBarriers(group, edgeSamples, definition, material) {
     [-1, 1].forEach((side) => {
       if (shoulderWidth > 0) {
         const shoulder = new THREE.Mesh(
-          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth),
+          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth, definition.groundSize),
           shoulderMaterial
         );
         shoulder.name = `${definition.name}:BarrierShoulder:${side}`;
@@ -842,7 +848,7 @@ export function createSplineTrack(definition, propsBuilder = noopTrackProps) {
   group.add(leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
-  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
+  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier, materials.ground);
   const checkpoints = createCheckpoints(curve, definition);
   addStartLine(group, checkpoints[0], materials, curve, roadHalfWidth);
   addStartGantry(group, checkpoints[0], materials);

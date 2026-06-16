@@ -106,11 +106,11 @@ const TRACK_DEFINITIONS = {
     },
     palette: {
       road: 0x2e3038,
-      ground: 0xf1d372,
+      ground: 0xf6e3a1,
       barrier: 0xf5e8b0,
       boost: 0xffee00,
       water: 0x0088cc,
-      sand: 0xf1d372,
+      sand: 0xf6e3a1,
       roadEdge: 0xf0d870,
       centerLine: 0xffffff,
       checkpoint: 0x1cd4c0,
