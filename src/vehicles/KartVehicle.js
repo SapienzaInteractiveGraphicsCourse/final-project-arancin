@@ -14,6 +14,8 @@ export class KartVehicle extends BaseVehicle {
     this.wheelRotation = 0;
     this.wheelRollGroups = [];
     this.frontSteeringPivots = [];
+    this.wheelPivots = [];
+    this.driverAnimationTime = 0;
     this.materials = this.createMaterials();
     this.buildKart();
   }
@@ -323,6 +325,12 @@ export class KartVehicle extends BaseVehicle {
     steeringPivot.add(rollGroup);
     this.chassisGroup.add(steeringPivot);
     this.wheelRollGroups.push(rollGroup);
+    this.wheelPivots.push({
+      pivot: steeringPivot,
+      baseY: position[1],
+      side: Math.sign(position[0]) || 1,
+      phase: position[2] > 0 ? 0 : Math.PI * 0.72
+    });
 
     if (steerable) {
       this.frontSteeringPivots.push(steeringPivot);
@@ -346,62 +354,95 @@ export class KartVehicle extends BaseVehicle {
     torso.receiveShadow = true;
     this.driverRoot.add(torso);
 
+    this.driverHeadPivot = new THREE.Group();
+    this.driverHeadPivot.name = "KartDriverHeadPivot";
+    this.driverHeadPivot.position.set(0, 0.58, 0.02);
+    this.driverRoot.add(this.driverHeadPivot);
+
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 16), this.materials.helmet);
     head.name = "KartDriverHelmet";
-    head.position.y = 0.62;
+    head.position.y = 0.04;
     head.scale.set(1, 0.9, 1.05);
     head.castShadow = true;
     head.receiveShadow = true;
-    this.driverRoot.add(head);
+    this.driverHeadPivot.add(head);
 
     const visor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.075, 0.035), this.materials.visor);
     visor.name = "KartDriverVisor";
-    visor.position.set(0, 0.64, 0.2);
+    visor.position.set(0, 0.06, 0.2);
     visor.castShadow = true;
     visor.receiveShadow = true;
-    this.driverRoot.add(visor);
+    this.driverHeadPivot.add(visor);
 
     const helmetStripe = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.035, 0.34), this.materials.body);
     helmetStripe.name = "KartDriverHelmetStripe";
-    helmetStripe.position.set(0, 0.78, 0.02);
+    helmetStripe.position.set(0, 0.2, 0.02);
     helmetStripe.rotation.x = -0.16;
     helmetStripe.castShadow = true;
     helmetStripe.receiveShadow = true;
-    this.driverRoot.add(helmetStripe);
+    this.driverHeadPivot.add(helmetStripe);
 
     const visorHighlight = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.014, 0.012), this.materials.stripe);
     visorHighlight.name = "KartDriverVisorHighlight";
-    visorHighlight.position.set(-0.03, 0.665, 0.221);
+    visorHighlight.position.set(-0.03, 0.085, 0.221);
     visorHighlight.castShadow = false;
     visorHighlight.receiveShadow = false;
-    this.driverRoot.add(visorHighlight);
+    this.driverHeadPivot.add(visorHighlight);
 
-    [-1, 1].forEach((side) => {
-      const arm = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.045, 0.46, 6, 12),
-        this.materials.suit
-      );
-      arm.name = side < 0 ? "KartDriverLeftArm" : "KartDriverRightArm";
-      arm.position.set(side * 0.25, 0.24, 0.26);
-      arm.rotation.set(Math.PI / 2.45, side * 0.16, side * 0.28);
-      arm.castShadow = true;
-      arm.receiveShadow = true;
-      this.driverRoot.add(arm);
+    this.driverArms = [-1, 1].map((side) => this.addDriverArm(side));
+  }
 
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), this.materials.skin);
-      hand.name = side < 0 ? "KartDriverLeftHand" : "KartDriverRightHand";
-      hand.position.set(side * 0.31, 0.03, 0.49);
-      hand.castShadow = true;
-      hand.receiveShadow = true;
-      this.driverRoot.add(hand);
-    });
+  addDriverArm(side) {
+    const sideName = side < 0 ? "Left" : "Right";
+    const shoulder = new THREE.Vector3(side * 0.2, 0.29, 0.18);
+    const elbow = new THREE.Vector3(side * 0.32, 0.15, 0.48);
+    const hand = new THREE.Vector3(side * 0.2, 0.045, 0.76);
+    const shoulderPivot = new THREE.Group();
+    shoulderPivot.name = `KartDriver${sideName}ShoulderPivot`;
+    shoulderPivot.position.copy(shoulder);
+
+    const upperEnd = elbow.clone().sub(shoulder);
+    const forearmEnd = hand.clone().sub(elbow);
+    const upperArm = this.createLimbSegment(`KartDriver${sideName}UpperArm`, upperEnd, 0.044, this.materials.suit);
+    const elbowPivot = new THREE.Group();
+    elbowPivot.name = `KartDriver${sideName}ElbowPivot`;
+    elbowPivot.position.copy(upperEnd);
+    const forearm = this.createLimbSegment(`KartDriver${sideName}Forearm`, forearmEnd, 0.038, this.materials.suit);
+    const handMesh = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), this.materials.skin);
+    handMesh.name = `KartDriver${sideName}Hand`;
+    handMesh.position.copy(forearmEnd);
+    handMesh.castShadow = true;
+    handMesh.receiveShadow = true;
+
+    elbowPivot.add(forearm, handMesh);
+    shoulderPivot.add(upperArm, elbowPivot);
+    this.driverRoot.add(shoulderPivot);
+
+    return {
+      side,
+      shoulderPivot,
+      elbowPivot,
+      hand: handMesh
+    };
+  }
+
+  createLimbSegment(name, endPoint, radius, material) {
+    const length = endPoint.length();
+    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, Math.max(0.02, length - radius * 2), 6, 12), material);
+    const direction = endPoint.clone().normalize();
+    mesh.name = name;
+    mesh.position.copy(endPoint).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   addSteeringWheel() {
     this.steeringWheelPivot = new THREE.Group();
     this.steeringWheelPivot.name = "KartSteeringWheel";
-    this.steeringWheelPivot.position.set(0, 1.02, 0.38);
-    this.steeringWheelPivot.rotation.x = Math.PI / 2.8;
+    this.steeringWheelPivot.position.set(0, 1.03, 0.31);
+    this.steeringWheelPivot.rotation.x = Math.PI / 2.55;
 
     const wheel = new THREE.Mesh(
       new THREE.TorusGeometry(0.2, 0.022, 12, 32),
@@ -412,18 +453,17 @@ export class KartVehicle extends BaseVehicle {
     wheel.receiveShadow = true;
     this.steeringWheelPivot.add(wheel);
 
-    const column = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.025, 0.42, 16),
-      this.materials.axle
-    );
+    const columnBase = new THREE.Vector3(0, 0.72, 0.05);
+    const columnTop = this.steeringWheelPivot.position.clone().add(new THREE.Vector3(0, -0.03, -0.03));
+    const columnVector = columnTop.clone().sub(columnBase);
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, columnVector.length(), 16), this.materials.axle);
     column.name = "KartSteeringColumn";
-    column.position.set(0, -0.02, -0.2);
-    column.rotation.x = Math.PI / 2;
+    column.position.copy(columnBase).addScaledVector(columnVector, 0.5);
+    column.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), columnVector.clone().normalize());
     column.castShadow = true;
     column.receiveShadow = true;
-    this.steeringWheelPivot.add(column);
 
-    this.chassisGroup.add(this.steeringWheelPivot);
+    this.chassisGroup.add(column, this.steeringWheelPivot);
   }
 
   addHeadlights() {
@@ -470,6 +510,8 @@ export class KartVehicle extends BaseVehicle {
 
     this.updateWheelRotation(distance);
     this.updateSteeringVisuals(steering);
+    this.updateSuspension(steering, speedRatio);
+    this.updateDriverAnimation(deltaTime, steering, speedRatio, speed);
     this.updateBodyMotion(deltaTime, steering, speedRatio, speed);
   }
 
@@ -493,16 +535,50 @@ export class KartVehicle extends BaseVehicle {
     }
   }
 
+  updateSuspension(steeringValue, speedRatio) {
+    this.wheelPivots.forEach(({ pivot, baseY, side, phase }) => {
+      const roadHop = Math.abs(Math.sin(this.wheelRotation * 2.4 + phase)) * speedRatio * 0.018;
+      const lateralLoad = -side * steeringValue * speedRatio * 0.018;
+      pivot.position.y = baseY + roadHop + lateralLoad;
+    });
+  }
+
+  updateDriverAnimation(deltaTime, steeringValue, speedRatio, speed) {
+    this.driverAnimationTime += deltaTime;
+    const absSteering = Math.abs(steeringValue);
+    const steeringAngle = steeringValue * Math.PI * 0.55;
+    const effort = absSteering * (0.55 + speedRatio * 0.45);
+    const vibration = Math.sin(this.driverAnimationTime * 18 + this.wheelRotation) * speedRatio * 0.018;
+
+    if (this.driverHeadPivot) {
+      this.driverHeadPivot.rotation.z = -steeringValue * speedRatio * 0.16;
+      this.driverHeadPivot.rotation.y = steeringValue * (0.06 + speedRatio * 0.08);
+      this.driverHeadPivot.rotation.x = -0.04 * speedRatio + vibration * 0.35;
+    }
+
+    this.driverArms?.forEach(({ side, shoulderPivot, elbowPivot, hand }) => {
+      const handLift = Math.sin(steeringAngle + side * Math.PI * 0.5) * 0.035;
+      shoulderPivot.rotation.x = -0.12 - speedRatio * 0.04 + handLift;
+      shoulderPivot.rotation.y = side * (0.08 + effort * 0.1);
+      shoulderPivot.rotation.z = side * 0.08 - steeringValue * 0.22;
+      elbowPivot.rotation.x = 0.1 + speedRatio * 0.03 - handLift * 0.8;
+      elbowPivot.rotation.z = -side * (0.04 + effort * 0.08);
+      hand.rotation.x = steeringAngle * 0.55;
+      hand.rotation.z = -side * 0.16 + steeringValue * 0.28;
+    });
+
+    if (this.driverRoot) {
+      this.driverRoot.rotation.z = -steeringValue * speedRatio * 0.05;
+      this.driverRoot.rotation.x = Math.min(Math.abs(speed), 18) * -0.0015;
+    }
+  }
+
   updateBodyMotion(deltaTime, steeringValue, speedRatio, speed) {
     const bounce = Math.sin(this.wheelRotation * 2.1) * speedRatio * 0.018;
 
     this.chassisGroup.position.y = bounce;
     this.chassisGroup.rotation.z = -steeringValue * speedRatio * 0.1;
     this.chassisGroup.rotation.x = Math.abs(steeringValue) * speedRatio * 0.035;
-
-    if (this.driverRoot) {
-      this.driverRoot.rotation.z = -steeringValue * speedRatio * 0.05;
-    }
 
     if (Math.abs(speed) < 0.1 && deltaTime > 0) {
       this.chassisGroup.position.y *= 0.9;
