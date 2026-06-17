@@ -3,6 +3,10 @@ import { BaseVehicle } from "./BaseVehicle.js";
 import { createHeadlightBeam } from "./headlightEffects.js";
 
 const KART_WHEEL_GROUND_Y = 0.34;
+const KART_SUSPENSION_ROAD_HOP = 0.004;
+const KART_SUSPENSION_LATERAL_LOAD = 0.005;
+const KART_BODY_BOUNCE = 0.004;
+const KART_BODY_ROLL = 0.045;
 
 export class KartVehicle extends BaseVehicle {
   constructor() {
@@ -539,8 +543,8 @@ export class KartVehicle extends BaseVehicle {
 
   updateSuspension(steeringValue, speedRatio) {
     this.wheelPivots.forEach(({ pivot, baseY, side, phase }) => {
-      const roadHop = Math.abs(Math.sin(this.wheelRotation * 2.4 + phase)) * speedRatio * 0.018;
-      const lateralLoad = -side * steeringValue * speedRatio * 0.018;
+      const roadHop = Math.abs(Math.sin(this.wheelRotation * 2.4 + phase)) * speedRatio * KART_SUSPENSION_ROAD_HOP;
+      const lateralLoad = -side * steeringValue * speedRatio * KART_SUSPENSION_LATERAL_LOAD;
       pivot.position.y = baseY + roadHop + lateralLoad;
     });
   }
@@ -576,11 +580,11 @@ export class KartVehicle extends BaseVehicle {
   }
 
   updateBodyMotion(deltaTime, steeringValue, speedRatio, speed) {
-    const bounce = Math.sin(this.wheelRotation * 2.1) * speedRatio * 0.018;
+    const bounce = Math.sin(this.wheelRotation * 2.1) * speedRatio * KART_BODY_BOUNCE;
 
     this.chassisGroup.position.y = bounce;
-    this.chassisGroup.rotation.z = -steeringValue * speedRatio * 0.1;
-    this.chassisGroup.rotation.x = Math.abs(steeringValue) * speedRatio * 0.035;
+    this.chassisGroup.rotation.z = -steeringValue * speedRatio * KART_BODY_ROLL;
+    this.chassisGroup.rotation.x = 0;
 
     if (Math.abs(speed) < 0.1 && deltaTime > 0) {
       this.chassisGroup.position.y *= 0.9;
