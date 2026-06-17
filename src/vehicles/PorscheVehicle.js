@@ -8,6 +8,7 @@ const WHEEL_NODE_NAMES = {
   rearLeft: "WHEEL_LR",
   rearRight: "WHEEL_RR"
 };
+const EXHAUST_POP_DURATION = 0.18;
 
 export class PorscheVehicle extends PlaceholderVehicle {
   constructor() {
@@ -238,7 +239,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
 
     this.exhaustPopGroup = new THREE.Group();
     this.exhaustPopGroup.name = "PorscheExhaustPopEffect";
-    this.exhaustPopGroup.visible = false;
+    this.exhaustPopGroup.visible = true;
 
     exhaustPositions.forEach(([x, y, z], index) => {
       const flame = new THREE.Mesh(flameGeometry, flameMaterial.clone());
@@ -252,7 +253,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
       flame.position.z = -0.18;
       core.position.z = -0.14;
       flameGroup.position.set(x, y, z);
-      flameGroup.scale.setScalar(0.01);
+      flameGroup.scale.setScalar(0.001);
       flameGroup.add(flame, core);
       this.exhaustPopGroup.add(flameGroup);
       this.exhaustPopFlames.push(flameGroup);
@@ -262,6 +263,7 @@ export class PorscheVehicle extends PlaceholderVehicle {
     this.exhaustPopLight.position.set(0, 0.28, -2.18);
     this.exhaustPopGroup.add(this.exhaustPopLight);
     this.modelPivot.add(this.exhaustPopGroup);
+    this.setExhaustPopVisibilityState(0, 0.001);
   }
 
   update(deltaTime, state = {}) {
@@ -326,27 +328,29 @@ export class PorscheVehicle extends PlaceholderVehicle {
       return;
     }
 
-    this.exhaustPopTimer = 0.18;
-    this.exhaustPopGroup.visible = true;
+    this.exhaustPopTimer = EXHAUST_POP_DURATION;
     this.exhaustPopFlames.forEach((flameGroup) => {
       flameGroup.rotation.z = (Math.random() - 0.5) * 0.16;
       flameGroup.scale.setScalar(0.85 + Math.random() * 0.3);
     });
+    this.setExhaustPopVisibilityState(1, 1);
   }
 
   updateExhaustPop(deltaTime) {
     if (!this.exhaustPopGroup || this.exhaustPopTimer <= 0) {
-      if (this.exhaustPopGroup) {
-        this.exhaustPopGroup.visible = false;
-      }
+      this.setExhaustPopVisibilityState(0, 0.001);
       return;
     }
 
     this.exhaustPopTimer = Math.max(0, this.exhaustPopTimer - deltaTime);
-    const progress = this.exhaustPopTimer / 0.18;
+    const progress = this.exhaustPopTimer / EXHAUST_POP_DURATION;
     const opacity = Math.min(1, progress * 1.6);
     const scale = 0.35 + progress * 0.85;
 
+    this.setExhaustPopVisibilityState(opacity, scale);
+  }
+
+  setExhaustPopVisibilityState(opacity, scale) {
     this.exhaustPopFlames.forEach((flameGroup) => {
       flameGroup.scale.setScalar(scale);
       flameGroup.children.forEach((child) => {
@@ -357,7 +361,5 @@ export class PorscheVehicle extends PlaceholderVehicle {
     if (this.exhaustPopLight) {
       this.exhaustPopLight.intensity = opacity * 1.4;
     }
-
-    this.exhaustPopGroup.visible = this.exhaustPopTimer > 0;
   }
 }

@@ -883,8 +883,15 @@ export class AudioManager {
     }
 
     this.popCooldown = pop.cooldown + Math.random() * 0.12;
-    this.playEnginePop(time, speedRatio);
     return true;
+  }
+
+  playEnginePopCue(speedRatio = this.lastSpeedRatio) {
+    if (!this.enabled || !this.context || !this.masterGain) {
+      return;
+    }
+
+    this.playEnginePop(this.context.currentTime, clamp(speedRatio, 0, 1));
   }
 
   playEnginePop(time, speedRatio) {
