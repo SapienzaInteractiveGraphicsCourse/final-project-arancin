@@ -1,182 +1,227 @@
 import * as THREE from "three";
 import { markShadow, pseudoRandom } from "../shared.js";
 
-function createSeagull(seed = 0) {
-  const gull = new THREE.Group();
-  gull.name = `TropicalBeachSeagull:${seed}`;
-
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf4f0e6,
-    emissive: 0xf7f1dc,
+const seagullMaterials = {
+  body: new THREE.MeshStandardMaterial({
+    color: 0xf5f1e6,
+    emissive: 0xfff6dd,
     emissiveIntensity: 0.08,
-    roughness: 0.58,
+    roughness: 0.56,
     metalness: 0,
     flatShading: true
-  });
-  const headMaterial = new THREE.MeshStandardMaterial({
+  }),
+  belly: new THREE.MeshStandardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 0.08,
-    roughness: 0.55,
+    emissiveIntensity: 0.06,
+    roughness: 0.6,
     metalness: 0,
     flatShading: true
-  });
-  const wingMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd9dde2,
-    emissive: 0xf2f4f7,
-    emissiveIntensity: 0.06,
+  }),
+  wing: new THREE.MeshStandardMaterial({
+    color: 0xd9dde3,
+    emissive: 0xf4f6f8,
+    emissiveIntensity: 0.05,
     roughness: 0.62,
     metalness: 0,
     flatShading: true,
     side: THREE.DoubleSide
-  });
-  const tipMaterial = new THREE.MeshStandardMaterial({
-    color: 0x18202b,
-    emissive: 0x18202b,
+  }),
+  tip: new THREE.MeshStandardMaterial({
+    color: 0x161d27,
+    emissive: 0x161d27,
     emissiveIntensity: 0.04,
     roughness: 0.78,
     metalness: 0,
-    flatShading: true
-  });
-  const beakMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf6b73c,
-    emissive: 0xf6b73c,
+    flatShading: true,
+    side: THREE.DoubleSide
+  }),
+  beak: new THREE.MeshStandardMaterial({
+    color: 0xf5b642,
+    emissive: 0xf5b642,
     emissiveIntensity: 0.08,
-    roughness: 0.65,
+    roughness: 0.64,
     metalness: 0,
     flatShading: true
-  });
+  }),
+  eye: new THREE.MeshStandardMaterial({
+    color: 0x101318,
+    roughness: 0.5,
+    metalness: 0,
+    flatShading: true
+  })
+};
 
-  const body = markShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.48, 4, 7), bodyMaterial));
+const seagullGeometries = {
+  body: new THREE.CapsuleGeometry(0.17, 0.52, 4, 8),
+  belly: new THREE.SphereGeometry(0.16, 8, 6),
+  head: new THREE.SphereGeometry(0.13, 10, 7),
+  beak: new THREE.ConeGeometry(0.045, 0.2, 6),
+  eye: new THREE.SphereGeometry(0.018, 6, 4),
+  tail: createTriangleGeometry([
+    0, 0.02, -0.36,
+    -0.16, 0, -0.64,
+    0.16, 0, -0.64
+  ]),
+  innerWingLeft: createTriangleGeometry([
+    0, 0, 0,
+    -0.64, 0.025, 0.04,
+    -0.34, -0.018, -0.22
+  ]),
+  outerWingLeft: createTriangleGeometry([
+    -0.58, 0.018, 0.02,
+    -1.16, 0.01, -0.08,
+    -0.43, -0.025, -0.27
+  ]),
+  innerWingRight: createTriangleGeometry([
+    0, 0, 0,
+    0.64, 0.025, 0.04,
+    0.34, -0.018, -0.22
+  ]),
+  outerWingRight: createTriangleGeometry([
+    0.58, 0.018, 0.02,
+    1.16, 0.01, -0.08,
+    0.43, -0.025, -0.27
+  ]),
+  wingTip: new THREE.BoxGeometry(0.24, 0.018, 0.06)
+};
+
+function createTriangleGeometry(vertices) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex([0, 1, 2]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createWing(side) {
+  const wing = new THREE.Group();
+  wing.name = side < 0 ? "SeagullLeftWing" : "SeagullRightWing";
+  wing.position.set(side * 0.13, 0.02, 0.04);
+  wing.userData.dynamic = true;
+
+  const inner = markShadow(new THREE.Mesh(
+    side < 0 ? seagullGeometries.innerWingLeft : seagullGeometries.innerWingRight,
+    seagullMaterials.wing
+  ));
+  inner.name = `${wing.name}:InnerFeather`;
+
+  const outer = markShadow(new THREE.Mesh(
+    side < 0 ? seagullGeometries.outerWingLeft : seagullGeometries.outerWingRight,
+    seagullMaterials.wing
+  ));
+  outer.name = `${wing.name}:OuterFeather`;
+
+  const tip = markShadow(new THREE.Mesh(
+    seagullGeometries.wingTip,
+    seagullMaterials.tip
+  ));
+  tip.name = `${wing.name}:BlackTip`;
+  tip.position.set(side * 1.08, 0.012, -0.08);
+  tip.rotation.y = side * 0.2;
+
+  wing.add(inner, outer, tip);
+  return wing;
+}
+
+function createSeagull(seed = 0) {
+  const gull = new THREE.Group();
+  gull.name = `TropicalBeachSeagull:${seed}`;
+
+  const body = markShadow(new THREE.Mesh(seagullGeometries.body, seagullMaterials.body));
   body.name = "SeagullBody";
   body.rotation.x = Math.PI / 2;
   gull.add(body);
 
-  const head = markShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), headMaterial));
+  const belly = markShadow(new THREE.Mesh(seagullGeometries.belly, seagullMaterials.belly));
+  belly.name = "SeagullBelly";
+  belly.position.set(0, -0.075, 0.02);
+  belly.scale.set(0.82, 0.36, 1.18);
+  gull.add(belly);
+
+  const head = markShadow(new THREE.Mesh(seagullGeometries.head, seagullMaterials.belly));
   head.name = "SeagullHead";
-  head.position.set(0, 0.02, 0.34);
+  head.position.set(0, 0.025, 0.36);
   gull.add(head);
 
-  const beak = markShadow(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), beakMaterial));
+  const beak = markShadow(new THREE.Mesh(seagullGeometries.beak, seagullMaterials.beak));
   beak.name = "SeagullBeak";
-  beak.position.set(0, 0.015, 0.48);
+  beak.position.set(0, 0.012, 0.51);
   beak.rotation.x = Math.PI / 2;
   gull.add(beak);
 
-  const tailGeometry = new THREE.BufferGeometry();
-  tailGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
-    0, 0.02, -0.34,
-    -0.14, 0.0, -0.58,
-    0.14, 0.0, -0.58
-  ], 3));
-  tailGeometry.setIndex([0, 1, 2]);
-  tailGeometry.computeVertexNormals();
-  const tail = markShadow(new THREE.Mesh(tailGeometry, wingMaterial));
-  tail.name = "SeagullTail";
+  [-1, 1].forEach((side) => {
+    const eye = markShadow(new THREE.Mesh(seagullGeometries.eye, seagullMaterials.eye));
+    eye.name = side < 0 ? "SeagullEyeLeft" : "SeagullEyeRight";
+    eye.position.set(side * 0.055, 0.045, 0.465);
+    gull.add(eye);
+  });
+
+  const tail = markShadow(new THREE.Mesh(seagullGeometries.tail, seagullMaterials.wing));
+  tail.name = "SeagullTailFan";
   gull.add(tail);
-
-  function createWing(side) {
-    const wing = new THREE.Group();
-    wing.name = side < 0 ? "SeagullLeftWing" : "SeagullRightWing";
-    wing.position.set(side * 0.12, 0.02, 0.05);
-    wing.userData.dynamic = true;
-
-    const innerGeometry = new THREE.BufferGeometry();
-    innerGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
-      0, 0, 0,
-      side * 0.58, 0.015, 0.05,
-      side * 0.34, -0.01, -0.18
-    ], 3));
-    innerGeometry.setIndex([0, 1, 2]);
-    innerGeometry.computeVertexNormals();
-
-    const outerGeometry = new THREE.BufferGeometry();
-    outerGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
-      side * 0.52, 0.012, 0.04,
-      side * 1.08, 0.02, -0.04,
-      side * 0.44, -0.012, -0.22
-    ], 3));
-    outerGeometry.setIndex([0, 1, 2]);
-    outerGeometry.computeVertexNormals();
-
-    const inner = markShadow(new THREE.Mesh(innerGeometry, wingMaterial));
-    inner.name = `${wing.name}:Inner`;
-    const outer = markShadow(new THREE.Mesh(outerGeometry, wingMaterial));
-    outer.name = `${wing.name}:Outer`;
-    const tip = markShadow(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.018, 0.055), tipMaterial));
-    tip.name = `${wing.name}:BlackTip`;
-    tip.position.set(side * 1.02, 0.015, -0.06);
-    tip.rotation.y = side * 0.18;
-
-    wing.add(inner, outer, tip);
-    return wing;
-  }
 
   const leftWing = createWing(-1);
   const rightWing = createWing(1);
-
   gull.add(leftWing, rightWing);
   gull.userData.wings = { leftWing, rightWing };
+
+  const lean = (pseudoRandom(seed + 8.5) - 0.5) * 0.08;
+  gull.rotation.z = lean;
 
   return gull;
 }
 
-function createSeagullGroup({ center, radiusX, radiusZ, speed, scale, count, seed }) {
-  const flockGroup = new THREE.Group();
-  flockGroup.name = `TropicalBeachVisibleSeagullFlock:${seed}`;
-  flockGroup.userData.flockWings = [];
+function placeSeagull(plan, seed) {
+  const gull = createSeagull(seed);
+  const phase = pseudoRandom(seed + 2.7) * Math.PI * 2;
+  const scale = plan.scale * (0.92 + pseudoRandom(seed + 3.9) * 0.16);
 
-  for (let index = 0; index < count; index += 1) {
-    const gull = createSeagull(seed * 10 + index);
-    const row = Math.floor(index / 3);
-    const column = index % 3;
-    const lateral = (column - 1) * (2.8 + row * 0.35);
-    const forward = row * -2.3 + (pseudoRandom(seed + index * 1.7) - 0.5) * 0.8;
-    const height = (pseudoRandom(seed + index * 2.3) - 0.5) * 1.2;
-
-    gull.position.set(lateral, height, forward);
-    gull.scale.setScalar(scale * (0.92 + pseudoRandom(seed + index * 3.1) * 0.18));
-    gull.rotation.y = (pseudoRandom(seed + index * 4.9) - 0.5) * 0.28;
-    flockGroup.userData.flockWings.push(gull.userData.wings);
-    flockGroup.add(gull);
-  }
-
-  flockGroup.userData.flight = {
-    center: new THREE.Vector3(...center),
-    radiusX,
-    radiusZ,
-    speed,
-    phase: pseudoRandom(seed + 2.7) * Math.PI * 2,
-    bobAmplitude: 0.7 + pseudoRandom(seed + 4.1) * 0.5,
-    bobSpeed: 0.55 + pseudoRandom(seed + 6.3) * 0.25,
-    wingSpeed: 2.65 + pseudoRandom(seed + 8.4) * 0.45,
-    wingAmplitude: 0.44 + pseudoRandom(seed + 10.5) * 0.18
+  gull.scale.setScalar(scale);
+  gull.userData.flight = {
+    center: new THREE.Vector3(...plan.center),
+    radiusX: plan.radiusX,
+    radiusZ: plan.radiusZ,
+    speed: plan.speed,
+    phase,
+    bobAmplitude: plan.bobAmplitude,
+    bobSpeed: plan.bobSpeed,
+    wingSpeed: plan.wingSpeed,
+    wingAmplitude: plan.wingAmplitude
   };
 
-  const flight = flockGroup.userData.flight;
-  flockGroup.position.set(
+  const flight = gull.userData.flight;
+  gull.position.set(
     flight.center.x + Math.cos(flight.phase) * flight.radiusX,
     flight.center.y,
     flight.center.z + Math.sin(flight.phase) * flight.radiusZ
   );
 
-  return flockGroup;
+  return gull;
 }
 
-export function addBeachSeagullFlock(group) {
-  const flock = new THREE.Group();
-  flock.name = "TropicalBeachSeagullFlock";
+export function addBeachSeagulls(group) {
+  const birds = new THREE.Group();
+  birds.name = "TropicalBeachSeagulls";
 
   const flightPlans = [
-    { center: [-24, 5.8, -104], radiusX: 8, radiusZ: 5, speed: 0.045, scale: 1.35, count: 7 },
-    { center: [-8, 6.2, -114], radiusX: 10, radiusZ: 6, speed: 0.048, scale: 1.28, count: 6 },
-    { center: [28, 6.6, -96], radiusX: 12, radiusZ: 7, speed: 0.043, scale: 1.22, count: 8 },
-    { center: [62, 7.0, -52], radiusX: 14, radiusZ: 8, speed: 0.05, scale: 1.16, count: 5 }
+    { center: [-48, 7.4, -118], radiusX: 5.5, radiusZ: 3.2, speed: 0.034, scale: 1.22, bobAmplitude: 0.5, bobSpeed: 0.58, wingSpeed: 2.3, wingAmplitude: 0.34 },
+    { center: [-30, 6.8, -96], radiusX: 4.4, radiusZ: 2.8, speed: 0.038, scale: 1.08, bobAmplitude: 0.42, bobSpeed: 0.62, wingSpeed: 2.55, wingAmplitude: 0.3 },
+    { center: [-11, 8.0, -125], radiusX: 5.0, radiusZ: 3.4, speed: 0.032, scale: 1.18, bobAmplitude: 0.54, bobSpeed: 0.55, wingSpeed: 2.38, wingAmplitude: 0.36 },
+    { center: [8, 6.5, -106], radiusX: 4.2, radiusZ: 2.6, speed: 0.041, scale: 1.04, bobAmplitude: 0.38, bobSpeed: 0.64, wingSpeed: 2.65, wingAmplitude: 0.28 },
+    { center: [25, 7.7, -92], radiusX: 5.6, radiusZ: 3.5, speed: 0.035, scale: 1.16, bobAmplitude: 0.48, bobSpeed: 0.6, wingSpeed: 2.46, wingAmplitude: 0.34 },
+    { center: [42, 6.9, -76], radiusX: 4.8, radiusZ: 3.0, speed: 0.039, scale: 1.08, bobAmplitude: 0.43, bobSpeed: 0.57, wingSpeed: 2.7, wingAmplitude: 0.3 },
+    { center: [61, 8.2, -55], radiusX: 5.8, radiusZ: 3.2, speed: 0.031, scale: 1.2, bobAmplitude: 0.55, bobSpeed: 0.52, wingSpeed: 2.34, wingAmplitude: 0.35 },
+    { center: [76, 7.0, -33], radiusX: 4.6, radiusZ: 2.9, speed: 0.037, scale: 1.06, bobAmplitude: 0.4, bobSpeed: 0.66, wingSpeed: 2.58, wingAmplitude: 0.29 },
+    { center: [48, 9.0, -118], radiusX: 6.0, radiusZ: 3.8, speed: 0.03, scale: 1.24, bobAmplitude: 0.58, bobSpeed: 0.5, wingSpeed: 2.24, wingAmplitude: 0.38 },
+    { center: [3, 8.8, -139], radiusX: 5.2, radiusZ: 3.6, speed: 0.033, scale: 1.14, bobAmplitude: 0.5, bobSpeed: 0.56, wingSpeed: 2.42, wingAmplitude: 0.33 },
+    { center: [-63, 6.3, -78], radiusX: 4.0, radiusZ: 2.7, speed: 0.043, scale: 1.0, bobAmplitude: 0.36, bobSpeed: 0.7, wingSpeed: 2.76, wingAmplitude: 0.27 },
+    { center: [88, 7.9, -72], radiusX: 5.4, radiusZ: 3.1, speed: 0.036, scale: 1.12, bobAmplitude: 0.46, bobSpeed: 0.59, wingSpeed: 2.5, wingAmplitude: 0.32 }
   ];
 
   flightPlans.forEach((plan, index) => {
-    flock.add(createSeagullGroup({ ...plan, seed: index }));
+    birds.add(placeSeagull(plan, index + 1));
   });
 
-  group.add(flock);
+  group.add(birds);
 }
