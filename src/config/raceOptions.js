@@ -33,7 +33,7 @@ export const VEHICLE_OPTIONS = [
   },
   {
     id: "silvia",
-    name: "Silvia",
+    name: "Nissan",
     maxSpeedKmh: getVehicleMaxSpeedKmh("silvia"),
     description: "Agile imported coupe, responsive through corners."
   }
