@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { BaseVehicle } from "./BaseVehicle.js";
 import { createHeadlightBeam } from "./headlightEffects.js";
 
+const KART_WHEEL_GROUND_Y = 0.34;
+
 export class KartVehicle extends BaseVehicle {
   constructor() {
     super({
@@ -131,13 +133,13 @@ export class KartVehicle extends BaseVehicle {
     this.addBumper("KartRearBumper", [0, 0.47, -1.32], 1.38);
     this.addRollBar();
 
-    this.addAxle("KartFrontAxle", [0, 0.38, 0.88]);
-    this.addAxle("KartRearAxle", [0, 0.38, -0.92]);
+    this.addAxle("KartFrontAxle", [0, KART_WHEEL_GROUND_Y, 0.88]);
+    this.addAxle("KartRearAxle", [0, KART_WHEEL_GROUND_Y, -0.92]);
 
-    this.addWheel("KartWheelFrontLeft", [-1.08, 0.38, 0.88], true);
-    this.addWheel("KartWheelFrontRight", [1.08, 0.38, 0.88], true);
-    this.addWheel("KartWheelRearLeft", [-1.08, 0.38, -0.92], false);
-    this.addWheel("KartWheelRearRight", [1.08, 0.38, -0.92], false);
+    this.addWheel("KartWheelFrontLeft", [-1.08, KART_WHEEL_GROUND_Y, 0.88], true);
+    this.addWheel("KartWheelFrontRight", [1.08, KART_WHEEL_GROUND_Y, 0.88], true);
+    this.addWheel("KartWheelRearLeft", [-1.08, KART_WHEEL_GROUND_Y, -0.92], false);
+    this.addWheel("KartWheelRearRight", [1.08, KART_WHEEL_GROUND_Y, -0.92], false);
 
     this.addDriver();
     this.addSteeringWheel();

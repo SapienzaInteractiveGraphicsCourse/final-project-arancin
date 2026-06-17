@@ -1,5 +1,7 @@
 import { VEHICLE_PERFORMANCE } from "./vehiclePerformance.js";
 
+const VEHICLE_SPEED_ESTIMATE_DELTA_TIME = 1 / 60;
+
 export const TRACK_OPTIONS = [
   {
     id: "vegas",
@@ -113,7 +115,12 @@ function getVehicleMaxSpeedKmh(vehicleId) {
     return 0;
   }
 
-  const steadyStateSpeed = performance.acceleration / performance.rollingFriction;
+  const frameFriction = Math.exp(-performance.rollingFriction * VEHICLE_SPEED_ESTIMATE_DELTA_TIME);
+  const steadyStateSpeed = (
+    performance.acceleration *
+    VEHICLE_SPEED_ESTIMATE_DELTA_TIME *
+    frameFriction
+  ) / (1 - frameFriction);
   const cappedSpeed = Math.min(steadyStateSpeed, performance.maxForwardSpeed);
 
   return Math.round(cappedSpeed * 3.6);

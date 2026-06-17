@@ -405,6 +405,7 @@ export function startScenePreview(container, setup, options = {}) {
     const audioEvents = audioManager.update(deltaTime, state, heldInputState);
     if (audioEvents?.enginePop) {
       vehicle.triggerExhaustPop?.();
+      audioManager.playEnginePopCue(state.speedRatio);
     }
 
     // Auto-enable headlights for night circuits (Vegas)
