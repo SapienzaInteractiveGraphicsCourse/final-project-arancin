@@ -484,14 +484,6 @@ export function startScenePreview(container, setup, options = {}) {
           child.userData.wings.leftWing.rotation.x = -0.12 + flap;
           child.userData.wings.rightWing.rotation.x = -0.12 - flap;
         }
-        if (child.userData.flockWings) {
-          const flap = Math.sin(totalElapsedTime * f.wingSpeed + f.phase) * f.wingAmplitude;
-          child.userData.flockWings.forEach((wings, wingIndex) => {
-            const offsetFlap = flap * (0.85 + (wingIndex % 3) * 0.08);
-            wings.leftWing.rotation.x = -0.12 + offsetFlap;
-            wings.rightWing.rotation.x = -0.12 - offsetFlap;
-          });
-        }
       }
     }
 
