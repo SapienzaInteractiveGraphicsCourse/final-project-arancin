@@ -285,7 +285,7 @@ function buildEiffelTower(group, curve, roadHalfWidth) {
   const tower = new THREE.Group();
   tower.name = "VegasSkyline:EiffelTower";
 
-  const transform = getRoadsideTransform(curve, 0.11, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  const transform = getRoadsideTransform(curve, 0.1, -1, roadHalfWidth + 42, roadHalfWidth, 30);
   tower.position.copy(transform.position);
   tower.rotation.y = transform.rotationY;
 
@@ -397,7 +397,7 @@ function buildFerrisWheel(group, curve, roadHalfWidth) {
   const ferrisGroup = new THREE.Group();
   ferrisGroup.name = "VegasSkyline:FerrisWheel";
 
-  const transform = getRoadsideTransform(curve, 0.13, -1, roadHalfWidth + 72, roadHalfWidth, 35);
+  const transform = getRoadsideTransform(curve, 0.155, -1, roadHalfWidth + 90, roadHalfWidth, 45);
   ferrisGroup.position.copy(transform.position);
   ferrisGroup.rotation.y = transform.rotationY + Math.PI / 2;
 
