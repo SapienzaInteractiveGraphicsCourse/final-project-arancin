@@ -38,6 +38,7 @@ Each track has a distinct visual theme, layout, lighting setup and environmental
 - Procedural kart model with hierarchical components and JavaScript animations
 - Imported Porsche and Nissan Silvia models with cached loading
 - Three themed tracks with checkpoints, barriers and decorative environments
+- Custom GLSL boost-pad shader with animated pulse uniforms
 - Race mode and time trial mode
 - AI opponent in race mode
 - Collision handling with track barriers and opponent vehicle

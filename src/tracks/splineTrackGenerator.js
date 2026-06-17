@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import {
+  createBoostPadShaderMaterial,
+  registerBoostPadShaderMaterial
+} from "../materials/boostPadShader.js";
+import {
   createSplineCenterline,
   createTrackCurve,
   getMinimapBounds,
@@ -653,7 +657,7 @@ function addBoostPads(group, curve, definition, material) {
     padGroup.position.set(point.x, ROAD_Y + 0.045, point.z);
     padGroup.rotation.y = heading;
 
-    createBoostPadVisual(padGroup, material, definition);
+    createBoostPadVisual(group, padGroup, material, definition, index);
     group.add(padGroup);
 
     return {
@@ -664,7 +668,7 @@ function addBoostPads(group, curve, definition, material) {
   });
 }
 
-function createBoostPadVisual(padGroup, material, definition) {
+function createBoostPadVisual(trackGroup, padGroup, material, definition, padIndex) {
   const boostColor = definition.palette.boost ?? 0xffd23a;
   const accentColor = definition.id === "beach" ? 0x7dd3fc : (definition.id === "monaco" ? 0xffffff : 0xfff7ad);
   const glowMaterial = material.clone();
@@ -682,6 +686,13 @@ function createBoostPadVisual(padGroup, material, definition) {
     depthWrite: false,
     side: THREE.DoubleSide
   });
+  const pulseMaterial = createBoostPadShaderMaterial({
+    baseColor: boostColor,
+    accentColor,
+    opacity: definition.id === "vegas" ? 0.9 : 0.74,
+    phase: padIndex * 0.85
+  });
+  registerBoostPadShaderMaterial(trackGroup, pulseMaterial);
   const accentMaterial = new THREE.MeshStandardMaterial({
     color: accentColor,
     emissive: accentColor,
@@ -695,7 +706,7 @@ function createBoostPadVisual(padGroup, material, definition) {
   base.receiveShadow = true;
   padGroup.add(base);
 
-  const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 56), glassMaterial);
+  const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 56), pulseMaterial);
   glowDisc.name = "BoostPadGlow";
   glowDisc.rotation.x = -Math.PI / 2;
   glowDisc.position.y = 0.035;

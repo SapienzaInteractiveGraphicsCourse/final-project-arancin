@@ -48,6 +48,7 @@ import {
   readBestLapTime,
   writeBestLapTime
 } from "../systems/raceRecords.js";
+import { updateBoostPadShaderTime } from "../materials/boostPadShader.js";
 
 const VEHICLE_LOADING_MIN_MS = {
   kart: 420,
@@ -186,6 +187,7 @@ export function startScenePreview(container, setup, options = {}) {
   let lastAudioBoostActive = false;
   let lastAudioRacePosition = raceManager.getState().position;
   let lastAudioRacePhase = raceManager.getState().phase;
+  let shaderElapsedTime = 0;
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
@@ -342,6 +344,9 @@ export function startScenePreview(container, setup, options = {}) {
     if (paused) {
       return;
     }
+
+    shaderElapsedTime += deltaTime;
+    updateBoostPadShaderTime(track.group, shaderElapsedTime);
 
     if (!raceArmed) {
       const state = controller.getState();
