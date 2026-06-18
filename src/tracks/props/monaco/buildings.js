@@ -181,6 +181,10 @@ export function addMonacoHillsideBuildings(group, curve, definition) {
     const treeSamples = collectMonacoSamples(curve, section.start, section.end, 5.2);
     treeSamples.forEach((sample, sampleIndex) => {
       const isCentralBuildableZone = sectionIndex === 1 || sectionIndex === 2;
+      if (sectionIndex === 1 && sampleIndex === 15) {
+        treeSeed += 1;
+        return;
+      }
       if (sampleIndex % 4 === 1 || sampleIndex % 6 === 4 || (isCentralBuildableZone && sampleIndex % 3 !== 0)) {
         return;
       }
