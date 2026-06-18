@@ -7,7 +7,7 @@ This register tracks assets that are not authored procedurally by the team.
 | Vehicle | Format | Local path | Current status |
 | --- | --- | --- | --- |
 | Porsche Cayman GT4 | GLB | `src/assets/models/vehicles/porsche-cayman-gt4/source/porsche_cayman_gt4+.glb` | Integrated with cached loader, cloned instances, scale/orientation fit, JS lights and wheel handling |
-| Nissan Silvia S14 Kouki | FBX | `src/assets/models/vehicles/nissan-silvia-kouki/source/FINAL_MODEL_VERTEX.fbx` | Imported only, not wired into gameplay |
+| Nissan Silvia S14 Kouki | FBX | `src/assets/models/vehicles/nissan-silvia-kouki/source/FINAL_MODEL_VERTEX.fbx` | Integrated with cached loader, cloned instances, scale/orientation fit, JS lights and wheel handling |
 
 ## Porsche Cayman GT4
 
@@ -18,6 +18,16 @@ This register tracks assets that are not authored procedurally by the team.
 - License URL: `http://creativecommons.org/licenses/by-nc-sa/4.0/`
 - Source metadata location: embedded GLB `asset.extras`
 - Integration notes: loaded through `src/vehicles/loaders/loadPorscheModel.js`, cloned per instance, and animated with JavaScript-authored wheel and light handling.
+
+## Nissan Silvia S14 Kouki
+
+- Title: `2018 VERTEX RIDGE S14 SILVIA Kouki`
+- Author: Ddiaz Design
+- Source: `https://sketchfab.com/3d-models/2018-vertex-ridge-s14-silvia-kouki-c5958cec759f41bbb770fca138bdb6ce`
+- License: CC-BY-NC-SA-4.0
+- License URL: `https://creativecommons.org/licenses/by-nc-sa/4.0/`
+- Source notes: Sketchfab page states the model is based on a Need For Speed Unbound 3D model and credits GM25.
+- Integration notes: loaded through `src/vehicles/loaders/loadSilviaModel.js`, cloned per instance, and animated with JavaScript-authored wheel, steering and light handling. No imported animation clips are used.
 
 ## Team-authored Assets
 
