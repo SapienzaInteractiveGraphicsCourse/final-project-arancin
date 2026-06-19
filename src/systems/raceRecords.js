@@ -24,7 +24,7 @@ export function writeBestLapTime(storage, key, lapTime) {
   storage.setItem(key, String(lapTime));
 }
 
-export function readLapRecords(storage, key) {
+function readLapRecords(storage, key) {
   if (!storage || !key) {
     return [];
   }

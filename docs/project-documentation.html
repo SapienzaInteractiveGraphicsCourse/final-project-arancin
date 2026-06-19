@@ -196,10 +196,6 @@
       <td>Used for smooth runtime transitions such as the arcade barrier bounce response.</td>
     </tr>
     <tr>
-      <td>playwright-core</td>
-      <td>Used for browser verification scripts and visual checks during development.</td>
-    </tr>
-    <tr>
       <td>Web Audio API</td>
       <td>Used by the audio manager for procedural engine audio and event feedback, with additional ambience samples where appropriate.</td>
     </tr>
@@ -207,7 +203,7 @@
 
   <h3>External models and assets</h3>
   <p>The Porsche Cayman GT4 model is imported from Sketchfab and licensed under CC-BY-NC-SA-4.0. The Nissan Silvia S14 Kouki model is also imported from Sketchfab, authored by Ddiaz Design, and licensed under CC-BY-NC-SA-4.0. Both models are used as static visual assets; their runtime motion is authored in JavaScript by the team. The procedural kart, tracks, most props, lights, particle effects, shader effects and generated textures are team-authored.</p>
-  <p>The project uses several audio files for crowd ambience, beach ambience and collision feedback. The runtime engine sound itself is procedural and generated with the Web Audio API. The asset register documents current external sources and remaining license checks.</p>
+  <p>The project uses several audio files for crowd ambience, beach ambience and collision feedback. The runtime engine sound itself is procedural and generated with the Web Audio API. The imported model licenses are listed in this section; audio source and license details should be verified and recorded in the final submission materials before publication.</p>
 
   <h2>3. Application Architecture</h2>
   <p>The codebase is organized by responsibility. The entry point initializes the setup menu and lazily starts the Three.js scene only after the player chooses a configuration. Runtime logic is divided into systems so that physics, input, race state, camera, minimap and audio do not live inside a single monolithic file.</p>
@@ -386,14 +382,13 @@
   <p>In Race mode the player competes against one AI opponent for multiple laps. The AI uses the same selected vehicle type and is visible on both the track and minimap. In Time Trial mode the player races alone, and the game records lap times and local best laps for the selected vehicle and track. Checkpoints must be crossed in order; returning to the start/finish line after the intermediate checkpoints completes a lap.</p>
 
   <h2>9. Verification and Known Limitations</h2>
-  <p>The project is verified with the production build command <code>bun run build</code>. Additional browser checks were used during development for menu flow, scene startup, countdown behavior, screenshots and visual regressions on the Monaco grandstands. The renderer also exposes a runtime statistics panel for FPS, draw calls, triangle count, geometry count and texture count.</p>
+  <p>The project is verified with the production build command <code>bun run build</code>. Browser verification is currently manual: setup menu flow, scene startup, all three tracks, all three vehicles, race and time trial modes, countdown behavior, HUD and minimap updates, camera changes, headlights, collisions, pause flow and finish screen. The renderer also exposes a runtime statistics panel for FPS.</p>
 
   <h3>Known limitations</h3>
   <ul>
     <li>The physics model is intentionally arcade-style and does not use a rigid-body physics engine.</li>
     <li>The AI follows a centerline-based route and does not implement advanced overtaking strategy.</li>
     <li>The tracks are mostly planar so collision, minimap and AI logic remain reliable.</li>
-    <li>Some external audio asset licenses should be double-checked before final publication, as documented in the asset register.</li>
   </ul>
 
   <h3>Conclusion</h3>

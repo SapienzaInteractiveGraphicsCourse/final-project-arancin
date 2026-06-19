@@ -1,3 +1,5 @@
+import { normalizeTrackTheme } from "./trackTheme.js";
+
 const HUD_GROUPS = [
   {
     className: "race-hud-main",
@@ -67,14 +69,6 @@ function setField(values, id, text) {
 
   element.textContent = text;
   element.hidden = text.length === 0;
-}
-
-function normalizeTrackTheme(trackId) {
-  if (trackId === "vegas" || trackId === "beach" || trackId === "monaco") {
-    return trackId;
-  }
-
-  return "default";
 }
 
 function formatSpeed(speed) {
