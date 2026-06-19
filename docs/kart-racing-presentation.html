@@ -240,8 +240,7 @@
           <pre><code>"scripts": {
   "dev": "vite --host 0.0.0.0",
   "build": "vite build",
-  "preview": "vite preview --host 0.0.0.0",
-  "verify:scene": "node scripts/verify-scene.mjs"
+  "preview": "vite preview --host 0.0.0.0"
 },</code></pre>
         </div>
       </div>
@@ -262,7 +261,7 @@
         <tr><td>Tracks and props</td><td>Spline generator plus themed low-poly modules.</td><td>Geometry, placement and animations are team-authored.</td></tr>
         <tr><td>Audio</td><td>Crowd, ambience and impact samples plus procedural engine sound.</td><td>Triggered and mixed by runtime state.</td></tr>
       </table>
-      <div class="footer">Asset register documents external sources and licenses</div>
+      <div class="footer">Final submission materials document external sources and license checks</div>
     </section>
 
     <section class="slide">
@@ -342,7 +341,7 @@
           <li>Selection state drives scene creation, race rules, vehicle factory and audio profiles.</li>
         </ul>
       </div>
-      <div class="footer">Screenshots generated from the live project</div>
+      <div class="footer">Screenshots captured from the live project</div>
     </section>
 
     <section class="slide">
@@ -605,7 +604,7 @@ uvs.push(0, cumulativeDistance / ROAD_UV_SCALE, 1, cumulativeDistance / ROAD_UV_
         <span class="tag">Beach: sand, water, palms</span>
         <span class="tag">Monaco: marina, city, grandstands</span>
       </div>
-      <div class="footer">Screenshots generated from live track previews</div>
+      <div class="footer">Screenshots captured from live track previews</div>
     </section>
 
     <section class="slide">
@@ -620,7 +619,7 @@ uvs.push(0, cumulativeDistance / ROAD_UV_SCALE, 1, cumulativeDistance / ROAD_UV_
         </div>
         <div class="body">
           <ul>
-            <li>Dark ground and glossy asphalt show specular-style highlights.</li>
+            <li>Dark ground and asphalt materials use roughness/metalness response for visible highlights.</li>
             <li>Neon road edges use emissive materials.</li>
             <li>Sky gradient and fog create a night city mood.</li>
             <li>Decorative signs and skyline props sell the environment.</li>
@@ -665,8 +664,8 @@ uvs.push(0, cumulativeDistance / ROAD_UV_SCALE, 1, cumulativeDistance / ROAD_UV_
         <div class="body">
           <ul>
             <li>City buildings, yachts, barriers, gantries and flags define the scene.</li>
-            <li>Grandstands use crowd texture and repeated spectator geometry.</li>
-            <li>Recent cleanup adjusted crowd/tree placement near the final curve.</li>
+            <li>Grandstands use repeated spectator geometry with varied shirt, skin, cap and flag materials.</li>
+            <li>Crowd, buildings, flags and lamps are placed from sampled spline sections.</li>
             <li>Road width and barriers make it the most technical track.</li>
           </ul>
         </div>
@@ -1122,14 +1121,14 @@ left.y = ROAD_Y;</code></pre>
       <div class="slide-logo" aria-label="Kart Racing Simulator logo"></div>
 <div class="slide-num"></div>
       <h1>Verification</h1>
-      <h2>Build and visual checks</h2>
+      <h2>Build and manual visual checks</h2>
       <div class="cols">
         <div class="body">
           <ul>
             <li><code>bun run build</code> passes.</li>
-            <li>Playwright-core is used for browser checks and screenshots.</li>
-            <li>Generated screenshots cover menu flow and all three tracks.</li>
-            <li>Recent Monaco grandstand cleanup was checked visually near the start/final curve.</li>
+            <li>Browser verification is currently manual: setup flow, scene startup and countdown behavior.</li>
+            <li>Stored presentation screenshots cover menu flow and all three track themes.</li>
+            <li>Manual checks cover vehicles, race modes, HUD/minimap, camera, headlights, collisions, pause and finish screen.</li>
           </ul>
         </div>
         <div class="code-slot">
