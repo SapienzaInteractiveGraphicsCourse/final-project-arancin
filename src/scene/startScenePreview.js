@@ -9,6 +9,7 @@ import { createPreviewDebugOptions } from "./preview/debugOptions.js";
 import { createPreviewFrameLoop } from "./preview/frameLoop.js";
 import { createGhostVehicleController } from "./preview/ghostVehicle.js";
 import { updatePlayerRacePosition } from "./preview/racePosition.js";
+import { AI_CONTROLLER_TUNING } from "../config/aiTuning.js";
 import { VEHICLE_COLOR_OPTIONS } from "../config/raceOptions.js";
 import { applyTrackLightingTheme, applyTrackSceneTheme } from "../tracks/applyTrackSceneTheme.js";
 import { createTrackById } from "../tracks/trackFactory.js";
@@ -82,7 +83,9 @@ export function startScenePreview(container, setup, options = {}) {
   });
   audioManager.setMuted(audioSettings.muted);
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
-  const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
+  const aiController = aiVehicle
+    ? new AiVehicleController(aiVehicle.performance, track.trackInfo, AI_CONTROLLER_TUNING)
+    : null;
   const trackInteraction = new TrackInteractionSystem();
   const barrierParticles = new BarrierParticleSystem();
   const wrongWayDetector = new WrongWayDetector();
