@@ -26,7 +26,7 @@ export const VEHICLE_PERFORMANCE = {
   kart: {
     maxForwardSpeed: 32,
     maxReverseSpeed: 8,
-    acceleration: 30,
+    acceleration: 38,
     brakeAcceleration: 34,
     rollingFriction: 1.8,
     idleFriction: 2.8,

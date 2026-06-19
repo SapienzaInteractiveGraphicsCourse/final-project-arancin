@@ -1,6 +1,6 @@
 import { VEHICLE_COLOR_OPTIONS } from "../config/raceOptions.js";
 
-export function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm }) {
+export function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm, onExplore, onExitExplore }) {
   const element = document.createElement("section");
   element.className = "pre-race-color-picker";
   element.setAttribute("aria-label", "Choose vehicle color");
@@ -41,6 +41,22 @@ export function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm })
     onConfirm?.(selectedColor);
   });
 
+  const exploreButton = document.createElement("button");
+  exploreButton.className = "pre-race-free-camera-button";
+  exploreButton.type = "button";
+  exploreButton.textContent = "Free Camera";
+  exploreButton.addEventListener("click", () => {
+    if (element.dataset.exploring === "true") {
+      onExitExplore?.();
+    } else {
+      onExplore?.();
+    }
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "pre-race-actions";
+  actions.append(exploreButton, confirmButton);
+
   element.innerHTML = `
     <div class="pre-race-color-copy">
       <span>Vehicle Color</span>
@@ -48,10 +64,15 @@ export function createPreRaceColorPicker({ selectedColor, onSelect, onConfirm })
     </div>
   `;
   element.appendChild(options);
-  element.appendChild(confirmButton);
+  element.appendChild(actions);
 
   return {
     element,
+    setExploring: (isExploring) => {
+      element.dataset.exploring = String(isExploring);
+      exploreButton.textContent = isExploring ? "Back" : "Free Camera";
+      confirmButton.disabled = isExploring;
+    },
     hide: () => {
       element.hidden = true;
     }

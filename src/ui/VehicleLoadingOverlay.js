@@ -1,7 +1,7 @@
 const VEHICLE_DISPLAY_NAMES = {
   kart: "Kart",
   porsche: "Porsche",
-  silvia: "Silvia"
+  silvia: "Nissan"
 };
 
 export function createVehicleLoadingOverlay(setup = {}) {

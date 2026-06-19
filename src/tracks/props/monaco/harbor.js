@@ -5,37 +5,35 @@ import { addMonacoInstancedPart, collectMonacoSamples, createMonacoRibbonMesh, c
 import { MONACO_GROUND_Y, MONACO_ROAD_Y } from "./constants.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
-const SIMPLE_YACHT_PALETTE = [
-  { hull: 0xffffff, stripe: 0x173b73, canvas: 0xf8fafc },
-  { hull: 0xf6f9fb, stripe: 0x111827, canvas: 0xe7edf2 },
-  { hull: 0xe9eff4, stripe: 0xb91c1c, canvas: 0xffffff },
-  { hull: 0xfdfaf3, stripe: 0x0f766e, canvas: 0xf3ead5 },
-  { hull: 0x121a24, stripe: 0xf4f7fb, canvas: 0xf8fafc },
-  { hull: 0xf7f3e8, stripe: 0x244f86, canvas: 0xdfe9ef },
-  { hull: 0xfafafa, stripe: 0x9a3412, canvas: 0xf4efe5 },
-  { hull: 0xdfe7ef, stripe: 0x1f2937, canvas: 0xf8fafc }
+const YACHT_VARIANTS = [
+  { hull: 0xf8fafc, accent: 0x173b73, canvas: 0xffffff, length: 8.8, width: 2.35, cabin: 0.34 },
+  { hull: 0x26354a, accent: 0xe8edf2, canvas: 0xd8e6ef, length: 10.4, width: 2.65, cabin: 0.38 },
+  { hull: 0xf7f1e4, accent: 0x0f766e, canvas: 0xf3ead5, length: 8.2, width: 2.2, cabin: 0.3 },
+  { hull: 0xe9eef4, accent: 0xb91c1c, canvas: 0xf9fafb, length: 11.6, width: 2.85, cabin: 0.4 }
 ];
 
 const simpleYachtGeometries = {
-  hull: new THREE.BoxGeometry(1, 1, 1),
-  cabin: createMonacoRoundedBoxGeometry(1, 1, 1, 0.08, 0.018),
+  hull: createMonacoYachtHullGeometry(),
+  cabin: createMonacoRoundedBoxGeometry(1, 1, 1, 0.16, 0.025),
   deck: new THREE.BoxGeometry(1, 1, 1),
   stripe: new THREE.BoxGeometry(1, 1, 1),
   glass: new THREE.BoxGeometry(1, 1, 1),
+  rail: new THREE.CylinderGeometry(0.018, 0.018, 1, 8),
+  radar: new THREE.CylinderGeometry(0.16, 0.16, 0.045, 16),
   mast: new THREE.CylinderGeometry(0.018, 0.018, 1, 6)
 };
 
 const simpleYachtMaterials = {
-  hulls: SIMPLE_YACHT_PALETTE.map(({ hull }) => createFlatStandardMaterial({
+  hulls: YACHT_VARIANTS.map(({ hull }) => createFlatStandardMaterial({
     color: hull,
     roughness: 0.28,
     metalness: 0.08
   })),
-  stripes: SIMPLE_YACHT_PALETTE.map(({ stripe }) => createFlatStandardMaterial({
-    color: stripe,
+  stripes: YACHT_VARIANTS.map(({ accent }) => createFlatStandardMaterial({
+    color: accent,
     roughness: 0.36
   })),
-  canvases: SIMPLE_YACHT_PALETTE.map(({ canvas }) => createFlatStandardMaterial({
+  canvases: YACHT_VARIANTS.map(({ canvas }) => createFlatStandardMaterial({
     color: canvas,
     roughness: 0.72
   })),
@@ -77,6 +75,63 @@ function createMonacoRoundedBoxGeometry(width, height, depth, radius = 0.12, bev
   return geometry;
 }
 
+function createMonacoYachtHullGeometry() {
+  const ringDefs = [
+    { z: -0.5, halfWidth: 0.08, top: 0.34, chine: -0.1, keel: -0.34 },
+    { z: -0.32, halfWidth: 0.42, top: 0.42, chine: -0.14, keel: -0.38 },
+    { z: 0.05, halfWidth: 0.5, top: 0.44, chine: -0.16, keel: -0.42 },
+    { z: 0.34, halfWidth: 0.36, top: 0.38, chine: -0.13, keel: -0.34 },
+    { z: 0.5, halfWidth: 0.06, top: 0.25, chine: -0.08, keel: -0.22 }
+  ];
+  const vertices = [];
+  const indices = [];
+
+  ringDefs.forEach(({ z, halfWidth, top, chine, keel }) => {
+    vertices.push(
+      -halfWidth, top, z,
+      halfWidth, top, z,
+      -halfWidth * 0.82, chine, z,
+      halfWidth * 0.82, chine, z,
+      0, keel, z
+    );
+  });
+
+  for (let ring = 0; ring < ringDefs.length - 1; ring += 1) {
+    const current = ring * 5;
+    const next = current + 5;
+    indices.push(
+      current, next, current + 1,
+      current + 1, next, next + 1,
+      current, current + 2, next,
+      current + 2, next + 2, next,
+      current + 1, next + 1, current + 3,
+      current + 3, next + 1, next + 3,
+      current + 2, current + 4, next + 2,
+      current + 4, next + 4, next + 2,
+      current + 4, current + 3, next + 4,
+      current + 3, next + 3, next + 4
+    );
+  }
+
+  indices.push(
+    0, 1, 2,
+    1, 3, 2,
+    2, 3, 4
+  );
+  const last = (ringDefs.length - 1) * 5;
+  indices.push(
+    last, last + 2, last + 1,
+    last + 1, last + 2, last + 3,
+    last + 2, last + 4, last + 3
+  );
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset, farOffset, y, material) {
   const vertices = [];
   const indices = [];
@@ -112,41 +167,16 @@ function createMonacoContinuousWaterMesh(curve, definition, sections, nearOffset
   return mesh;
 }
 
-function createMonacoWaterHighlightMesh(curve, definition, sections, offset, y, material) {
-  const geometry = new THREE.BoxGeometry(0.08, 0.012, 3.8);
-  const matrices = [];
-  const matrix = new THREE.Matrix4();
-
-  sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 4.8);
-    samples.forEach((sample, sampleIndex) => {
-      if ((sampleIndex + sectionIndex) % 2 === 1) {
-        return;
-      }
-      const position = sample.center
-        .clone()
-        .addScaledVector(sample.right, section.side * (offset + pseudoRandom(sectionIndex * 19 + sampleIndex) * 26))
-        .addScaledVector(sample.tangent, (pseudoRandom(sampleIndex + 3) - 0.5) * 1.2);
-      position.y = y;
-      const right = sample.right.clone().multiplyScalar(section.side);
-      const tangent = sample.tangent.clone().setY(0).normalize();
-      matrix.makeBasis(right, UP, tangent.clone().negate());
-      matrix.setPosition(position);
-      matrices.push(matrix.clone());
-    });
-  });
-
-  return { geometry, matrices, material };
-}
-
 function createSimpleYachtBatch() {
   return {
-    hulls: SIMPLE_YACHT_PALETTE.map(() => []),
-    cabins: SIMPLE_YACHT_PALETTE.map(() => []),
+    hulls: YACHT_VARIANTS.map(() => []),
+    cabins: YACHT_VARIANTS.map(() => []),
     decks: [],
-    stripes: SIMPLE_YACHT_PALETTE.map(() => []),
+    stripes: YACHT_VARIANTS.map(() => []),
     glass: [],
-    canvases: SIMPLE_YACHT_PALETTE.map(() => []),
+    rails: [],
+    radars: [],
+    canvases: YACHT_VARIANTS.map(() => []),
     masts: []
   };
 }
@@ -158,14 +188,33 @@ function composeSimpleYachtMatrix(basePosition, heading, localPosition, localSca
   return new THREE.Matrix4().compose(position, baseRotation, localScale);
 }
 
+function getSimpleYachtDimensions(seed, scale, large = false) {
+  const variant = seed % YACHT_VARIANTS.length;
+  const config = YACHT_VARIANTS[variant];
+  const yachtScale = scale * (large ? 1.05 : 1);
+  return {
+    variant,
+    yachtScale,
+    length: config.length * yachtScale,
+    width: config.width * yachtScale,
+    hullHeight: (0.86 + pseudoRandom(seed + 3) * 0.16) * yachtScale,
+    cabinLength: config.length * yachtScale * config.cabin,
+    cabinWidth: config.width * yachtScale * (0.48 + pseudoRandom(seed + 5) * 0.08),
+    cabinHeight: (0.82 + pseudoRandom(seed + 6) * 0.2) * yachtScale
+  };
+}
+
+function canPlaceYacht(placedYachts, position, length, width) {
+  return placedYachts.every((placed) => {
+    const distance = position.distanceTo(placed.position);
+    const lateralClearance = Math.max(width, placed.width) * 1.55;
+    const bowClearance = Math.min(length, placed.length) * 0.48;
+    return distance > Math.max(lateralClearance, bowClearance);
+  });
+}
+
 function addSimpleYachtToBatch(batch, position, heading, scale, seed, large = false) {
-  const variant = seed % SIMPLE_YACHT_PALETTE.length;
-  const length = (large ? 15.5 : 9.8 + pseudoRandom(seed + 1) * 3.4) * scale;
-  const width = (large ? 3.8 : 2.4 + pseudoRandom(seed + 2) * 1.0) * scale;
-  const hullHeight = (large ? 0.95 : 0.66 + pseudoRandom(seed + 3) * 0.22) * scale;
-  const cabinLength = length * (large ? 0.36 : 0.28 + pseudoRandom(seed + 4) * 0.12);
-  const cabinWidth = width * (large ? 0.62 : 0.5 + pseudoRandom(seed + 5) * 0.14);
-  const cabinHeight = (large ? 0.78 : 0.52 + pseudoRandom(seed + 6) * 0.22) * scale;
+  const { variant, yachtScale, length, width, hullHeight, cabinLength, cabinWidth, cabinHeight } = getSimpleYachtDimensions(seed, scale, large);
   const basePosition = position.clone();
   basePosition.y += hullHeight * 0.5;
 
@@ -178,46 +227,102 @@ function addSimpleYachtToBatch(batch, position, heading, scale, seed, large = fa
   batch.decks.push(composeSimpleYachtMatrix(
     basePosition,
     heading,
-    new THREE.Vector3(0, hullHeight * 0.55, -length * 0.08),
-    new THREE.Vector3(width * 0.72, 0.045 * scale, length * 0.52)
+    new THREE.Vector3(0, hullHeight * 0.44, -length * 0.06),
+    new THREE.Vector3(width * 0.68, 0.06 * yachtScale, length * 0.62)
   ));
   batch.cabins[variant].push(composeSimpleYachtMatrix(
     basePosition,
     heading,
-    new THREE.Vector3(0, hullHeight * 0.8 + cabinHeight * 0.5, length * 0.04),
+    new THREE.Vector3(0, hullHeight * 0.58 + cabinHeight * 0.5, length * 0.04),
     new THREE.Vector3(cabinWidth, cabinHeight, cabinLength)
   ));
   batch.glass.push(composeSimpleYachtMatrix(
     basePosition,
     heading,
-    new THREE.Vector3(0, hullHeight * 0.92 + cabinHeight * 0.72, length * 0.04 + cabinLength * 0.5),
-    new THREE.Vector3(cabinWidth * 0.86, cabinHeight * 0.28, 0.06 * scale)
+    new THREE.Vector3(0, hullHeight * 0.67 + cabinHeight * 0.68, length * 0.04 + cabinLength * 0.5),
+    new THREE.Vector3(cabinWidth * 0.82, cabinHeight * 0.25, 0.08 * yachtScale)
   ));
 
   [-1, 1].forEach((side) => {
     batch.stripes[variant].push(composeSimpleYachtMatrix(
       basePosition,
       heading,
-      new THREE.Vector3(side * width * 0.51, hullHeight * 0.08, -length * 0.04),
-      new THREE.Vector3(0.04 * scale, 0.08 * scale, length * 0.72)
+      new THREE.Vector3(side * width * 0.43, hullHeight * 0.03, -length * 0.02),
+      new THREE.Vector3(0.055 * yachtScale, 0.12 * yachtScale, length * 0.76)
     ));
+
+    [-0.3, -0.05, 0.2, 0.42].forEach((zOffset) => {
+      batch.rails.push(composeSimpleYachtMatrix(
+        basePosition,
+        heading,
+        new THREE.Vector3(side * width * 0.39, hullHeight * 0.58, length * zOffset),
+        new THREE.Vector3(yachtScale, 0.58 * yachtScale, yachtScale)
+      ));
+    });
   });
 
-  if (large || variant % 2 === 0) {
-    batch.canvases[variant].push(composeSimpleYachtMatrix(
-      basePosition,
-      heading,
-      new THREE.Vector3(0, hullHeight * 0.98 + cabinHeight + 0.16 * scale, -length * 0.08),
-      new THREE.Vector3(cabinWidth * 0.78, 0.09 * scale, cabinLength * 0.62)
-    ));
-  }
+  batch.canvases[variant].push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, hullHeight * 0.64 + cabinHeight + 0.16 * yachtScale, -length * 0.04),
+    new THREE.Vector3(cabinWidth * 0.72, 0.1 * yachtScale, cabinLength * 0.58)
+  ));
+
+  batch.radars.push(composeSimpleYachtMatrix(
+    basePosition,
+    heading,
+    new THREE.Vector3(0, hullHeight * 0.72 + cabinHeight + 0.36 * yachtScale, length * 0.02),
+    new THREE.Vector3(1.4 * yachtScale, yachtScale, 0.42 * yachtScale)
+  ));
 
   batch.masts.push(composeSimpleYachtMatrix(
     basePosition,
     heading,
-    new THREE.Vector3(width * 0.12, hullHeight + cabinHeight + 0.66 * scale, -length * 0.12),
-    new THREE.Vector3(scale, 1.1 * scale, scale)
+    new THREE.Vector3(width * 0.13, hullHeight * 0.62 + cabinHeight + 0.8 * yachtScale, -length * 0.12),
+    new THREE.Vector3(yachtScale, 1.45 * yachtScale, yachtScale)
   ));
+}
+
+function addYachtBerth(
+  batch,
+  placedYachts,
+  sample,
+  section,
+  quayFar,
+  pierLength,
+  tangent,
+  outward,
+  side,
+  seed,
+  {
+    distanceRatio = 0.64,
+    sideOffset = 5.1,
+    scaleBase = 0.7,
+    scaleVariance = 0.12
+  } = {}
+) {
+  const berthDistance = quayFar + pierLength * distanceRatio;
+  const berthSideOffset = side * sideOffset;
+  const position = sample.center
+    .clone()
+    .addScaledVector(sample.right, section.side * berthDistance)
+    .addScaledVector(tangent, berthSideOffset);
+
+  position.y = MONACO_GROUND_Y + 0.02;
+  const scale = scaleBase + pseudoRandom(seed + 17) * scaleVariance;
+  const { length, width } = getSimpleYachtDimensions(seed, scale, false);
+  if (!canPlaceYacht(placedYachts, position, length, width)) {
+    return;
+  }
+
+  addSimpleYachtToBatch(
+    batch,
+    position,
+    Math.atan2(outward.x, outward.z),
+    scale,
+    seed
+  );
+  placedYachts.push({ position: position.clone(), length, width });
 }
 
 function flushSimpleYachtBatch(group, batch) {
@@ -232,6 +337,8 @@ function flushSimpleYachtBatch(group, batch) {
     addMonacoInstancedPart(group, simpleYachtGeometries.stripe, simpleYachtMaterials.stripes[index], matrices, `MonacoSimpleYachtStripes:${index}`);
   });
   addMonacoInstancedPart(group, simpleYachtGeometries.glass, simpleYachtMaterials.glass, batch.glass, "MonacoSimpleYachtGlass");
+  addMonacoInstancedPart(group, simpleYachtGeometries.rail, simpleYachtMaterials.steel, batch.rails, "MonacoSimpleYachtRails");
+  addMonacoInstancedPart(group, simpleYachtGeometries.radar, simpleYachtMaterials.steel, batch.radars, "MonacoSimpleYachtRadars");
   batch.canvases.forEach((matrices, index) => {
     addMonacoInstancedPart(group, simpleYachtGeometries.deck, simpleYachtMaterials.canvases[index], matrices, `MonacoSimpleYachtCanopies:${index}`);
   });
@@ -251,15 +358,6 @@ export function addMonacoOuterPort(group, curve, definition) {
     opacity: 0.94,
     side: THREE.DoubleSide
   });
-  const waterHighlightMat = createFlatStandardMaterial({
-    color: 0xa7ecff,
-    emissive: 0x6dd7ff,
-    emissiveIntensity: 0.28,
-    roughness: 0.12,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.46
-  });
   const quayMat = createFlatStandardMaterial({ color: 0xd7d0c4, roughness: 0.78, metalness: 0.04 });
   const quayEdgeMat = createFlatStandardMaterial({ color: 0x8c8378, roughness: 0.86 });
   const pierMat = createFlatStandardMaterial({ color: 0xc5b59a, roughness: 0.68, metalness: 0.03 });
@@ -270,15 +368,14 @@ export function addMonacoOuterPort(group, curve, definition) {
   const barrierClearance = (definition.barrierOffset ?? 0.5) + (definition.barrierThickness ?? 0.5);
   const quayNear = roadHalfWidth + barrierClearance + 1.8;
   const quayFar = quayNear + 4.6;
-  const waterFar = quayFar + 96;
+  const waterFar = quayFar + 360;
   const quaySections = [
     { start: 0, end: 1, side: -1 }
   ];
   const marinaSections = [
-    { start: 0.012, end: 0.238, side: -1 },
-    { start: 0.252, end: 0.502, side: -1 },
-    { start: 0.518, end: 0.744, side: -1 },
-    { start: 0.758, end: 0.988, side: -1 }
+    { start: 0.255, end: 0.475, side: -1 },
+    { start: 0.53, end: 0.755, side: -1 },
+    { start: 0.79, end: 0.975, side: -1 }
   ];
   const waterSections = [
     { start: 0, end: 1, side: -1 }
@@ -288,6 +385,7 @@ export function addMonacoOuterPort(group, curve, definition) {
   const bollardGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10);
   const bollardMatrices = [];
   const yachtBatch = createSimpleYachtBatch();
+  const placedYachts = [];
   const matrix = new THREE.Matrix4();
 
   portGroup.add(createMonacoContinuousWaterMesh(
@@ -299,22 +397,6 @@ export function addMonacoOuterPort(group, curve, definition) {
     MONACO_GROUND_Y + 0.018,
     waterMat
   ));
-
-  const waterHighlights = createMonacoWaterHighlightMesh(
-    curve,
-    definition,
-    waterSections,
-    quayFar + 5,
-    MONACO_GROUND_Y + 0.032,
-    waterHighlightMat
-  );
-  addMonacoInstancedPart(
-    portGroup,
-    waterHighlights.geometry,
-    waterHighlights.material,
-    waterHighlights.matrices,
-    "MonacoSeaReflectionStreaks"
-  );
 
   quaySections.forEach((section, sectionIndex) => {
     portGroup.add(createMonacoRibbonMesh(curve, definition, {
@@ -343,11 +425,11 @@ export function addMonacoOuterPort(group, curve, definition) {
   });
 
   marinaSections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 14.5);
+    const samples = collectMonacoSamples(curve, section.start, section.end, 12.5);
     samples.forEach((sample, sampleIndex) => {
       const tangent = sample.tangent.clone().setY(0).normalize();
       const outward = sample.right.clone().multiplyScalar(section.side).setY(0).normalize();
-      const pierLength = 16 + pseudoRandom(sectionIndex * 43 + sampleIndex) * 16;
+      const pierLength = 17.5 + (sampleIndex % 2) * 1.8;
       const pierDistance = quayFar + pierLength * 0.5;
       const basePosition = sample.center.clone().addScaledVector(sample.right, section.side * pierDistance);
       basePosition.y = MONACO_ROAD_Y - 0.07;
@@ -385,40 +467,30 @@ export function addMonacoOuterPort(group, curve, definition) {
         });
       });
 
-      if (sampleIndex % 2 === 0 || pseudoRandom(sectionIndex * 9000 + sampleIndex * 31) > 0.72) {
-        const side = sampleIndex % 4 === 0 ? -1 : 1;
-        const yachtSeed = sectionIndex * 10000 + sampleIndex * 137 + (side > 0 ? 19 : 7) + 5;
-        const rowDistance = quayFar + 12.8 + pseudoRandom(sampleIndex * 17) * 3.2;
-        const position = sample.center
-          .clone()
-          .addScaledVector(sample.right, section.side * rowDistance)
-          .addScaledVector(tangent, side * (5.3 + pseudoRandom(sampleIndex + 30) * 1.4));
-        position.y = MONACO_GROUND_Y + 0.02;
-        addSimpleYachtToBatch(
-          yachtBatch,
-          position,
-          Math.atan2(outward.x, outward.z) + (side > 0 ? 0.08 : -0.08) + (pseudoRandom(sampleIndex + 9) - 0.5) * 0.08,
-          0.78 + pseudoRandom(sampleIndex * 29 + sectionIndex) * 0.28,
-          yachtSeed
-        );
-      }
+      [-1, 1].forEach((berthSide) => {
+        if ((sampleIndex + sectionIndex + berthSide) % 6 === 0) {
+          return;
+        }
 
-      if (sampleIndex % 14 === 4) {
-        const largeYachtSeed = sectionIndex * 20000 + sampleIndex * 211 + 77;
-        const position = sample.center
-          .clone()
-          .addScaledVector(sample.right, section.side * (quayFar + pierLength + 18 + pseudoRandom(sampleIndex) * 11))
-          .addScaledVector(tangent, (pseudoRandom(sampleIndex + 13) - 0.5) * 8.2);
-        position.y = MONACO_GROUND_Y + 0.025;
-        addSimpleYachtToBatch(
+        addYachtBerth(
           yachtBatch,
-          position,
-          Math.atan2(outward.x, outward.z) + (pseudoRandom(sampleIndex + 22) - 0.5) * 0.18,
-          1.18 + pseudoRandom(sampleIndex + 31) * 0.32,
-          largeYachtSeed,
-          true
+          placedYachts,
+          sample,
+          section,
+          quayFar,
+          pierLength,
+          tangent,
+          outward,
+          berthSide,
+          sectionIndex * 1000 + sampleIndex * 59 + (berthSide > 0 ? 17 : 5),
+          {
+            distanceRatio: 0.68 + ((sampleIndex + sectionIndex) % 3) * 0.08,
+            sideOffset: 3.25,
+            scaleBase: 0.82 + ((sampleIndex + sectionIndex) % 3) * 0.04,
+            scaleVariance: 0.1
+          }
         );
-      }
+      });
     });
   });
 

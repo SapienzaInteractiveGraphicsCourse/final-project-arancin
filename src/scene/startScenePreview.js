@@ -16,7 +16,9 @@ import { createVehicleById } from "../vehicles/vehicleFactory.js";
 import { AiVehicleController } from "../systems/AiVehicleController.js";
 import { ArcadeVehicleController } from "../systems/ArcadeVehicleController.js";
 import { AudioManager } from "../systems/AudioManager.js";
+import { BarrierParticleSystem } from "../systems/BarrierParticleSystem.js";
 import { CameraController } from "../systems/CameraController.js";
+import { FreeCameraController } from "../systems/FreeCameraController.js";
 import { InputManager } from "../systems/InputManager.js";
 import { MinimapSystem } from "../systems/MinimapSystem.js";
 import { RaceManager, RACE_MODES, RACE_PHASES } from "../systems/RaceManager.js";
@@ -46,6 +48,7 @@ import {
   readBestLapTime,
   writeBestLapTime
 } from "../systems/raceRecords.js";
+import { updateBoostPadShaderTime } from "../materials/boostPadShader.js";
 
 const VEHICLE_LOADING_MIN_MS = {
   kart: 420,
@@ -58,6 +61,9 @@ export function startScenePreview(container, setup, options = {}) {
   const scene = createScene();
   const camera = createMainCamera();
   const cameraController = new CameraController(camera);
+  const freeCameraController = new FreeCameraController(camera, renderer.domElement, {
+    onExit: exitFreeCamera
+  });
   const lights = createSceneLights(scene);
   const track = createTrackById(setup.trackId);
   const vehicle = createVehicleById(setup.vehicleId);
@@ -78,6 +84,7 @@ export function startScenePreview(container, setup, options = {}) {
   const controller = new ArcadeVehicleController(vehicle.performance, track.spawn);
   const aiController = aiVehicle ? new AiVehicleController(aiVehicle.performance, track.trackInfo) : null;
   const trackInteraction = new TrackInteractionSystem();
+  const barrierParticles = new BarrierParticleSystem();
   const wrongWayDetector = new WrongWayDetector();
   const recordKey = getRaceRecordKey(setup);
   const lapRecordsKey = getRaceLapRecordsKey(recordKey);
@@ -127,12 +134,27 @@ export function startScenePreview(container, setup, options = {}) {
       audioManager.playUiSelect();
     },
     onConfirm: () => {
+      exitFreeCamera();
       raceArmed = true;
       colorPicker.hide();
       audioManager.playUiConfirm();
       void audioManager.enable();
       raceManager.startCountdown();
       resetAudioEventState();
+    },
+    onExplore: () => {
+      if (raceArmed) {
+        return;
+      }
+
+      freeCameraController.enter();
+      inputManager.clearHeldState();
+      colorPicker.setExploring(true);
+      audioManager.playUiSelect();
+    },
+    onExitExplore: () => {
+      exitFreeCamera();
+      audioManager.playUiSelect();
     }
   });
   colorPicker.element.hidden = true;
@@ -165,10 +187,11 @@ export function startScenePreview(container, setup, options = {}) {
   let lastAudioBoostActive = false;
   let lastAudioRacePosition = raceManager.getState().position;
   let lastAudioRacePhase = raceManager.getState().phase;
+  let shaderElapsedTime = 0;
 
   applyTrackSceneTheme(scene, track.trackInfo);
   applyTrackLightingTheme(lights, track.trackInfo);
-  scene.add(track.group, vehicle.group);
+  scene.add(track.group, vehicle.group, barrierParticles.group);
   if (ghostVehicle) {
     ghostVehicle.group.visible = false;
     scene.add(ghostVehicle.group);
@@ -187,6 +210,7 @@ export function startScenePreview(container, setup, options = {}) {
   window.gameTrack = track;
   window.gameVehicle = vehicle;
   window.gameController = controller;
+  window.gameCamera = camera;
 
   // Cache references to animating props and start lights to avoid costly traversals in the frame loop
   const animatingProps = [];
@@ -256,13 +280,21 @@ export function startScenePreview(container, setup, options = {}) {
     setPaused(false);
   }
 
+  function exitFreeCamera() {
+    freeCameraController.exit({ notify: false });
+    colorPicker.setExploring(false);
+    inputManager.clearHeldState();
+  }
+
   function resetRace() {
+    exitFreeCamera();
     controller.reset(track.spawn);
     aiController?.reset(track.trackInfo);
     trackInteraction.reset();
     raceManager.reset();
     wrongWayDetector.reset();
     ghostRecorder.reset();
+    barrierParticles.reset();
     raceManager.startCountdown();
     audioManager.setEngineAudible(true);
     resetAudioEventState();
@@ -290,10 +322,15 @@ export function startScenePreview(container, setup, options = {}) {
     const actions = inputManager.consumeActions();
 
     if (actions.pause) {
+      if (!raceArmed && freeCameraController.enabled) {
+        exitFreeCamera();
+        return;
+      }
+
       setPaused(!paused);
     }
 
-    if (actions.camera) {
+    if (actions.camera && !freeCameraController.enabled) {
       cameraController.nextMode();
     }
 
@@ -308,12 +345,19 @@ export function startScenePreview(container, setup, options = {}) {
       return;
     }
 
+    shaderElapsedTime += deltaTime;
+    updateBoostPadShaderTime(track.group, shaderElapsedTime);
+
     if (!raceArmed) {
       const state = controller.getState();
       vehicle.setTransform(state.position, state.heading);
       vehicle.update(deltaTime, state);
       ghostVehicleController.hide();
-      cameraController.update(deltaTime, state, track.trackInfo);
+      if (freeCameraController.enabled) {
+        freeCameraController.update(deltaTime);
+      } else {
+        cameraController.update(deltaTime, state, track.trackInfo);
+      }
       updateTrackSkyPosition();
       raceHud.update({
         raceState: raceManager.getState(),
@@ -329,6 +373,7 @@ export function startScenePreview(container, setup, options = {}) {
         rendererInfo: renderer.info
       });
       audioManager.update(deltaTime, state);
+      barrierParticles.update(deltaTime);
       return;
     }
 
@@ -360,6 +405,7 @@ export function startScenePreview(container, setup, options = {}) {
     const audioEvents = audioManager.update(deltaTime, state, heldInputState);
     if (audioEvents?.enginePop) {
       vehicle.triggerExhaustPop?.();
+      audioManager.playEnginePopCue(state.speedRatio);
     }
 
     // Auto-enable headlights for night circuits (Vegas)
@@ -438,14 +484,6 @@ export function startScenePreview(container, setup, options = {}) {
           child.userData.wings.leftWing.rotation.x = -0.12 + flap;
           child.userData.wings.rightWing.rotation.x = -0.12 - flap;
         }
-        if (child.userData.flockWings) {
-          const flap = Math.sin(totalElapsedTime * f.wingSpeed + f.phase) * f.wingAmplitude;
-          child.userData.flockWings.forEach((wings, wingIndex) => {
-            const offsetFlap = flap * (0.85 + (wingIndex % 3) * 0.08);
-            wings.leftWing.rotation.x = -0.12 + offsetFlap;
-            wings.rightWing.rotation.x = -0.12 - offsetFlap;
-          });
-        }
       }
     }
 
@@ -466,6 +504,10 @@ export function startScenePreview(container, setup, options = {}) {
     if (environmentState.impact) {
       cameraController.applyShake(environmentState.impact.type === "opponent" ? 0.45 : 1);
     }
+    if (environmentState.impact?.type === "barrier") {
+      barrierParticles.spawnBarrierImpact(state, environmentState.impact, track.trackInfo);
+    }
+    barrierParticles.update(deltaTime);
 
     cameraController.update(deltaTime, state, track.trackInfo);
     updateTrackSkyPosition();
@@ -599,6 +641,8 @@ export function startScenePreview(container, setup, options = {}) {
       inputManager.dispose();
       audioManager.dispose();
       controller.dispose();
+      barrierParticles.dispose();
+      freeCameraController.dispose();
       cameraController.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -616,7 +660,7 @@ export function startScenePreview(container, setup, options = {}) {
       vehicle.dispose();
       aiVehicle?.dispose();
       ghostVehicle?.dispose();
-      scene.remove(track.group, vehicle.group, lights.ambient, lights.sun);
+      scene.remove(track.group, vehicle.group, barrierParticles.group, lights.ambient, lights.sun);
 
       if (aiVehicle) {
         scene.remove(aiVehicle.group);

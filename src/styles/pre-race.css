@@ -90,18 +90,49 @@
   white-space: nowrap;
 }
 
-.pre-race-start-button {
+.pre-race-actions {
+  display: grid;
+  grid-template-columns: minmax(108px, auto);
+  gap: 8px;
+}
+
+.pre-race-start-button,
+.pre-race-free-camera-button {
   min-width: 112px;
   min-height: 44px;
   border: 0;
   border-radius: 7px;
-  color: #082f49;
-  background: #facc15;
   font-size: 14px;
   font-weight: 900;
   cursor: pointer;
 }
 
+.pre-race-start-button {
+  color: #082f49;
+  background: #facc15;
+}
+
 .pre-race-start-button:hover {
   background: #fde68a;
+}
+
+.pre-race-start-button:disabled {
+  color: #94a3b8;
+  background: rgba(51, 65, 85, 0.92);
+  cursor: not-allowed;
+}
+
+.pre-race-free-camera-button {
+  color: #dbeafe;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(147, 197, 253, 0.36);
+}
+
+.pre-race-free-camera-button:hover {
+  background: rgba(51, 65, 85, 0.96);
+}
+
+.pre-race-color-picker[data-exploring="true"] {
+  border-color: rgba(125, 211, 252, 0.42);
+  background: rgba(8, 13, 23, 0.76);
 }

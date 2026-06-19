@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { attachPropsDisposer, optimizeStaticDecorativeProps } from "./shared.js";
-import { addBeachSeagullFlock } from "./beach/birds.js";
+import { addBeachSeagulls } from "./beach/birds.js";
 import { addBeachClouds } from "./beach/clouds.js";
 import { addBeachGround, addBeachOceanPlane } from "./beach/ocean.js";
 import { addBeachPeople } from "./beach/people.js";
@@ -11,10 +11,10 @@ export function buildBeachProps(group, curve, trackDef) {
   const propsGroup = new THREE.Group();
   propsGroup.name = "TropicalBeachProps";
 
-  addBeachGround(propsGroup);
+  addBeachGround(propsGroup, trackDef);
   addBeachOceanPlane(propsGroup, curve, trackDef);
   addBeachClouds(propsGroup);
-  addBeachSeagullFlock(propsGroup);
+  addBeachSeagulls(propsGroup);
   addBeachTropicalPlants(propsGroup, curve, trackDef);
   addBeachHutsStrict(propsGroup, curve, trackDef);
   addBeachUmbrellasStrict(propsGroup, curve, trackDef);
@@ -22,7 +22,6 @@ export function buildBeachProps(group, curve, trackDef) {
 
   optimizeStaticDecorativeProps(propsGroup, [
     "TropicalBeachPropsGround",
-    "TropicalBeachOceanShore",
     "TropicalBeachOceanSurf"
   ]);
 

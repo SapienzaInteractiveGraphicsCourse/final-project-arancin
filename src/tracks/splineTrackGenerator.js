@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import {
+  createBoostPadShaderMaterial,
+  registerBoostPadShaderMaterial
+} from "../materials/boostPadShader.js";
+import {
   createSplineCenterline,
   createTrackCurve,
   getMinimapBounds,
@@ -368,8 +372,9 @@ function createBarrierRibbonGeometry(edgeSamples, side, offset, height, thicknes
   return geometry;
 }
 
-function createBeachShoulderGeometry(edgeSamples, side, width) {
+function createBeachShoulderGeometry(edgeSamples, side, width, groundSize) {
   const vertices = [];
+  const uvs = [];
   const indices = [];
 
   edgeSamples.forEach((sample) => {
@@ -382,6 +387,10 @@ function createBeachShoulderGeometry(edgeSamples, side, width) {
       roadEdge.x, roadEdge.y, roadEdge.z,
       shoulderEdge.x, shoulderEdge.y, shoulderEdge.z
     );
+    uvs.push(
+      roadEdge.x / groundSize + 0.5, -roadEdge.z / groundSize + 0.5,
+      shoulderEdge.x / groundSize + 0.5, -shoulderEdge.z / groundSize + 0.5
+    );
   });
 
   for (let index = 0; index < edgeSamples.length - 1; index += 1) {
@@ -392,12 +401,13 @@ function createBeachShoulderGeometry(edgeSamples, side, width) {
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function addBarriers(group, edgeSamples, definition, material) {
+function addBarriers(group, edgeSamples, definition, material, groundMaterial) {
   const colliders = [];
   const matrices = [];
   const offset = definition.barrierOffset ?? 0.85;
@@ -428,8 +438,8 @@ function addBarriers(group, edgeSamples, definition, material) {
   }
 
   if (definition.id === "beach") {
-    const shoulderMaterial = material.clone();
-    shoulderMaterial.color.setHex(0xe0c66f);
+    const shoulderMaterial = groundMaterial.clone();
+    shoulderMaterial.color.setHex(definition.palette.sand ?? definition.palette.ground);
     shoulderMaterial.side = THREE.DoubleSide;
     const barrierMaterial = material.clone();
     barrierMaterial.side = THREE.DoubleSide;
@@ -438,7 +448,7 @@ function addBarriers(group, edgeSamples, definition, material) {
     [-1, 1].forEach((side) => {
       if (shoulderWidth > 0) {
         const shoulder = new THREE.Mesh(
-          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth),
+          createBeachShoulderGeometry(edgeSamples, side, shoulderWidth, definition.groundSize),
           shoulderMaterial
         );
         shoulder.name = `${definition.name}:BarrierShoulder:${side}`;
@@ -487,7 +497,7 @@ function createCheckpoints(curve, definition) {
   });
 }
 
-function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
+function addStartLine(group, checkpoint, materials) {
   const startLine = new THREE.Group();
   startLine.name = "StartFinishLine";
   startLine.position.copy(checkpoint.position);
@@ -527,46 +537,6 @@ function addStartLine(group, checkpoint, materials, curve, roadHalfWidth) {
   });
 
   group.add(startLine);
-
-  // Add starting grid slots/boxes behind the finish line.
-  // Sample the curve at each slot distance so slots follow the track curvature.
-  const startT = checkpoint.progress ?? 0;
-  const totalLength = curve.getLength();
-  const gridDistances = [4.8, 8.8, 12.8, 16.8];
-  const gridSides = [1, -1, 1, -1];
-
-  gridDistances.forEach((dist, idx) => {
-    // Walk backwards along the curve by 'dist' meters
-    const backT = ((startT - dist / totalLength) + 1) % 1;
-    const slotPoint = curve.getPointAt(backT);
-    const slotTangent = curve.getTangentAt(backT).setY(0).normalize();
-    const slotNormal = new THREE.Vector3(-slotTangent.z, 0, slotTangent.x);
-    const side = gridSides[idx];
-    const sideOffset = side * roadHalfWidth * 0.44;
-
-    const slotPos = slotPoint.clone().addScaledVector(slotNormal, sideOffset);
-    slotPos.y = ROAD_Y + 0.051;
-
-    const slotGroup = new THREE.Group();
-    slotGroup.name = `StartGridSlot:${idx}`;
-    slotGroup.position.copy(slotPos);
-    slotGroup.rotation.y = getHeading(slotTangent);
-
-    const bracketMaterial = materials.startWhite;
-    const line = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.08), bracketMaterial);
-    line.receiveShadow = true;
-    slotGroup.add(line);
-
-    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
-    sideLeft.position.set(-0.8, 0, 0.2);
-    sideLeft.receiveShadow = true;
-    const sideRight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.4), bracketMaterial);
-    sideRight.position.set(0.8, 0, 0.2);
-    sideRight.receiveShadow = true;
-
-    slotGroup.add(sideLeft, sideRight);
-    group.add(slotGroup);
-  });
 
   const checkpointMarker = new THREE.Group();
   checkpointMarker.name = "StartFinishCheckpointGate";
@@ -687,7 +657,7 @@ function addBoostPads(group, curve, definition, material) {
     padGroup.position.set(point.x, ROAD_Y + 0.045, point.z);
     padGroup.rotation.y = heading;
 
-    createBoostPadVisual(padGroup, material, definition);
+    createBoostPadVisual(group, padGroup, material, definition, index);
     group.add(padGroup);
 
     return {
@@ -698,7 +668,7 @@ function addBoostPads(group, curve, definition, material) {
   });
 }
 
-function createBoostPadVisual(padGroup, material, definition) {
+function createBoostPadVisual(trackGroup, padGroup, material, definition, padIndex) {
   const boostColor = definition.palette.boost ?? 0xffd23a;
   const accentColor = definition.id === "beach" ? 0x7dd3fc : (definition.id === "monaco" ? 0xffffff : 0xfff7ad);
   const glowMaterial = material.clone();
@@ -716,6 +686,13 @@ function createBoostPadVisual(padGroup, material, definition) {
     depthWrite: false,
     side: THREE.DoubleSide
   });
+  const pulseMaterial = createBoostPadShaderMaterial({
+    baseColor: boostColor,
+    accentColor,
+    opacity: definition.id === "vegas" ? 0.9 : 0.74,
+    phase: padIndex * 0.85
+  });
+  registerBoostPadShaderMaterial(trackGroup, pulseMaterial);
   const accentMaterial = new THREE.MeshStandardMaterial({
     color: accentColor,
     emissive: accentColor,
@@ -729,7 +706,7 @@ function createBoostPadVisual(padGroup, material, definition) {
   base.receiveShadow = true;
   padGroup.add(base);
 
-  const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 56), glassMaterial);
+  const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 56), pulseMaterial);
   glowDisc.name = "BoostPadGlow";
   glowDisc.rotation.x = -Math.PI / 2;
   glowDisc.position.y = 0.035;
@@ -842,9 +819,9 @@ export function createSplineTrack(definition, propsBuilder = noopTrackProps) {
   group.add(leftEdge, rightEdge);
   addCenterLineDashes(group, roadData.edgeSamples, definition, materials.centerLine);
   addApexCurbs(group, roadData.edgeSamples, definition, materials);
-  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier);
+  const barrierColliders = addBarriers(group, roadData.edgeSamples, definition, materials.barrier, materials.ground);
   const checkpoints = createCheckpoints(curve, definition);
-  addStartLine(group, checkpoints[0], materials, curve, roadHalfWidth);
+  addStartLine(group, checkpoints[0], materials);
   addStartGantry(group, checkpoints[0], materials);
   addCheckpointGates(group, checkpoints, materials.checkpoint);
   const boostPads = addBoostPads(group, curve, definition, materials.boost);

@@ -1,3 +1,5 @@
+import { clearRuntimeTweens, updateRuntimeTweens } from "../../systems/tweenRuntime.js";
+
 const TARGET_FRAME_RATE = 60;
 const TARGET_FRAME_INTERVAL_MS = 1000 / TARGET_FRAME_RATE;
 const FIXED_DELTA_TIME = 1 / TARGET_FRAME_RATE;
@@ -36,6 +38,7 @@ export function createPreviewFrameLoop({ update, render, frameRateMonitor }) {
       ? FIXED_DELTA_TIME
       : Math.min(renderedIntervalMs / 1000, MAX_DELTA_TIME);
 
+    updateRuntimeTweens();
     update(deltaTime);
     render();
   }
@@ -46,6 +49,7 @@ export function createPreviewFrameLoop({ update, render, frameRateMonitor }) {
     },
     dispose() {
       cancelAnimationFrame(animationFrameId);
+      clearRuntimeTweens();
     }
   };
 }

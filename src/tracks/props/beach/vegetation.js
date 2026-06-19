@@ -26,7 +26,7 @@ palmMaterials.leafLight.side = THREE.DoubleSide;
 const palmGeometries = {
   trunk: new THREE.CylinderGeometry(1, 1, 1, 10),
   band: new THREE.CylinderGeometry(1, 1, 1, 10),
-  rib: new THREE.BoxGeometry(0.08, 0.05, 1),
+  rib: new THREE.BoxGeometry(0.045, 0.035, 1),
   leaf: createPalmFrondGeometry(),
   coconut: new THREE.SphereGeometry(0.18, 6, 6),
   bush: new THREE.DodecahedronGeometry(0.8, 0)
@@ -34,24 +34,33 @@ const palmGeometries = {
 
 function createPalmFrondGeometry() {
   const geometry = new THREE.BufferGeometry();
+  const centerline = [
+    { z: 0.0, y: 0.0, width: 0.10 },
+    { z: 0.95, y: -0.06, width: 0.42 },
+    { z: 2.15, y: -0.26, width: 0.58 },
+    { z: 3.35, y: -0.64, width: 0.42 },
+    { z: 4.35, y: -1.02, width: 0.20 },
+    { z: 4.95, y: -1.28, width: 0.02 }
+  ];
+  const positions = [];
+
+  centerline.forEach(({ z, y, width }) => {
+    positions.push(-width, y, z, width, y, z);
+  });
+
+  const indices = [];
+  for (let index = 0; index < centerline.length - 1; index += 1) {
+    const left = index * 2;
+    const right = left + 1;
+    const nextLeft = left + 2;
+    const nextRight = left + 3;
+    indices.push(left, nextLeft, right, right, nextLeft, nextRight);
+  }
+
   geometry.setAttribute("position", new THREE.Float32BufferAttribute([
-    0, 0.0, 0.0,
-    -0.075, -0.65, -0.03,
-    0.075, -0.65, -0.03,
-    -0.095, -1.6, -0.12,
-    0.095, -1.6, -0.12,
-    -0.055, -2.75, -0.26,
-    0.055, -2.75, -0.26,
-    0, -3.65, -0.4
+    ...positions
   ], 3));
-  geometry.setIndex([
-    0, 1, 2,
-    1, 3, 2,
-    2, 3, 4,
-    3, 5, 4,
-    4, 5, 6,
-    5, 7, 6
-  ]);
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -94,37 +103,38 @@ function addInstancedPalm(batch, position, rotationY, scale, seed) {
   const crownCenter = new THREE.Vector3(lean * trunkHeight * 0.5, trunkHeight + 0.25, 0);
   const leafMaterials = [batch.leavesMid, batch.leavesLight, batch.leavesDark];
 
-  for (let index = 0; index < 28; index += 1) {
+  for (let index = 0; index < 16; index += 1) {
     const innerLayer = index % 2 === 1;
     const layerIndex = Math.floor(index / 2);
-    const layerCount = 14;
+    const layerCount = 8;
     const angle = (layerIndex / layerCount) * Math.PI * 2 + (innerLayer ? Math.PI / layerCount : 0);
-    const length = innerLayer ? 4.4 : 5.65;
-    const droop = innerLayer ? 0.5 : 0.82;
+    const length = innerLayer ? 3.85 : 4.95;
+    const droop = innerLayer ? 0.18 : 0.34;
+    const roll = (pseudoRandom(seed * 19 + index) - 0.5) * 0.18;
     const localPosition = crownCenter.clone().add(new THREE.Vector3(
-      Math.sin(angle) * length * 0.1,
-      innerLayer ? 0.14 : -0.08,
-      Math.cos(angle) * length * 0.1
+      Math.sin(angle) * 0.28,
+      innerLayer ? 0.16 : 0.02,
+      Math.cos(angle) * 0.28
     ));
     const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-      Math.PI / 2.62 + droop,
+      droop,
       angle,
-      0
+      roll
     ));
-    const localScale = new THREE.Vector3(innerLayer ? 0.74 : 0.86, length / 3.65, 1);
+    const localScale = new THREE.Vector3(innerLayer ? 0.82 : 1, 1, length / 4.95);
     leafMaterials[index % leafMaterials.length].push(
       multiplyMatrices(baseMatrix, composeMatrix(localPosition, localRotation, localScale))
     );
 
     const ribPosition = crownCenter.clone().add(new THREE.Vector3(
-      Math.sin(angle) * length * 0.44,
-      -0.04 - droop * 0.32,
-      Math.cos(angle) * length * 0.44
+      Math.sin(angle) * length * 0.46,
+      -0.05 - droop * length * 0.32,
+      Math.cos(angle) * length * 0.46
     ));
-    const ribRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2.05 + droop * 0.24, angle, 0));
+    const ribRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(droop * 0.92, angle, roll * 0.3));
     batch.ribs.push(multiplyMatrices(
       baseMatrix,
-      composeMatrix(ribPosition, ribRotation, new THREE.Vector3(0.62, 0.62, length * 0.92))
+      composeMatrix(ribPosition, ribRotation, new THREE.Vector3(1, 1, length * 0.78))
     ));
   }
 

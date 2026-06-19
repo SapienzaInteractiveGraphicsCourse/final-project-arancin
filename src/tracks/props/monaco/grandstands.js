@@ -73,7 +73,9 @@ function addMonacoSeatedCrowd(group, curve, definition, sections, baseOffset) {
   const flagScale = new THREE.Vector3(1, 1, 1);
 
   sections.forEach((section, sectionIndex) => {
-    const samples = collectMonacoSamples(curve, section.start, section.end, 0.58);
+    const crowdStart = section.crowdStart ?? section.start;
+    const crowdEnd = section.crowdEnd ?? section.end;
+    const samples = collectMonacoSamples(curve, crowdStart, crowdEnd, 0.58);
 
     samples.forEach((sample, sampleIndex) => {
       const toTrack = sample.center.clone().sub(
@@ -236,8 +238,8 @@ export function addMonacoContinuousInnerGrandstands(group, curve, definition) {
   const baseOffset = roadHalfWidth + barrierClearance + 2.4;
   const sections = [
     { start: 0.02, end: 0.24, side: 1 },
-    { start: 0.27, end: 0.48, side: 1 },
-    { start: 0.50, end: 0.72, side: 1 },
+    { start: 0.27, end: 0.425, side: 1, crowdEnd: 0.425 },
+    { start: 0.455, end: 0.72, side: 1, crowdStart: 0.455 },
     { start: 0.74, end: 0.96, side: 1 }
   ];
 
