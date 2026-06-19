@@ -1,0 +1,5 @@
+const AI_SPEED_PERCENTAGE = 67;
+
+export const AI_CONTROLLER_TUNING = {
+  speedFactor: AI_SPEED_PERCENTAGE / 100
+};
