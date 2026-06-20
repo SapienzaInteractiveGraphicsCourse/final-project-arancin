@@ -122,8 +122,7 @@ docs/
 
 The current project documentation is concentrated in:
 
-- [Technical documentation and user manual](docs/project-documentation.html)
-- [Printable project documentation](docs/project-documentation.pdf)
+- [Technical project documentation and user manual](docs/project-documentation.pdf)
 
 The documentation covers the implementation choices required for the Interactive Graphics presentation: environment and libraries, external assets, hierarchical modeling, lights, materials, texture types, JavaScript animations, gameplay interactions, verification and known limitations.
 
